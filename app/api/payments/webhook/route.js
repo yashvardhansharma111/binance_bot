@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import dbConnect from '@/lib/db';
+import { connectDB } from '@/lib/db';
 import Payment from '@/lib/models/Payment';
 import Subscription from '@/lib/models/Subscription';
 import User from '@/lib/models/User';
@@ -28,7 +28,7 @@ export async function POST(req) {
   const { payment_id, payment_status, order_id, actually_paid } = body;
   if (!payment_id) return NextResponse.json({ ok: true });
 
-  await dbConnect();
+  await connectDB();
 
   // Route by order_id prefix
   if (order_id?.startsWith('sub_')) {
