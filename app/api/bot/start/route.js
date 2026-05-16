@@ -10,6 +10,7 @@ export async function POST() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await connectDB();
   const user = await User.findOne({ email: session.user.email });
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   const key  = await ApiKey.findOne({ userId: user._id, isActive: true });
   if (!key) return NextResponse.json({ error: 'Connect your Binance API key first' }, { status: 400 });
   await User.findByIdAndUpdate(user._id, { botActive: true });

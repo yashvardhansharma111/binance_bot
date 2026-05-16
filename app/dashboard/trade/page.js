@@ -46,23 +46,45 @@ export default function ManualTradePage() {
       setError('Enter USDT amount (min $1)'); return;
     }
     setLoading(true);
-    const res  = await fetch('/api/trade/manual', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        symbol, side,
-        usdtAmount:       side === 'BUY' ? parseFloat(amount) : undefined,
-        qty:              side === 'SELL' && qty ? parseFloat(qty) : undefined,
-        stopLossPercent:  sl ? parseFloat(sl) : undefined,
-        takeProfitPercent: tp ? parseFloat(tp) : undefined,
-      }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) { setError(data.error); return; }
-    setResult(data);
-    setAmount(''); setQty('');
-    fetchBalance(); fetchOpen();
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+
+      const res = await fetch('/api/trade/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          symbol, side,
+          usdtAmount:        side === 'BUY' ? parseFloat(amount) : undefined,
+          qty:               side === 'SELL' && qty ? parseFloat(qty) : undefined,
+          stopLossPercent:   sl ? parseFloat(sl) : undefined,
+          takeProfitPercent: tp ? parseFloat(tp) : undefined,
+        }),
+      });
+      clearTimeout(timer);
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        setError(`Server error (HTTP ${res.status}) — order may or may not have been placed. Check History.`);
+        return;
+      }
+
+      if (!res.ok) { setError(data.error || 'Order failed'); return; }
+      setResult(data);
+      setAmount(''); setQty('');
+      fetchBalance(); fetchOpen();
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setError('Request timed out (20s) — check History to see if the order was placed.');
+      } else {
+        setError(`Network error: ${err.message}`);
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   const usdtBal = balance?.balances?.find(b => b.asset === 'USDT')?.free || 0;

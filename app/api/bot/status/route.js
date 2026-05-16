@@ -33,14 +33,20 @@ export async function GET() {
   const losses      = allTrades.filter(t => t.profit < 0).length;
   const todayProfit = todayTrades.reduce((s, t) => s + (t.profit || 0), 0);
 
+  // Consider bot process "alive" if it ticked within the last 10 minutes
+  const lastTickAt    = settings?.lastTickAt || null;
+  const processAlive  = lastTickAt && (Date.now() - new Date(lastTickAt).getTime()) < 10 * 60 * 1000;
+
   return NextResponse.json({
-    botActive:   user.botActive,
-    hasApiKey:   !!apiKey,
-    testnet:     process.env.BINANCE_TESTNET === 'true',
-    dryRun:      process.env.DRY_RUN === 'true',
-    settings:    settings || {},
-    openTrade:   openTrade || null,
-    logs:        recentLogs,
+    botActive:    user.botActive,
+    hasApiKey:    !!apiKey,
+    testnet:      process.env.BINANCE_TESTNET === 'true',
+    dryRun:       process.env.DRY_RUN === 'true',
+    settings:     settings || {},
+    openTrade:    openTrade || null,
+    logs:         recentLogs,
+    lastTickAt,
+    processAlive: !!processAlive,
     stats: {
       totalTrades:  allTrades.length,
       todayTrades:  todayTrades.length,

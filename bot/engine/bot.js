@@ -49,6 +49,7 @@ export async function runBotForUser(user) {
     // 2. Settings (auto-create defaults)
     let settings = await BotSettings.findOne({ userId });
     if (!settings) settings = await BotSettings.create({ userId });
+    await BotSettings.findOneAndUpdate({ userId }, { lastTickAt: new Date() });
 
     const { symbol, timeframe } = settings;
 

@@ -19,6 +19,7 @@ export async function POST(req) {
 
   await connectDB();
   const user = await User.findOne({ email: session.user.email });
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
   if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
 
