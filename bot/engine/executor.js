@@ -1,11 +1,68 @@
 import { placeMarketBuy, placeMarketSell } from '../services/binance.js';
 import { calcRiskLevels, recordTrade } from './risk.js';
 import Trade from '../../lib/models/Trade.js';
+import User from '../../lib/models/User.js';
+import Commission from '../../lib/models/Commission.js';
 import BotLog from '../../lib/models/BotLog.js';
+
+const TOTAL_COMMISSION_RATE = 15;  // 15% of profit
+const REFERRER_RATE         = 10;  // referrer gets 10%
+const PLATFORM_RATE_WITH    = 5;   // platform gets 5% when referrer exists
+const PLATFORM_RATE_WITHOUT = 15;  // platform gets 15% when no referrer
 
 async function log(userId, level, message, data = null) {
   console.log(`[Bot:${String(userId).slice(-4)}] [${level.toUpperCase()}] ${message}`);
   await BotLog.create({ userId, level, message, data }).catch(() => {});
+}
+
+async function applyCommission(userId, tradeId, profit) {
+  if (profit <= 0) return; // only on profitable trades
+
+  const user = await User.findById(userId);
+  if (!user) return;
+
+  const totalCut = parseFloat((profit * TOTAL_COMMISSION_RATE / 100).toFixed(8));
+
+  let referrerId     = null;
+  let referrerAmount = 0;
+  let platformAmount = totalCut;
+  let platformRate   = PLATFORM_RATE_WITHOUT;
+  let referrerRate   = 0;
+
+  if (user.referredBy) {
+    const referrer = await User.findOne({ referralCode: user.referredBy });
+    if (referrer) {
+      referrerId     = referrer._id;
+      referrerAmount = parseFloat((profit * REFERRER_RATE / 100).toFixed(8));
+      platformAmount = parseFloat((profit * PLATFORM_RATE_WITH / 100).toFixed(8));
+      platformRate   = PLATFORM_RATE_WITH;
+      referrerRate   = REFERRER_RATE;
+
+      // Credit referrer's fund balance
+      await User.findByIdAndUpdate(referrer._id, {
+        $inc: { fundBalance: referrerAmount },
+      });
+    }
+  }
+
+  // Deduct total commission from user's asset balance
+  await User.findByIdAndUpdate(userId, {
+    $inc: { assetBalance: -totalCut },
+  });
+
+  await Commission.create({
+    tradeId,
+    userId,
+    referrerId,
+    profit,
+    platformRate,
+    referrerRate,
+    platformAmount,
+    referrerAmount,
+    totalAmount: totalCut,
+  });
+
+  console.log(`[Commission] ${TOTAL_COMMISSION_RATE}% of $${profit.toFixed(4)} = $${totalCut.toFixed(4)} | platform:$${platformAmount.toFixed(4)} referrer:$${referrerAmount.toFixed(4)}`);
 }
 
 export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmount, indicators, sentiment) {
@@ -21,7 +78,7 @@ export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmou
     price: order.price, qty: order.qty, total: order.total,
     stopLoss, takeProfit, orderId: order.orderId,
     status: 'open', source: 'bot',
-    reason: `RSI:${indicators.rsi} MACD:crossover↑ EMA:uptrend Vol:↑ Sentiment:${sentiment?.sentiment}`,
+    reason: `RSI:${indicators.rsi} sentiment:${sentiment?.sentiment}`,
   });
 
   await recordTrade(userId);
@@ -36,10 +93,10 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   const order  = await placeMarketSell(apiKey, apiSecret, symbol, qty);
   const profit = parseFloat(((order.price - entry) * qty).toFixed(6));
 
-  await Trade.findByIdAndUpdate(openTrade._id, {
+  const closedTrade = await Trade.findByIdAndUpdate(openTrade._id, {
     status: 'closed', closedAt: new Date(), profit,
-    reason: `${openTrade.reason} | EXIT:${reason}`,
-  });
+    reason: `${openTrade.reason || ''} | EXIT:${reason}`,
+  }, { new: true });
 
   await Trade.create({
     userId, symbol, side: 'SELL',
@@ -49,7 +106,17 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   });
 
   await recordTrade(userId);
+
+  // Apply 15% commission on profit
+  if (profit > 0) {
+    await applyCommission(userId, closedTrade._id, profit);
+  }
+
+  const commissionNote = profit > 0
+    ? ` | Commission: ${TOTAL_COMMISSION_RATE}% = $${(profit * TOTAL_COMMISSION_RATE / 100).toFixed(4)}`
+    : '';
+
   await log(userId, profit >= 0 ? 'info' : 'warn',
-    `${profit >= 0 ? '✅' : '❌'} SELL @ $${order.price} | P&L: ${profit >= 0 ? '+' : ''}$${profit}`
+    `${profit >= 0 ? '✅' : '❌'} SELL @ $${order.price} | P&L: ${profit >= 0 ? '+' : ''}$${profit}${commissionNote}`
   );
 }

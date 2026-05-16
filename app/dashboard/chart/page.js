@@ -15,6 +15,7 @@ const BASE_OPTS = {
     textColor: '#64748b',
     fontFamily: "'Open Sans', sans-serif",
     fontSize: 11,
+    attributionLogo: false,
   },
   grid: {
     vertLines: { color: '#f1f5f9' },
@@ -34,6 +35,8 @@ export default function ChartPage() {
   const volumeSerRef   = useRef(null);
   const rsiSerRef      = useRef(null);
   const wsRef          = useRef(null);
+  const wsRetryRef     = useRef(null);
+  const wsActiveRef    = useRef(true);
 
   const [symbol,    setSymbol]    = useState('BTCUSDT');
   const [timeframe, setTimeframe] = useState('5m');
@@ -135,9 +138,14 @@ export default function ChartPage() {
 
   // ── Reload history + reconnect WS when symbol / timeframe changes ────────────
   useEffect(() => {
+    wsActiveRef.current = true;
     loadHistory();
     connectWS();
-    return () => { wsRef.current?.close(); };
+    return () => {
+      wsActiveRef.current = false;
+      clearTimeout(wsRetryRef.current);
+      wsRef.current?.close();
+    };
   }, [symbol, timeframe]); // eslint-disable-line
 
   async function loadHistory() {
@@ -178,12 +186,18 @@ export default function ChartPage() {
 
   function connectWS() {
     wsRef.current?.close();
+    clearTimeout(wsRetryRef.current);
     const ws = new WebSocket(
       `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${timeframe}`
     );
     ws.onopen  = () => setWsOk(true);
-    ws.onclose = () => setWsOk(false);
-    ws.onerror = () => setWsOk(false);
+    ws.onclose = () => {
+      setWsOk(false);
+      if (wsActiveRef.current) {
+        wsRetryRef.current = setTimeout(connectWS, 5000);
+      }
+    };
+    ws.onerror = () => { ws.close(); };
     ws.onmessage = (e) => {
       const { k } = JSON.parse(e.data);
       const t = Math.floor(k.t / 1000);

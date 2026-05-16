@@ -15,8 +15,18 @@ async function adminGuard() {
 export async function GET() {
   const admin = await adminGuard();
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const users = await User.find({}).select('-password').sort({ createdAt: -1 });
-  return NextResponse.json(users);
+  const users = await User.find({})
+    .select('-password')
+    .sort({ createdAt: -1 });
+  const now = new Date();
+  const result = users.map(u => ({
+    ...u.toObject(),
+    subscriptionActive: u.subscriptionExpiry && new Date(u.subscriptionExpiry) > now,
+    subscriptionDaysLeft: u.subscriptionExpiry
+      ? Math.max(0, Math.ceil((new Date(u.subscriptionExpiry) - now) / 86400000))
+      : 0,
+  }));
+  return NextResponse.json(result);
 }
 
 export async function PATCH(req) {

@@ -76,7 +76,8 @@ export default function LoginPage() {
                 <div className="relative">
                   <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    className="input pl-10"
+                    className="input"
+                    style={{ paddingLeft: '2.5rem' }}
                     type="email"
                     placeholder="you@example.com"
                     value={form.email}
@@ -91,7 +92,8 @@ export default function LoginPage() {
                 <div className="relative">
                   <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    className="input pl-10 pr-12"
+                    className="input"
+                    style={{ paddingLeft: '2.5rem', paddingRight: '3rem' }}
                     type={showPass ? 'text' : 'password'}
                     placeholder="Enter your password"
                     value={form.password}
@@ -103,6 +105,12 @@ export default function LoginPage() {
                     {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
+              </div>
+
+              <div className="flex justify-end -mt-2">
+                <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                  Forgot password?
+                </Link>
               </div>
 
               <button type="submit" disabled={loading}

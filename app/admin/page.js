@@ -1,6 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Users, Bot, ShieldCheck, TrendingUp, RefreshCw, UserX, UserCheck, Settings } from 'lucide-react';
+import {
+  Users, Bot, ShieldCheck, TrendingUp, RefreshCw, UserX, UserCheck,
+  Settings, DollarSign, Percent, Star, CreditCard, Activity,
+} from 'lucide-react';
 
 const DEFAULT_CONFIGS = [
   { key: 'referral_commission_pct', label: 'Referral Commission %', value: 5 },
@@ -8,6 +11,20 @@ const DEFAULT_CONFIGS = [
   { key: 'min_asset_balance', label: 'Min Asset Balance ($)', value: 100 },
   { key: 'trading_symbol', label: 'Default Trading Symbol', value: 'BTCUSDT' },
 ];
+
+function StatCard({ label, value, icon: Icon, iconBg, iconColor, prefix = '', suffix = '' }) {
+  return (
+    <div className="card p-5 glow-border">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-slate-500 text-sm">{label}</span>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: iconBg }}>
+          <Icon size={16} style={{ color: iconColor }} />
+        </div>
+      </div>
+      <div className="text-2xl font-bold text-slate-900">{prefix}{value ?? '—'}{suffix}</div>
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const [stats, setStats] = useState(null);
@@ -28,7 +45,7 @@ export default function AdminPage() {
     const u = await uRes.json();
     const c = await cRes.json();
     setStats(s);
-    setUsers(u);
+    setUsers(Array.isArray(u) ? u : []);
     const cfgMap = {};
     (c || []).forEach(x => { cfgMap[x.key] = x.value; });
     DEFAULT_CONFIGS.forEach(d => { if (cfgMap[d.key] === undefined) cfgMap[d.key] = d.value; });
@@ -67,6 +84,7 @@ export default function AdminPage() {
   const TABS = [
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: 'Users' },
+    { id: 'commissions', label: 'Commissions' },
     { id: 'config', label: 'Config' },
   ];
 
@@ -85,7 +103,7 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-lg w-fit">
+      <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-lg w-fit flex-wrap">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className="px-5 py-2 rounded-md text-sm font-medium transition-all"
@@ -102,35 +120,41 @@ export default function AdminPage() {
       {/* Overview */}
       {tab === 'overview' && (
         <div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-            {[
-              { label: 'Total Users', value: stats?.totalUsers, icon: Users, iconBg: '#eff6ff', iconColor: '#2563eb' },
-              { label: 'Active Users', value: stats?.activeUsers, icon: UserCheck, iconBg: '#f0fdf4', iconColor: '#16a34a' },
-              { label: 'Bots Running', value: stats?.activeBots, icon: Bot, iconBg: '#ecfeff', iconColor: '#0891b2' },
-              { label: 'Total Trades', value: stats?.totalTrades, icon: TrendingUp, iconBg: '#fefce8', iconColor: '#b45309' },
-            ].map(s => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label} className="card p-5 glow-border">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-slate-500 text-sm">{s.label}</span>
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: s.iconBg }}>
-                      <Icon size={16} style={{ color: s.iconColor }} />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900">{s.value ?? '—'}</div>
-                </div>
-              );
-            })}
+          {/* User stats */}
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Users & Bots</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <StatCard label="Total Users"    value={stats?.totalUsers}  icon={Users}     iconBg="#eff6ff" iconColor="#2563eb" />
+            <StatCard label="Active Users"   value={stats?.activeUsers} icon={UserCheck} iconBg="#f0fdf4" iconColor="#16a34a" />
+            <StatCard label="Bots Running"   value={stats?.activeBots}  icon={Bot}       iconBg="#ecfeff" iconColor="#0891b2" />
+            <StatCard label="Blocked Users"  value={stats?.blockedUsers} icon={UserX}    iconBg="#fef2f2" iconColor="#dc2626" />
           </div>
 
+          {/* Trade stats */}
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Trading</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <StatCard label="Total Trades"  value={stats?.totalTrades}  icon={TrendingUp} iconBg="#fefce8" iconColor="#b45309" />
+            <StatCard label="Closed Trades" value={stats?.closedTrades} icon={Activity}   iconBg="#f0fdf4" iconColor="#16a34a" />
+            <StatCard label="Total Profit"  value={stats?.totalProfit?.toFixed(2)}  icon={DollarSign} iconBg="#f0fdf4" iconColor="#16a34a" prefix="$" />
+            <StatCard label="Commissions"   value={stats?.commissionCount} icon={Percent} iconBg="#faf5ff" iconColor="#7c3aed" />
+          </div>
+
+          {/* Revenue stats */}
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Revenue</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <StatCard label="Platform Revenue"  value={stats?.totalPlatformRevenue?.toFixed(4)} icon={DollarSign}  iconBg="#ecfdf5" iconColor="#059669" prefix="$" />
+            <StatCard label="Referrer Paid Out" value={stats?.totalReferrerPaid?.toFixed(4)}    icon={Star}        iconBg="#fffbeb" iconColor="#d97706" prefix="$" />
+            <StatCard label="Total Commission"  value={stats?.totalCommission?.toFixed(4)}      icon={Percent}     iconBg="#faf5ff" iconColor="#7c3aed" prefix="$" />
+            <StatCard label="Active Subs"       value={stats?.activeSubs}                       icon={CreditCard}  iconBg="#eff6ff" iconColor="#2563eb" />
+          </div>
+
+          {/* Recent trades */}
           <div className="card p-6 glow-border">
             <h2 className="text-base font-bold text-slate-900 mb-4">Recent Trades — All Users</h2>
-            {stats?.recentTrades?.length === 0 ? (
+            {!stats?.recentTrades?.length ? (
               <p className="text-slate-400 text-sm text-center py-8">No trades yet</p>
             ) : (
               <div className="space-y-2">
-                {stats?.recentTrades?.map(t => (
+                {stats.recentTrades.map(t => (
                   <div key={t._id} className="flex items-center justify-between py-2.5 px-4 rounded-lg bg-slate-50">
                     <div className="flex items-center gap-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-bold ${
@@ -139,7 +163,14 @@ export default function AdminPage() {
                       <span className="text-sm font-mono font-semibold text-slate-800">{t.symbol}</span>
                       <span className="text-xs text-slate-400">{t.userId?.name || 'Unknown'}</span>
                     </div>
-                    <div className="text-sm text-slate-600">${t.price?.toFixed(4)}</div>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-slate-600">${t.price?.toFixed(4)}</span>
+                      {t.profit != null && (
+                        <span className={`text-xs font-semibold ${t.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(4)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -159,45 +190,56 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  {['Name', 'Email', 'Referral Code', 'Bot', 'Status', 'Joined', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-5 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider">{h}</th>
+                  {['Name', 'Email', 'Referral', 'Fund Bal', 'Asset Bal', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {users.map(u => (
                   <tr key={u._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600 shrink-0">
                           {u.name?.[0]?.toUpperCase()}
                         </div>
-                        <span className="font-semibold text-slate-800">{u.name}</span>
+                        <span className="font-semibold text-slate-800 whitespace-nowrap">{u.name}</span>
                         {u.role === 'admin' && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700 font-semibold">Admin</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-slate-500">{u.email}</td>
-                    <td className="px-5 py-4 font-mono text-blue-600 font-medium">{u.referralCode}</td>
-                    <td className="px-5 py-4">
+                    <td className="px-4 py-3 text-slate-500 text-xs">{u.email}</td>
+                    <td className="px-4 py-3 font-mono text-blue-600 font-medium text-xs">{u.referralCode}</td>
+                    <td className="px-4 py-3 text-slate-700 font-mono text-xs">${(u.fundBalance || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-slate-700 font-mono text-xs">${(u.assetBalance || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         u.botActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                       }`}>
                         {u.botActive ? 'Running' : 'Off'}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-4 py-3">
+                      {u.subscriptionActive ? (
+                        <span className="text-xs font-semibold text-emerald-600">
+                          Active · {u.subscriptionDaysLeft}d left
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">Inactive</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         u.status === 'active' ? 'bg-emerald-100 text-emerald-700'
                           : u.status === 'blocked' ? 'bg-red-100 text-red-600'
                           : 'bg-slate-100 text-slate-500'
                       }`}>{u.status}</span>
                     </td>
-                    <td className="px-5 py-4 text-slate-500">{new Date(u.createdAt).toLocaleDateString()}</td>
-                    <td className="px-5 py-4">
+                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{new Date(u.createdAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
                       <button onClick={() => toggleUser(u._id, u.status)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
                           u.status === 'active'
                             ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
                             : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
@@ -209,6 +251,54 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Commissions */}
+      {tab === 'commissions' && (
+        <div>
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <StatCard label="Total Commission Collected" value={stats?.totalCommission?.toFixed(4)}     icon={Percent}    iconBg="#faf5ff" iconColor="#7c3aed" prefix="$" />
+            <StatCard label="Platform Revenue"           value={stats?.totalPlatformRevenue?.toFixed(4)} icon={DollarSign} iconBg="#ecfdf5" iconColor="#059669" prefix="$" />
+            <StatCard label="Referrer Earnings"          value={stats?.totalReferrerPaid?.toFixed(4)}   icon={Star}       iconBg="#fffbeb" iconColor="#d97706" prefix="$" />
+          </div>
+
+          <div className="card p-6 glow-border">
+            <h2 className="text-base font-bold text-slate-900 mb-2">Commission Breakdown</h2>
+            <p className="text-xs text-slate-400 mb-5">15% of each profitable trade: 10% referrer + 5% platform (or 15% platform if no referrer)</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-xl border border-slate-200 p-5 text-center">
+                <div className="text-3xl font-bold text-violet-600 mb-1">${stats?.totalCommission?.toFixed(2) ?? '0.00'}</div>
+                <div className="text-sm text-slate-500">Total Commission</div>
+                <div className="text-xs text-slate-400 mt-1">from {stats?.commissionCount ?? 0} trades</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-5 text-center">
+                <div className="text-3xl font-bold text-emerald-600 mb-1">${stats?.totalPlatformRevenue?.toFixed(2) ?? '0.00'}</div>
+                <div className="text-sm text-slate-500">Platform Revenue</div>
+                <div className="text-xs text-slate-400 mt-1">5% or 15% per trade</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-5 text-center">
+                <div className="text-3xl font-bold text-amber-500 mb-1">${stats?.totalReferrerPaid?.toFixed(2) ?? '0.00'}</div>
+                <div className="text-sm text-slate-500">Referrer Paid Out</div>
+                <div className="text-xs text-slate-400 mt-1">10% per referred trade</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card p-6 glow-border mt-5">
+            <h2 className="text-base font-bold text-slate-900 mb-4">Subscriptions</h2>
+            <div className="flex gap-8">
+              <div>
+                <div className="text-2xl font-bold text-blue-600">{stats?.activeSubs ?? 0}</div>
+                <div className="text-sm text-slate-500 mt-0.5">Active Subscribers</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-slate-600">{stats?.totalSubs ?? 0}</div>
+                <div className="text-sm text-slate-500 mt-0.5">Total Subscriptions</div>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import { getOtp, deleteOtp } from '@/lib/otpCache';
+import { sendWelcomeEmail } from '@/lib/mail';
 
 function generateReferralCode(name) {
   const base = name.replace(/\s+/g, '').toUpperCase().slice(0, 4);
@@ -11,12 +13,18 @@ function generateReferralCode(name) {
 
 export async function POST(req) {
   try {
-    const { name, email, password, referralCode } = await req.json();
-    if (!name || !email || !password) {
+    const { name, email, password, referralCode, otp } = await req.json();
+    if (!name || !email || !password || !otp) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 });
     }
+
+    // Verify OTP
+    const stored = getOtp('signup', email);
+    if (!stored) return NextResponse.json({ error: 'OTP expired. Request a new code.' }, { status: 400 });
+    if (stored !== otp) return NextResponse.json({ error: 'Invalid OTP' }, { status: 400 });
+
     await connectDB();
-    const exists = await User.findOne({ email });
+    const exists = await User.findOne({ email: email.toLowerCase() });
     if (exists) return NextResponse.json({ error: 'Email already registered' }, { status: 400 });
 
     let referredBy = null;
@@ -30,11 +38,18 @@ export async function POST(req) {
 
     const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashed,
       referralCode: code,
       referredBy,
     });
+
+    deleteOtp('signup', email);
+
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail(user.email, user.name, user.referralCode).catch(e =>
+      console.error('[welcome-email]', e.message)
+    );
 
     return NextResponse.json({
       message: 'Registered successfully',
