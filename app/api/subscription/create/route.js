@@ -8,7 +8,7 @@ const NP_BASE = process.env.NOWPAYMENTS_SANDBOX === 'true'
   ? 'https://api-sandbox.nowpayments.io/v1'
   : 'https://api.nowpayments.io/v1';
 
-const PLAN_PRICE = 399;
+const PLAN_PRICE = 1;
 const PLAN_MONTHS = 6;
 
 export async function POST(req) {

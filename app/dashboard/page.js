@@ -118,11 +118,11 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1">
               <div className="text-white font-bold text-base">Unlock AI Trading Bot</div>
-              <div className="text-blue-200 text-xs mt-0.5">Subscribe for 6 months at $399 USDT and let AI trade for you 24/7</div>
+              <div className="text-blue-200 text-xs mt-0.5">Subscribe for 6 months at $1 USDT and let AI trade for you 24/7</div>
             </div>
             <button onClick={() => router.push('/dashboard/subscribe')}
               className="shrink-0 bg-white text-blue-700 font-bold text-sm px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">
-              Subscribe — $399
+              Subscribe — $1
             </button>
           </div>
         </div>
