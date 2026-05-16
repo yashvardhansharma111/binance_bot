@@ -6,7 +6,8 @@ import User from '@/lib/models/User';
 import ApiKey from '@/lib/models/ApiKey';
 import { decrypt } from '@/lib/encryption';
 
-const REAL_BASE    = 'https://api.binance.com';
+// Binance provides multiple identical endpoints — try alternates if primary is geo-blocked
+const REAL_BASES   = ['https://api.binance.com', 'https://api2.binance.com', 'https://api3.binance.com'];
 const TESTNET_BASE = 'https://testnet.binance.vision';
 
 function sign(secret, queryString) {
@@ -14,35 +15,47 @@ function sign(secret, queryString) {
 }
 
 async function fetchBalance(apiKey, apiSecret, isTestnet) {
-  const base      = isTestnet ? TESTNET_BASE : REAL_BASE;
-  const timestamp = Date.now();
-  const qs        = `timestamp=${timestamp}&recvWindow=10000`;
-  const signature = sign(apiSecret, qs);
-  const url       = `${base}/api/v3/account?${qs}&signature=${signature}`;
+  const bases = isTestnet ? [TESTNET_BASE] : REAL_BASES;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000); // 10s hard timeout
+  let lastError = null;
+  for (const base of bases) {
+    const timestamp = Date.now();
+    const qs        = `timestamp=${timestamp}&recvWindow=10000`;
+    const signature = sign(apiSecret, qs);
+    const url       = `${base}/api/v3/account?${qs}&signature=${signature}`;
 
-  try {
-    const res = await fetch(url, {
-      headers: { 'X-MBX-APIKEY': apiKey },
-      signal: controller.signal,
-    });
-    const data = await res.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
 
-    if (!res.ok) {
-      const msg = data?.msg || `Binance error ${res.status}`;
-      console.error(`[balance] Binance API error: ${msg} (code ${data?.code})`);
-      throw new Error(msg);
+    try {
+      const res  = await fetch(url, { headers: { 'X-MBX-APIKEY': apiKey }, signal: controller.signal });
+      const data = await res.json();
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        const msg = data?.msg || `Binance error ${res.status}`;
+        console.error(`[balance] ${base} error: ${msg} (code ${data?.code})`);
+        // Geo-block (code -1101 / status 451) — try next endpoint
+        if (data?.code === -1101 || res.status === 451 || res.status === 403) {
+          lastError = new Error(msg);
+          continue;
+        }
+        throw new Error(msg);
+      }
+
+      console.log(`[balance] Success via ${base}`);
+      return data.balances
+        .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
+        .filter(b => b.free > 0 || b.locked > 0)
+        .sort((a, b) => b.free - a.free);
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') { lastError = new Error('Binance request timed out'); continue; }
+      if (lastError !== null) { lastError = e; continue; } // already had an error, keep trying
+      throw e;
     }
-
-    return data.balances
-      .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
-      .filter(b => b.free > 0 || b.locked > 0)
-      .sort((a, b) => b.free - a.free);
-  } finally {
-    clearTimeout(timer);
   }
+  throw lastError || new Error('All Binance endpoints unreachable');
 }
 
 export async function GET() {

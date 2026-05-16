@@ -60,11 +60,37 @@ export default function DashboardPage() {
   }
 
   async function fetchBalance() {
+    console.log('[balance] ▶ fetchBalance called');
     setBalLoading(true);
-    const res  = await fetch('/api/balance');
-    const data = await res.json();
-    setBalances(data);
-    setBalLoading(false);
+    try {
+      console.log('[balance] → GET /api/balance');
+      const res = await fetch('/api/balance');
+      console.log(`[balance] ← HTTP ${res.status} ${res.statusText}`);
+
+      let data;
+      try {
+        data = await res.json();
+        console.log('[balance] response JSON:', data);
+      } catch (parseErr) {
+        console.error('[balance] failed to parse JSON:', parseErr.message);
+        setBalances({ error: `Server returned non-JSON (status ${res.status})` });
+        return;
+      }
+
+      if (!res.ok || data?.error) {
+        console.warn('[balance] API error:', data?.error || `HTTP ${res.status}`);
+      } else {
+        console.log(`[balance] ✓ ${data.balances?.length ?? 0} assets loaded (accountType: ${data.accountType})`);
+      }
+
+      setBalances(data);
+    } catch (networkErr) {
+      console.error('[balance] network/fetch error:', networkErr.name, networkErr.message);
+      setBalances({ error: `Network error: ${networkErr.message}` });
+    } finally {
+      console.log('[balance] ■ fetchBalance done, clearing loader');
+      setBalLoading(false);
+    }
   }
 
   useEffect(() => { loadData(); fetchBalance(); }, []);
