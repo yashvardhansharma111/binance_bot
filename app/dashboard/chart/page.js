@@ -9,6 +9,25 @@ import { RefreshCw, BarChart2, Wifi, WifiOff, ArrowUp, ArrowDown, Activity } fro
 const SYMBOLS   = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h'];
 
+function calcRSI(closes, period = 14) {
+  const rsi = new Array(closes.length).fill(null);
+  if (closes.length <= period) return rsi;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = closes[i] - closes[i - 1];
+    if (d > 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  rsi[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = period + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    avgGain = (avgGain * (period - 1) + Math.max(d, 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + Math.max(-d, 0)) / period;
+    rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return rsi;
+}
+
 const BASE_OPTS = {
   layout: {
     background: { type: ColorType.Solid, color: '#ffffff' },
@@ -151,9 +170,29 @@ export default function ChartPage() {
   async function loadHistory() {
     setLoading(true);
     try {
-      const res  = await fetch(`/api/chart?symbol=${symbol}&interval=${timeframe}&limit=200`);
-      const data = await res.json();
-      if (!data.length) return;
+      // Fetch directly from Binance (supports CORS) — avoids server geo-blocks
+      const res = await fetch(
+        `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${timeframe}&limit=200`
+      );
+      if (!res.ok) throw new Error(`Binance ${res.status}`);
+      const raw = await res.json();
+      if (!raw.length) return;
+
+      const parsed = raw.map(c => ({
+        timestamp: c[0],
+        open:   parseFloat(c[1]),
+        high:   parseFloat(c[2]),
+        low:    parseFloat(c[3]),
+        close:  parseFloat(c[4]),
+        volume: parseFloat(c[5]),
+      }));
+
+      const closes    = parsed.map(c => c.close);
+      const rsiValues = calcRSI(closes, 14);
+      const data = parsed.map((c, i) => ({
+        ...c,
+        rsi: rsiValues[i] !== null ? parseFloat(rsiValues[i].toFixed(2)) : null,
+      }));
 
       const candles = data.map(c => ({
         time:  Math.floor(c.timestamp / 1000),
