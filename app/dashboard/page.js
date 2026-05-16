@@ -178,7 +178,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Asset Balance"
-          value={`$${(user?.assetBalance || 0).toFixed(2)}`}
+          value={`$${(user?.assetBalance ?? 0).toFixed(2)}`}
           sub={`Min: $${user?.minAssetRequired || 100}`}
           icon={Activity} iconBg="#ecfeff" iconColor="#0891b2"
         />
@@ -233,7 +233,15 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {balances?.balances && (
+        {balances?.balances && balances.balances.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Wallet size={28} className="mb-2 opacity-20" style={{ color: 'var(--text-2)' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-2)' }}>$0.00</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>No assets with a non-zero balance</p>
+          </div>
+        )}
+
+        {balances?.balances && balances.balances.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {balances.balances.slice(0, 8).map(b => {
               const isUsdt = b.asset === 'USDT';

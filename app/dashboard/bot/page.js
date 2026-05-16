@@ -182,7 +182,7 @@ export default function BotMonitorPage() {
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 shrink-0">
             <h2 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
               <Activity size={15} className="text-blue-500" />
-              Live Bot Logs
+              Live AI
               {autoRefresh && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
             </h2>
             <span className="text-slate-400 text-xs">{logs.length} entries</span>
