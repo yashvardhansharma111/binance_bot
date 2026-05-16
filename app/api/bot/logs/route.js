@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import BotLog from '@/lib/models/BotLog';
 
 export async function GET(req) {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { searchParams } = new URL(req.url);
   const limit = parseInt(searchParams.get('limit') || '50');

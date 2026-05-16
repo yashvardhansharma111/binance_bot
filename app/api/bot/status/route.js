@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import ApiKey from '@/lib/models/ApiKey';
@@ -8,7 +9,7 @@ import BotLog from '@/lib/models/BotLog';
 import BotSettings from '@/lib/models/BotSettings';
 
 export async function GET() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   await connectDB();

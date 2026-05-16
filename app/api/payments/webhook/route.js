@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/db';
 import Payment from '@/lib/models/Payment';
 import Subscription from '@/lib/models/Subscription';
 import User from '@/lib/models/User';
+import DepositCommission from '@/lib/models/DepositCommission';
 
 export async function POST(req) {
   const rawBody = await req.text();
@@ -30,36 +31,83 @@ export async function POST(req) {
 
   await connectDB();
 
-  // Route by order_id prefix
+  // ── Subscription payment ────────────────────────────────────────────────────
   if (order_id?.startsWith('sub_')) {
-    // ── Subscription payment ──────────────────────────────────────────────────
     const sub = await Subscription.findOne({ nowpaymentsId: String(payment_id) });
     if (!sub || sub.status === payment_status) return NextResponse.json({ ok: true });
 
     sub.status = payment_status;
     if (payment_status === 'finished') {
       sub.activatedAt = new Date();
-      sub.expiresAt   = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000); // 6 months
+      sub.expiresAt   = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
       await sub.save();
       await User.findByIdAndUpdate(sub.userId, { subscriptionExpiry: sub.expiresAt });
     } else {
       await sub.save();
     }
+    return NextResponse.json({ ok: true });
+  }
 
-  } else {
-    // ── Deposit payment ───────────────────────────────────────────────────────
-    const payment = await Payment.findOne({ nowpaymentsId: String(payment_id) });
-    if (!payment || payment.status === payment_status) return NextResponse.json({ ok: true });
+  // ── Deposit payment ─────────────────────────────────────────────────────────
+  const payment = await Payment.findOne({ nowpaymentsId: String(payment_id) });
+  if (!payment || payment.status === payment_status) return NextResponse.json({ ok: true });
 
-    payment.status = payment_status;
-    if (payment_status === 'finished') {
-      payment.actuallyPaid = actually_paid ?? payment.payAmount;
-      payment.completedAt  = new Date();
-      await payment.save();
-      await User.findByIdAndUpdate(payment.userId, { $inc: { fundBalance: payment.priceAmount } });
-    } else {
-      await payment.save();
+  payment.status = payment_status;
+
+  if (payment_status === 'finished') {
+    payment.actuallyPaid = actually_paid ?? payment.payAmount;
+    payment.completedAt  = new Date();
+    await payment.save();
+
+    const depositAmount = payment.priceAmount;
+
+    // Commission split
+    const COMMISSION_RATE = 0.15;
+    const REFERRER_RATE   = 0.10;
+    const PLATFORM_RATE   = 0.05;
+
+    const totalCommission = +(depositAmount * COMMISSION_RATE).toFixed(2);
+    const netCredited     = +(depositAmount - totalCommission).toFixed(2);
+
+    // Load depositing user to check for referrer
+    const depositor = await User.findById(payment.userId).select('referredBy');
+    let referrerId     = null;
+    let referrerAmount = 0;
+    let platformAmount = totalCommission; // default: all 15% to platform
+
+    if (depositor?.referredBy) {
+      const referrer = await User.findOne({ referralCode: depositor.referredBy }).select('_id');
+      if (referrer) {
+        referrerId     = referrer._id;
+        referrerAmount = +(depositAmount * REFERRER_RATE).toFixed(2);
+        platformAmount = +(depositAmount * PLATFORM_RATE).toFixed(2);
+
+        // Credit referrer's fundBalance
+        await User.findByIdAndUpdate(referrer._id, { $inc: { fundBalance: referrerAmount } });
+        console.log(`[webhook] Referrer ${referrer._id} credited $${referrerAmount}`);
+      }
     }
+
+    // Credit depositor's assetBalance (net after commission)
+    await User.findByIdAndUpdate(payment.userId, { $inc: { assetBalance: netCredited } });
+
+    // Record commission
+    await DepositCommission.create({
+      paymentId:      payment._id,
+      userId:         payment.userId,
+      referrerId,
+      depositAmount,
+      netCredited,
+      referrerAmount,
+      platformAmount,
+    });
+
+    console.log(
+      `[webhook] Deposit finished — user:${payment.userId} deposit:$${depositAmount} ` +
+      `net:$${netCredited} referrer:$${referrerAmount} platform:$${platformAmount}`
+    );
+  } else {
+    await payment.save();
   }
 
   return NextResponse.json({ ok: true });

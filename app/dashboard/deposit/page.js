@@ -75,7 +75,7 @@ export default function DepositPage() {
       const res  = await fetch(`/api/payments/${id}`);
       const data = await res.json();
       setStatus(data.status);
-      if (data.fundBalance !== undefined) setBalance(data.fundBalance);
+      if (data.assetBalance !== undefined) setBalance(data.assetBalance);
       if (['finished','failed','expired','refunded'].includes(data.status)) {
         clearInterval(pollRef.current);
       }
@@ -119,7 +119,7 @@ export default function DepositPage() {
         </div>
         {balance !== null && (
           <div className="text-right">
-            <div className="text-xs text-slate-400">Fund Balance</div>
+            <div className="text-xs text-slate-400">Asset Balance</div>
             <div className="text-xl font-bold text-slate-900">
               ${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </div>
@@ -211,7 +211,8 @@ export default function DepositPage() {
               <CheckCircle2 size={40} className="text-emerald-500 mx-auto" />
               <div className="text-lg font-bold text-slate-900">Deposit Confirmed!</div>
               <div className="text-slate-500 text-sm">
-                ${finalAmt.toFixed(2)} has been added to your fund balance.
+                ${(finalAmt * 0.85).toFixed(2)} has been added to your asset balance
+                <span className="block text-xs text-slate-400 mt-0.5">(after 15% platform commission)</span>
               </div>
               {balance !== null && (
                 <div className="text-2xl font-bold text-emerald-600">

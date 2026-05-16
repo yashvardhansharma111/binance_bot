@@ -6,8 +6,10 @@ import {
   LayoutDashboard, Key, Users, BarChart2, LogOut, Zap,
   ShieldCheck, Activity, ChevronRight, LineChart,
   ArrowDownToLine, Menu, X, Crown, Settings2, Zap as Trade,
+  Sun, Moon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTheme } from '@/app/ThemeContext';
 
 const navItems = [
   { href: '/dashboard',             label: 'Dashboard',  icon: LayoutDashboard },
@@ -26,74 +28,130 @@ function isActive(href, pathname) {
   return pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
 }
 
-/* ── Desktop sidebar ─────────────────────────────────────────────────────── */
+/* ── Theme toggle button ──────────────────────────────────────────────────── */
+function ThemeToggle({ compact = false }) {
+  const { theme, toggle } = useTheme();
+  const dark = theme === 'dark';
+  return (
+    <button
+      onClick={toggle}
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-medium transition-all"
+      style={{
+        color:      'var(--text-2)',
+        background: 'transparent',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.background = 'var(--accent-dim)';
+        e.currentTarget.style.color      = 'var(--accent)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.background = 'transparent';
+        e.currentTarget.style.color      = 'var(--text-2)';
+      }}
+    >
+      {dark
+        ? <Sun  size={compact ? 16 : 15} />
+        : <Moon size={compact ? 16 : 15} />}
+      {!compact && <span>{dark ? 'Light Mode' : 'Dark Mode'}</span>}
+    </button>
+  );
+}
+
+/* ── Desktop sidebar ──────────────────────────────────────────────────────── */
 export function DesktopSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
   return (
-    <aside className="hidden lg:flex w-64 min-h-screen flex-col bg-white border-r border-slate-200 shrink-0">
+    <aside
+      className="hidden lg:flex w-64 min-h-screen flex-col shrink-0"
+      style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
+    >
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-slate-100">
+      <div className="px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
         <Link href="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
             <Zap size={16} className="text-white" />
           </div>
-          <span className="text-lg font-bold text-slate-900">
-            TrickyX<span className="text-blue-600">.ai</span>
+          <span className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>
+            TrickyX<span style={{ color: 'var(--accent)' }}>.ai</span>
           </span>
         </Link>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-3 mb-2">Navigation</p>
+        <p className="text-[10px] font-semibold uppercase tracking-widest px-3 mb-2"
+          style={{ color: 'var(--text-3)' }}>
+          Navigation
+        </p>
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = isActive(href, pathname);
           return (
             <Link key={href} href={href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
               style={{
-                background: active ? '#eff6ff' : 'transparent',
-                color:      active ? '#2563eb' : '#64748b',
+                background: active ? 'var(--accent-dim)' : 'transparent',
+                color:      active ? 'var(--accent)'     : 'var(--text-2)',
               }}>
               <Icon size={16} />
               <span className="flex-1">{label}</span>
-              {active && <ChevronRight size={13} className="opacity-40" />}
+              {active && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
             </Link>
           );
         })}
 
         {session?.user?.role === 'admin' && (
           <div className="pt-3">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-3 mb-2">Admin</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest px-3 mb-2"
+              style={{ color: 'var(--text-3)' }}>
+              Admin
+            </p>
             <Link href="/admin"
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
               style={{
                 background: pathname.startsWith('/admin') ? '#fefce8' : 'transparent',
-                color:      pathname.startsWith('/admin') ? '#b45309' : '#64748b',
+                color:      pathname.startsWith('/admin') ? '#b45309' : 'var(--text-2)',
               }}>
               <ShieldCheck size={16} />
               <span className="flex-1">Admin Panel</span>
-              {pathname.startsWith('/admin') && <ChevronRight size={13} className="opacity-40" />}
+              {pathname.startsWith('/admin') && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
             </Link>
           </div>
         )}
       </nav>
 
-      {/* User */}
-      <div className="px-3 py-4 border-t border-slate-100">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 bg-slate-50">
+      {/* User + controls */}
+      <div className="px-3 py-4" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1"
+          style={{ background: 'var(--surface-2)' }}>
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600 shrink-0">
             {session?.user?.name?.[0]?.toUpperCase() || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-slate-800 truncate">{session?.user?.name}</div>
-            <div className="text-xs text-slate-400 truncate">{session?.user?.email}</div>
+            <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-1)' }}>
+              {session?.user?.name}
+            </div>
+            <div className="text-xs truncate" style={{ color: 'var(--text-3)' }}>
+              {session?.user?.email}
+            </div>
           </div>
         </div>
+
+        <ThemeToggle />
+
         <button onClick={() => signOut({ callbackUrl: '/' })}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-red-600 hover:bg-red-50 w-full transition-colors mt-0.5">
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-colors mt-0.5"
+          style={{ color: 'var(--text-2)' }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color      = '#dc2626';
+            e.currentTarget.style.background = '#fef2f2';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color      = 'var(--text-2)';
+            e.currentTarget.style.background = 'transparent';
+          }}>
           <LogOut size={15} />
           Sign Out
         </button>
@@ -102,7 +160,7 @@ export function DesktopSidebar() {
   );
 }
 
-/* ── Mobile top bar ──────────────────────────────────────────────────────── */
+/* ── Mobile top bar ───────────────────────────────────────────────────────── */
 export function MobileTopBar() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
@@ -110,33 +168,48 @@ export function MobileTopBar() {
 
   return (
     <>
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 h-14 flex items-center justify-between">
+      <header
+        className="lg:hidden fixed top-0 left-0 right-0 z-40 px-4 h-14 flex items-center justify-between"
+        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
+      >
         <Link href="/" className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-blue-600">
             <Zap size={14} className="text-white" />
           </div>
-          <span className="text-base font-bold text-slate-900">
-            TrickyX<span className="text-blue-600">.ai</span>
+          <span className="text-base font-bold" style={{ color: 'var(--text-1)' }}>
+            TrickyX<span style={{ color: 'var(--accent)' }}>.ai</span>
           </span>
         </Link>
-        <button onClick={() => setOpen(v => !v)}
-          className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors">
-          {open ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center gap-1">
+          <ThemeToggle compact />
+          <button onClick={() => setOpen(v => !v)}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-2)' }}>
+            {open ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </header>
 
       {/* Slide-down drawer */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-30" onClick={() => setOpen(false)}>
-          <div className="absolute top-14 left-0 right-0 bg-white border-b border-slate-200 shadow-xl px-4 py-3"
-            onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-3 bg-slate-50">
+          <div
+            className="absolute top-14 left-0 right-0 shadow-xl px-4 py-3"
+            style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-3"
+              style={{ background: 'var(--surface-2)' }}>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600 shrink-0">
                 {session?.user?.name?.[0]?.toUpperCase() || 'U'}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-slate-800 truncate">{session?.user?.name}</div>
-                <div className="text-xs text-slate-400 truncate">{session?.user?.email}</div>
+                <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-1)' }}>
+                  {session?.user?.name}
+                </div>
+                <div className="text-xs truncate" style={{ color: 'var(--text-3)' }}>
+                  {session?.user?.email}
+                </div>
               </div>
             </div>
 
@@ -145,14 +218,15 @@ export function MobileTopBar() {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-2 transition-all"
                 style={{
                   background: pathname.startsWith('/admin') ? '#fefce8' : 'transparent',
-                  color:      pathname.startsWith('/admin') ? '#b45309' : '#64748b',
+                  color:      pathname.startsWith('/admin') ? '#b45309' : 'var(--text-2)',
                 }}>
                 <ShieldCheck size={16} /> Admin Panel
               </Link>
             )}
 
             <button onClick={() => { signOut({ callbackUrl: '/' }); setOpen(false); }}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-500 hover:bg-red-50 w-full transition-colors">
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-colors"
+              style={{ color: '#ef4444' }}>
               <LogOut size={15} /> Sign Out
             </button>
           </div>
@@ -162,7 +236,7 @@ export function MobileTopBar() {
   );
 }
 
-/* ── Mobile bottom tab bar ───────────────────────────────────────────────── */
+/* ── Mobile bottom tab bar ────────────────────────────────────────────────── */
 export function MobileTabBar() {
   const pathname = usePathname();
 
@@ -175,23 +249,30 @@ export function MobileTabBar() {
   ];
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40"
+      style={{
+        background:    'var(--surface)',
+        borderTop:     '1px solid var(--border)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
       <div className="flex">
         {tabs.map(({ href, label, icon: Icon }) => {
           const active = isActive(href, pathname);
           return (
             <Link key={href} href={href}
               className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors"
-              style={{ color: active ? '#2563eb' : '#94a3b8' }}>
+              style={{ color: active ? 'var(--accent)' : 'var(--text-3)' }}>
               <div className="relative">
                 <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
                 {active && (
-                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
+                    style={{ background: 'var(--accent)' }} />
                 )}
               </div>
               <span className="text-[10px] font-semibold leading-none"
-                style={{ color: active ? '#2563eb' : '#94a3b8' }}>
+                style={{ color: active ? 'var(--accent)' : 'var(--text-3)' }}>
                 {label}
               </span>
             </Link>
@@ -202,7 +283,7 @@ export function MobileTabBar() {
   );
 }
 
-/* ── Default export (kept for any direct imports) ────────────────────────── */
+/* ── Default export ───────────────────────────────────────────────────────── */
 export default function Sidebar() {
   return <DesktopSidebar />;
 }

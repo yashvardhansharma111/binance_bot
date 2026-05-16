@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import ApiKey from '@/lib/models/ApiKey';
@@ -10,7 +11,7 @@ async function getUser(session) {
 }
 
 export async function GET() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await connectDB();
   const user = await getUser(session);
@@ -28,7 +29,7 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const { apiKey, apiSecret, label, accountType } = await req.json();
   if (!apiKey || !apiSecret) return NextResponse.json({ error: 'API Key and Secret required' }, { status: 400 });
@@ -52,7 +53,7 @@ export async function POST(req) {
 }
 
 export async function DELETE() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await connectDB();
   const user = await getUser(session);

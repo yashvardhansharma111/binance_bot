@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import Payment from '@/lib/models/Payment';
 import User from '@/lib/models/User';
@@ -10,7 +11,7 @@ const NP_BASE = process.env.NOWPAYMENTS_SANDBOX === 'true'
   : 'https://api.nowpayments.io/v1';
 
 export async function POST(req) {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { amount, currency } = await req.json();

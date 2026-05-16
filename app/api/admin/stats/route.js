@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import Trade from '@/lib/models/Trade';
@@ -7,7 +8,7 @@ import Commission from '@/lib/models/Commission';
 import Subscription from '@/lib/models/Subscription';
 
 export async function GET() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await connectDB();
   const caller = await User.findOne({ email: session.user.email });

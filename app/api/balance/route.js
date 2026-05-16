@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { createHmac } from 'crypto';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
@@ -59,7 +60,7 @@ async function fetchBalance(apiKey, apiSecret, isTestnet) {
 }
 
 export async function GET() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) {
     console.log('[balance] No session');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

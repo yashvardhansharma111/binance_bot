@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 
 async function adminGuard() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
   if (!session) return null;
   await connectDB();
   const user = await User.findOne({ email: session.user.email });

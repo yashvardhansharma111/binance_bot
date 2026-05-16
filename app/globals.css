@@ -1,41 +1,113 @@
 @import "tailwindcss";
 
+/* Enable class-based dark variant for Tailwind utilities */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Light theme (default) ────────────────────────────────────────────────── */
+:root {
+  --bg:           #f1f5f9;
+  --surface:      #ffffff;
+  --surface-2:    #f8fafc;
+  --border:       #e2e8f0;
+  --border-hover: #bfdbfe;
+  --text-1:       #0f172a;
+  --text-2:       #64748b;
+  --text-3:       #94a3b8;
+  --accent:       #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-glow:  rgba(37, 99, 235, 0.35);
+  --accent-dim:   #eff6ff;
+  --focus-ring:   rgba(37, 99, 235, 0.12);
+  --grad-text:    linear-gradient(135deg, #2563eb, #0ea5e9);
+}
+
+/* ── Dark theme — black + green ───────────────────────────────────────────── */
+html.dark {
+  color-scheme: dark;
+
+  --bg:           #000000;
+  --surface:      #0c0c0c;
+  --surface-2:    #111111;
+  --border:       #1a2e1a;
+  --border-hover: #22c55e;
+  --text-1:       #e2ece2;
+  --text-2:       #8b9e8b;
+  --text-3:       #4d6b4d;
+  --accent:       #22c55e;
+  --accent-hover: #16a34a;
+  --accent-glow:  rgba(34, 197, 94, 0.35);
+  --accent-dim:   rgba(34, 197, 94, 0.08);
+  --focus-ring:   rgba(34, 197, 94, 0.15);
+  --grad-text:    linear-gradient(135deg, #22c55e, #4ade80);
+
+  /* Override Tailwind v4 color tokens — utilities like bg-white / text-slate-900
+     reference these CSS custom properties at runtime, so they flip automatically */
+  --color-white:      #0c0c0c;
+  --color-slate-50:   #000000;
+  --color-slate-100:  #0c0c0c;
+  --color-slate-200:  #1a2e1a;
+  --color-slate-300:  #233323;
+  --color-slate-400:  #4d6b4d;
+  --color-slate-500:  #6b8a6b;
+  --color-slate-600:  #8faa8f;
+  --color-slate-700:  #b8cbb8;
+  --color-slate-800:  #d4e4d4;
+  --color-slate-900:  #e2ece2;
+  --color-slate-950:  #f0f7f0;
+
+  /* Blues → greens so accent / active states flip across the whole app */
+  --color-blue-50:    rgba(34, 197, 94, 0.06);
+  --color-blue-100:   rgba(34, 197, 94, 0.10);
+  --color-blue-200:   rgba(34, 197, 94, 0.18);
+  --color-blue-300:   rgba(34, 197, 94, 0.30);
+  --color-blue-400:   #4ade80;
+  --color-blue-500:   #22c55e;
+  --color-blue-600:   #22c55e;
+  --color-blue-700:   #16a34a;
+  --color-blue-800:   #15803d;
+  --color-blue-900:   #14532d;
+  --color-blue-950:   #052e16;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
 html, body { overflow-x: hidden; }
 
 body {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--bg);
+  color: var(--text-1);
   font-family: var(--font-open-sans), 'Open Sans', sans-serif;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
+/* ── Custom utility classes ───────────────────────────────────────────────── */
 .gradient-text {
-  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  background: var(--grad-text);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .glow-border {
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .glow-border:hover {
-  border-color: #bfdbfe;
-  box-shadow: 0 4px 16px rgba(37,99,235,0.08);
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 16px var(--accent-dim);
   transition: all 0.2s;
 }
 
 .btn-primary {
-  background: #2563eb;
+  background: var(--accent);
   color: white;
   border-radius: 8px;
   padding: 10px 24px;
@@ -49,15 +121,15 @@ body {
 }
 
 .btn-primary:hover {
-  background: #1d4ed8;
-  box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+  background: var(--accent-hover);
+  box-shadow: 0 4px 14px var(--accent-glow);
   transform: translateY(-1px);
 }
 
 .btn-outline {
   background: transparent;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: var(--text-2);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 24px;
   font-weight: 600;
@@ -69,16 +141,16 @@ body {
 }
 
 .btn-outline:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-  background: #eff6ff;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .input {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  color: #0f172a;
+  color: var(--text-1);
   padding: 11px 16px;
   width: 100%;
   outline: none;
@@ -87,14 +159,15 @@ body {
 }
 
 .input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-  background: white;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  background: var(--surface);
 }
 
-.input::placeholder { color: #94a3b8; }
+.input::placeholder { color: var(--text-3); }
 
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
