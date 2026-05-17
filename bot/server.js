@@ -9,6 +9,13 @@
 import mongoose from 'mongoose';
 import { startScheduler } from './scheduler/cron.js';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[Bot] Unhandled rejection:', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Bot] Uncaught exception:', err.message);
+});
+
 async function boot() {
   const uri = process.env.MONGODB_URI;
   if (!uri) { console.error('[Bot] MONGODB_URI not set'); process.exit(1); }

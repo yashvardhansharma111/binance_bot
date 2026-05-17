@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Key, Users, BarChart2, LogOut, Zap,
   ShieldCheck, Activity, ChevronRight, LineChart,
   ArrowDownToLine, Menu, X, Crown, Settings2, Zap as Trade,
-  Sun, Moon,
+  Sun, Moon, ArrowUpRight,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/app/ThemeContext';
@@ -108,16 +108,24 @@ export function DesktopSidebar() {
               style={{ color: 'var(--text-3)' }}>
               Admin
             </p>
-            <Link href="/admin"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: pathname.startsWith('/admin') ? '#fefce8' : 'transparent',
-                color:      pathname.startsWith('/admin') ? '#b45309' : 'var(--text-2)',
-              }}>
-              <ShieldCheck size={16} />
-              <span className="flex-1">Admin Panel</span>
-              {pathname.startsWith('/admin') && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
-            </Link>
+            {[
+              { href: '/admin',              label: 'Admin Panel',  icon: ShieldCheck },
+              { href: '/admin/withdrawals',  label: 'Withdrawals',  icon: ArrowUpRight },
+            ].map(({ href, label, icon: Icon }) => {
+              const active = pathname === href;
+              return (
+                <Link key={href} href={href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    background: active ? '#fefce8' : 'transparent',
+                    color:      active ? '#b45309' : 'var(--text-2)',
+                  }}>
+                  <Icon size={16} />
+                  <span className="flex-1">{label}</span>
+                  {active && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
+                </Link>
+              );
+            })}
           </div>
         )}
       </nav>
@@ -214,14 +222,24 @@ export function MobileTopBar() {
             </div>
 
             {session?.user?.role === 'admin' && (
-              <Link href="/admin" onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-2 transition-all"
-                style={{
-                  background: pathname.startsWith('/admin') ? '#fefce8' : 'transparent',
-                  color:      pathname.startsWith('/admin') ? '#b45309' : 'var(--text-2)',
-                }}>
-                <ShieldCheck size={16} /> Admin Panel
-              </Link>
+              <>
+                <Link href="/admin" onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all"
+                  style={{
+                    background: pathname === '/admin' ? '#fefce8' : 'transparent',
+                    color:      pathname === '/admin' ? '#b45309' : 'var(--text-2)',
+                  }}>
+                  <ShieldCheck size={16} /> Admin Panel
+                </Link>
+                <Link href="/admin/withdrawals" onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-2 transition-all"
+                  style={{
+                    background: pathname === '/admin/withdrawals' ? '#fefce8' : 'transparent',
+                    color:      pathname === '/admin/withdrawals' ? '#b45309' : 'var(--text-2)',
+                  }}>
+                  <ArrowUpRight size={16} /> Withdrawals
+                </Link>
+              </>
             )}
 
             <button onClick={() => { signOut({ callbackUrl: '/' }); setOpen(false); }}

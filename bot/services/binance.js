@@ -83,6 +83,19 @@ function roundStep(qty, step) {
 
 // ── Orders ────────────────────────────────────────────────────────────────────
 
+function binanceError(err) {
+  // node-binance-api passes raw JSON strings in err.body — parse for a clean message
+  try {
+    const parsed = JSON.parse(err.body || err.message);
+    const code   = parsed.code ?? '';
+    const msg    = parsed.msg  ?? err.message;
+    if (code === -2015) return new Error(`Binance API key missing Spot Trading permission or VPS IP not whitelisted (code -2015)`);
+    return new Error(`Binance error ${code}: ${msg}`);
+  } catch {
+    return new Error(err.body || err.message || String(err));
+  }
+}
+
 export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
   const price = await getCurrentPrice(symbol);
   const step  = await getStepSize(symbol);
@@ -94,11 +107,15 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
   }
 
   return new Promise((resolve, reject) => {
-    client(apiKey, apiSecret).marketBuy(symbol, qty, (err, r) => {
-      if (err) return reject(new Error(err.body || err.message));
-      const fill = parseFloat(r.fills?.[0]?.price || price);
-      resolve({ orderId: String(r.orderId), price: fill, qty, total: qty * fill });
-    });
+    try {
+      client(apiKey, apiSecret).marketBuy(symbol, qty, (err, r) => {
+        if (err) return reject(binanceError(err));
+        const fill = parseFloat(r.fills?.[0]?.price || price);
+        resolve({ orderId: String(r.orderId), price: fill, qty, total: qty * fill });
+      });
+    } catch (e) {
+      reject(binanceError(e));
+    }
   });
 }
 
@@ -113,10 +130,14 @@ export async function placeMarketSell(apiKey, apiSecret, symbol, qty) {
   }
 
   return new Promise((resolve, reject) => {
-    client(apiKey, apiSecret).marketSell(symbol, safeQty, (err, r) => {
-      if (err) return reject(new Error(err.body || err.message));
-      const fill = parseFloat(r.fills?.[0]?.price || price);
-      resolve({ orderId: String(r.orderId), price: fill, qty: safeQty, total: safeQty * fill });
-    });
+    try {
+      client(apiKey, apiSecret).marketSell(symbol, safeQty, (err, r) => {
+        if (err) return reject(binanceError(err));
+        const fill = parseFloat(r.fills?.[0]?.price || price);
+        resolve({ orderId: String(r.orderId), price: fill, qty: safeQty, total: safeQty * fill });
+      });
+    } catch (e) {
+      reject(binanceError(e));
+    }
   });
 }

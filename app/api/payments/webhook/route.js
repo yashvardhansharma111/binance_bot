@@ -42,6 +42,17 @@ export async function POST(req) {
       sub.expiresAt   = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
       await sub.save();
       await User.findByIdAndUpdate(sub.userId, { subscriptionExpiry: sub.expiresAt });
+
+      // Credit 20% of subscription price to referrer (if any)
+      const buyer = await User.findById(sub.userId).select('referredBy');
+      if (buyer?.referredBy) {
+        const referrer = await User.findOne({ referralCode: buyer.referredBy }).select('_id');
+        if (referrer) {
+          const referrerCut = parseFloat(((sub.amount || 1) * 0.20).toFixed(4));
+          await User.findByIdAndUpdate(referrer._id, { $inc: { fundBalance: referrerCut } });
+          console.log(`[webhook] Sub referral: referrer ${referrer._id} credited $${referrerCut}`);
+        }
+      }
     } else {
       await sub.save();
     }
