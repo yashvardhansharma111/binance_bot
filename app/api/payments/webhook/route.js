@@ -26,7 +26,8 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Bad JSON' }, { status: 400 });
   }
 
-  const { payment_id, payment_status, order_id, actually_paid } = body;
+  const { payment_id, payment_status, order_id, actually_paid,
+          pay_amount: ipnPayAmount, price_amount: ipnPriceAmount } = body;
   if (!payment_id) return NextResponse.json({ ok: true });
 
   await connectDB();
@@ -42,6 +43,20 @@ export async function POST(req) {
       sub.expiresAt   = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
       await sub.save();
       await User.findByIdAndUpdate(sub.userId, { subscriptionExpiry: sub.expiresAt });
+
+      // Credit overpayment to fundBalance
+      // e.g. plan = $1, user sent $5 worth → $4 goes to their fundBalance
+      const expectedCrypto  = ipnPayAmount  || sub.payAmount;   // crypto amount for $1
+      const planPriceUsd    = ipnPriceAmount || sub.amount || 1; // plan price in USD
+      if (actually_paid && expectedCrypto && actually_paid > expectedCrypto * 1.01) {
+        // 1.01 threshold to ignore tiny rounding differences from the payment gateway
+        const overpayRatio = (actually_paid - expectedCrypto) / expectedCrypto;
+        const overpayUsd   = parseFloat((overpayRatio * planPriceUsd).toFixed(2));
+        if (overpayUsd >= 0.01) {
+          await User.findByIdAndUpdate(sub.userId, { $inc: { fundBalance: overpayUsd } });
+          console.log(`[webhook] Sub overpayment: $${overpayUsd} credited to user ${sub.userId}`);
+        }
+      }
 
       // Credit 20% of subscription price to referrer (if any)
       const buyer = await User.findById(sub.userId).select('referredBy');
