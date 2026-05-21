@@ -221,8 +221,32 @@ export function MobileTopBar() {
               </div>
             </div>
 
+            {/* Nav links not in bottom tab bar */}
+            <div className="mb-2">
+              {[
+                { href: '/dashboard/trades',    label: 'History',   icon: BarChart2 },
+                { href: '/dashboard/deposit',   label: 'Deposit',   icon: ArrowDownToLine },
+                { href: '/dashboard/subscribe', label: 'Subscribe', icon: Crown },
+                { href: '/dashboard/apikeys',   label: 'API Keys',  icon: Key },
+                { href: '/dashboard/referral',  label: 'Referral',  icon: Users },
+              ].map(({ href, label, icon: Icon }) => {
+                const active = isActive(href, pathname);
+                return (
+                  <Link key={href} href={href} onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-0.5 transition-all"
+                    style={{
+                      background: active ? 'var(--accent-dim)' : 'transparent',
+                      color:      active ? 'var(--accent)'     : 'var(--text-2)',
+                    }}>
+                    <Icon size={16} /> {label}
+                  </Link>
+                );
+              })}
+            </div>
+
             {session?.user?.role === 'admin' && (
               <>
+                <div className="my-2" style={{ borderTop: '1px solid var(--border)' }} />
                 <Link href="/admin" onClick={() => setOpen(false)}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all"
                   style={{
@@ -232,7 +256,7 @@ export function MobileTopBar() {
                   <ShieldCheck size={16} /> Admin Panel
                 </Link>
                 <Link href="/admin/withdrawals" onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-2 transition-all"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all"
                   style={{
                     background: pathname === '/admin/withdrawals' ? '#fefce8' : 'transparent',
                     color:      pathname === '/admin/withdrawals' ? '#b45309' : 'var(--text-2)',
@@ -242,8 +266,9 @@ export function MobileTopBar() {
               </>
             )}
 
+            <div className="mt-2" style={{ borderTop: '1px solid var(--border)' }} />
             <button onClick={() => { signOut({ callbackUrl: '/' }); setOpen(false); }}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-colors mt-1"
               style={{ color: '#ef4444' }}>
               <LogOut size={15} /> Sign Out
             </button>
