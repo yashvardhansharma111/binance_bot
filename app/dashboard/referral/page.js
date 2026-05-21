@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, Send,
 } from 'lucide-react';
 
-const CURRENCIES = ['USDT', 'BTC', 'ETH', 'BNB', 'SOL', 'LTC'];
+const CURRENCIES = ['USDT TRC20', 'USDT BEP20'];
 
 const STATUS_STYLE = {
   pending:  { label: 'Pending',  color: '#b45309', bg: '#fefce8', icon: Clock },
@@ -23,7 +23,7 @@ export default function ReferralPage() {
   const [withdrawals,   setWithdrawals]   = useState([]);
   const [wAmount,       setWAmount]       = useState('');
   const [wAddress,      setWAddress]      = useState('');
-  const [wCurrency,     setWCurrency]     = useState('USDT');
+  const [wCurrency,     setWCurrency]     = useState('USDT TRC20');
   const [wNetwork,      setWNetwork]      = useState('');
   const [wLoading,      setWLoading]      = useState(false);
   const [wError,        setWError]        = useState('');

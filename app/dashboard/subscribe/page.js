@@ -4,12 +4,8 @@ import QRCode from 'react-qr-code';
 import { Crown, CheckCircle2, Clock, XCircle, RefreshCw, Copy, Zap } from 'lucide-react';
 
 const CURRENCIES = [
-  { value: 'usdttrc20', label: 'USDT TRC20' },
-  { value: 'usdterc20', label: 'USDT ERC20' },
-  { value: 'btc',       label: 'Bitcoin' },
-  { value: 'eth',       label: 'Ethereum' },
-  { value: 'bnb',       label: 'BNB' },
-  { value: 'sol',       label: 'Solana' },
+  { value: 'usdttrc20', label: 'USDT TRC20', sub: 'Tron (TRC20)' },
+  { value: 'usdtbsc',   label: 'USDT BEP20', sub: 'BNB Smart Chain' },
 ];
 
 const STATUS_META = {
@@ -149,18 +145,20 @@ export default function SubscribePage() {
         /* Currency select + pay button */
         <div className="card glow-border p-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Pay with</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Network</label>
+            <div className="flex gap-3">
               {CURRENCIES.map(c => (
                 <button key={c.value} onClick={() => setCurrency(c.value)}
-                  className="px-3 py-2.5 rounded-lg border text-sm font-semibold transition-all text-left"
+                  className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left transition-all"
                   style={{
                     background:  currency === c.value ? '#eff6ff' : '#f8fafc',
-                    color:       currency === c.value ? '#2563eb' : '#64748b',
                     borderColor: currency === c.value ? '#2563eb' : '#e2e8f0',
                   }}>
-                  {c.label}
-                  {currency === c.value && <CheckCircle2 size={12} className="float-right mt-0.5 text-blue-500" />}
+                  <div>
+                    <div className="text-sm font-bold text-slate-800">{c.label}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{c.sub}</div>
+                  </div>
+                  {currency === c.value && <CheckCircle2 size={15} className="text-blue-500 shrink-0" />}
                 </button>
               ))}
             </div>

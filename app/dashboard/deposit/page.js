@@ -8,13 +8,8 @@ import {
 } from 'lucide-react';
 
 const CURRENCIES = [
-  { value: 'btc',   label: 'Bitcoin',   symbol: 'BTC' },
-  { value: 'eth',   label: 'Ethereum',  symbol: 'ETH' },
-  { value: 'usdt',  label: 'Tether',    symbol: 'USDT (TRC20)' },
-  { value: 'usdttrc20', label: 'Tether TRC20', symbol: 'USDT' },
-  { value: 'bnb',   label: 'BNB',       symbol: 'BNB' },
-  { value: 'sol',   label: 'Solana',    symbol: 'SOL' },
-  { value: 'ltc',   label: 'Litecoin',  symbol: 'LTC' },
+  { value: 'usdttrc20', label: 'USDT TRC20', symbol: 'USDT', network: 'Tron (TRC20)' },
+  { value: 'usdtbsc',   label: 'USDT BEP20', symbol: 'USDT', network: 'BNB Smart Chain (BEP20)' },
 ];
 
 const AMOUNTS = [10, 25, 50, 100, 250, 500];
@@ -154,22 +149,22 @@ export default function DepositPage() {
             />
           </div>
 
-          {/* Currency */}
+          {/* Network */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-3">Pay With</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm font-semibold text-slate-700 mb-3">Network</label>
+            <div className="flex gap-3">
               {CURRENCIES.map(c => (
                 <button key={c.value} onClick={() => setCurrency(c.value)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-all"
+                  className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left transition-all"
                   style={{
                     background:  currency === c.value ? '#eff6ff' : '#f8fafc',
                     borderColor: currency === c.value ? '#2563eb' : '#e2e8f0',
                   }}>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-slate-800">{c.symbol}</div>
-                    <div className="text-xs text-slate-400">{c.label}</div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-800">{c.label}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{c.network}</div>
                   </div>
-                  {currency === c.value && <CheckCircle2 size={14} className="text-blue-500 shrink-0" />}
+                  {currency === c.value && <CheckCircle2 size={16} className="text-blue-500 shrink-0" />}
                 </button>
               ))}
             </div>
