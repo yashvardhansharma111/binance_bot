@@ -19,12 +19,13 @@ export default function ReferralPage() {
   const [data,          setData]          = useState(null);
   const [loading,       setLoading]       = useState(true);
   const [copied,        setCopied]        = useState('');
-  const [tab,           setTab]           = useState('overview'); // overview | withdraw | history
+  const [tab,           setTab]           = useState('overview');
   const [withdrawals,   setWithdrawals]   = useState([]);
+  const [assetBalance,  setAssetBalance]  = useState(0);
+  const [wSource,       setWSource]       = useState('fund'); // 'fund' | 'asset'
   const [wAmount,       setWAmount]       = useState('');
   const [wAddress,      setWAddress]      = useState('');
   const [wCurrency,     setWCurrency]     = useState('USDT TRC20');
-  const [wNetwork,      setWNetwork]      = useState('');
   const [wLoading,      setWLoading]      = useState(false);
   const [wError,        setWError]        = useState('');
   const [wSuccess,      setWSuccess]      = useState('');
@@ -40,6 +41,7 @@ export default function ReferralPage() {
     const res = await fetch('/api/withdrawal');
     const d   = await res.json();
     setWithdrawals(d.withdrawals || []);
+    setAssetBalance(d.assetBalance ?? 0);
   }
 
   useEffect(() => { loadReferral(); loadWithdrawals(); }, []);
@@ -58,12 +60,18 @@ export default function ReferralPage() {
       const res  = await fetch('/api/withdrawal', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ amount: parseFloat(wAmount), walletAddress: wAddress, currency: wCurrency, network: wNetwork }),
+        body:    JSON.stringify({
+          amount:        parseFloat(wAmount),
+          walletAddress: wAddress,
+          currency:      wCurrency,
+          network:       wCurrency === 'USDT TRC20' ? 'TRC20' : 'BEP20',
+          source:        wSource,
+        }),
       });
       const json = await res.json();
       if (!res.ok) { setWError(json.error); return; }
-      setWSuccess(`Withdrawal request of $${wAmount} submitted! Admin will process it within 24 hours.`);
-      setWAmount(''); setWAddress(''); setWNetwork('');
+      setWSuccess(`Withdrawal request of $${wAmount} submitted! Admin will process within 24 hours.`);
+      setWAmount(''); setWAddress('');
       await loadReferral();
       await loadWithdrawals();
     } catch {
@@ -84,41 +92,64 @@ export default function ReferralPage() {
   );
 
   const fundBalance = data?.fundBalance ?? 0;
+  const totalWithdrawable = fundBalance + assetBalance;
 
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>Referral &amp; Earnings</h1>
         <p className="mt-0.5 text-sm" style={{ color: 'var(--text-2)' }}>
-          Earn 20% on subscriptions + 10% on every trade profit from your referrals
+          Earn 20% on subscriptions + 10% on every deposit from your referrals
         </p>
       </div>
 
-      {/* Withdrawable balance banner */}
-      <div className="card glow-border p-5 mb-6 flex items-center justify-between gap-4"
-        style={{ background: fundBalance > 0 ? 'var(--accent-dim)' : 'var(--surface)', borderColor: fundBalance > 0 ? 'var(--border-hover)' : 'var(--border)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
-            style={{ background: 'var(--accent-dim)', border: '1px solid var(--border-hover)' }}>
-            <Wallet size={20} style={{ color: 'var(--accent)' }} />
+      {/* Balance cards */}
+      <div className="grid sm:grid-cols-2 gap-4 mb-6">
+        {/* Referral balance */}
+        <div className="card glow-border p-5 flex items-center justify-between gap-3"
+          style={{ background: fundBalance > 0 ? 'var(--accent-dim)' : 'var(--surface)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'var(--accent-dim)', border: '1px solid var(--border-hover)' }}>
+              <Users size={18} style={{ color: 'var(--accent)' }} />
+            </div>
+            <div>
+              <div className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>Referral Balance</div>
+              <div className="text-xl font-bold" style={{ color: 'var(--accent)' }}>${fundBalance.toFixed(2)}</div>
+              <div className="text-xs" style={{ color: 'var(--text-3)' }}>From commissions</div>
+            </div>
           </div>
-          <div>
-            <div className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-2)' }}>Withdrawable Balance</div>
-            <div className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>${fundBalance.toFixed(2)}</div>
-            <div className="text-xs" style={{ color: 'var(--text-3)' }}>From referral commissions</div>
-          </div>
+          {fundBalance >= 5
+            ? <button onClick={() => { setWSource('fund'); setTab('withdraw'); }}
+                className="btn-primary flex items-center gap-1.5 text-xs px-3 py-2">
+                <ArrowUpRight size={13} /> Withdraw
+              </button>
+            : <span className="text-xs" style={{ color: 'var(--text-3)' }}>Min $5</span>
+          }
         </div>
-        {fundBalance >= 5 && (
-          <button onClick={() => setTab('withdraw')}
-            className="btn-primary flex items-center gap-2 text-sm px-5 py-2.5">
-            <ArrowUpRight size={15} /> Withdraw
-          </button>
-        )}
-        {fundBalance > 0 && fundBalance < 5 && (
-          <span className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}>
-            Min $5 to withdraw
-          </span>
-        )}
+
+        {/* Asset balance */}
+        <div className="card glow-border p-5 flex items-center justify-between gap-3"
+          style={{ background: assetBalance > 0 ? 'var(--accent-dim)' : 'var(--surface)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'var(--accent-dim)', border: '1px solid var(--border-hover)' }}>
+              <Wallet size={18} style={{ color: 'var(--accent)' }} />
+            </div>
+            <div>
+              <div className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>Asset Balance</div>
+              <div className="text-xl font-bold" style={{ color: 'var(--accent)' }}>${assetBalance.toFixed(2)}</div>
+              <div className="text-xs" style={{ color: 'var(--text-3)' }}>Deposited funds</div>
+            </div>
+          </div>
+          {assetBalance >= 5
+            ? <button onClick={() => { setWSource('asset'); setTab('withdraw'); }}
+                className="btn-primary flex items-center gap-1.5 text-xs px-3 py-2">
+                <ArrowUpRight size={13} /> Withdraw
+              </button>
+            : <span className="text-xs" style={{ color: 'var(--text-3)' }}>Min $5</span>
+          }
+        </div>
       </div>
 
       {/* Tabs */}
@@ -284,19 +315,32 @@ export default function ReferralPage() {
         <div className="max-w-lg">
           <div className="card p-6 glow-border">
             <h2 className="text-base font-bold mb-1" style={{ color: 'var(--text-1)' }}>Request Withdrawal</h2>
-            <p className="text-xs mb-5" style={{ color: 'var(--text-2)' }}>
-              Admin processes withdrawals manually within 24 hours. Minimum $5.
+            <p className="text-xs mb-4" style={{ color: 'var(--text-2)' }}>
+              Admin processes within 24 hours. Minimum $5.
             </p>
 
-            <div className="mb-4 p-3 rounded-xl flex items-center gap-3"
-              style={{ background: 'var(--accent-dim)', border: '1px solid var(--border-hover)' }}>
-              <Wallet size={18} style={{ color: 'var(--accent)' }} />
-              <div>
-                <div className="text-xs" style={{ color: 'var(--text-2)' }}>Available</div>
-                <div className="text-lg font-bold" style={{ color: 'var(--accent)' }}>${fundBalance.toFixed(2)}</div>
-              </div>
+            {/* Source selector */}
+            <div className="flex gap-2 mb-4">
+              {[
+                { key: 'fund',  label: 'Referral Balance', bal: fundBalance },
+                { key: 'asset', label: 'Asset Balance',    bal: assetBalance },
+              ].map(({ key, label, bal }) => (
+                <button key={key} onClick={() => { setWSource(key); setWAmount(''); }}
+                  className="flex-1 rounded-xl p-3 border-2 text-left transition-all"
+                  style={{
+                    borderColor: wSource === key ? 'var(--accent)' : 'var(--border)',
+                    background:  wSource === key ? 'var(--accent-dim)' : 'var(--surface-2)',
+                  }}>
+                  <div className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>{label}</div>
+                  <div className="text-lg font-bold mt-0.5" style={{ color: 'var(--accent)' }}>${bal.toFixed(2)}</div>
+                </button>
+              ))}
             </div>
 
+            {(() => {
+              const activeBal = wSource === 'asset' ? assetBalance : fundBalance;
+              return (
+            <>
             {wSuccess ? (
               <div className="flex items-start gap-3 p-4 rounded-xl mb-4"
                 style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)' }}>
@@ -310,25 +354,25 @@ export default function ReferralPage() {
                   <input type="number" min="5" step="0.01" placeholder="e.g. 10.00"
                     value={wAmount} onChange={e => setWAmount(e.target.value)}
                     className="input" required />
-                  {wAmount && parseFloat(wAmount) > fundBalance && (
-                    <p className="text-xs mt-1" style={{ color: '#dc2626' }}>Exceeds available balance</p>
+                  {wAmount && parseFloat(wAmount) > activeBal && (
+                    <p className="text-xs mt-1" style={{ color: '#dc2626' }}>Exceeds available balance (${activeBal.toFixed(2)})</p>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>Currency</label>
-                    <select value={wCurrency} onChange={e => setWCurrency(e.target.value)} className="input">
-                      {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>
-                      Network <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(optional)</span>
-                    </label>
-                    <input type="text" placeholder="e.g. TRC20"
-                      value={wNetwork} onChange={e => setWNetwork(e.target.value)}
-                      className="input" />
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-2)' }}>Network</label>
+                  <div className="flex gap-2">
+                    {CURRENCIES.map(c => (
+                      <button key={c} type="button" onClick={() => setWCurrency(c)}
+                        className="flex-1 py-2 rounded-lg border text-xs font-semibold transition-all"
+                        style={{
+                          background:  wCurrency === c ? 'var(--accent-dim)' : 'var(--surface-2)',
+                          borderColor: wCurrency === c ? 'var(--accent)' : 'var(--border)',
+                          color:       wCurrency === c ? 'var(--accent)' : 'var(--text-2)',
+                        }}>
+                        {c}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -346,7 +390,7 @@ export default function ReferralPage() {
                   </div>
                 )}
 
-                <button type="submit" disabled={wLoading || parseFloat(wAmount) > fundBalance}
+                <button type="submit" disabled={wLoading || !wAmount || parseFloat(wAmount) > activeBal}
                   className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50">
                   {wLoading ? <RefreshCw size={15} className="animate-spin" /> : <Send size={15} />}
                   {wLoading ? 'Submitting...' : 'Submit Withdrawal Request'}
@@ -364,6 +408,9 @@ export default function ReferralPage() {
                 View Withdrawal History
               </button>
             )}
+            </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -393,8 +440,13 @@ export default function ReferralPage() {
                           <Icon size={16} style={{ color: s.color }} />
                         </div>
                         <div>
-                          <div className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>
-                            ${w.amount.toFixed(2)} <span className="font-normal text-xs" style={{ color: 'var(--text-2)' }}>{w.currency} {w.network && `· ${w.network}`}</span>
+                          <div className="text-sm font-bold flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-1)' }}>
+                            ${w.amount.toFixed(2)}
+                            <span className="font-normal text-xs" style={{ color: 'var(--text-2)' }}>{w.currency} {w.network && `· ${w.network}`}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                              style={{ background: w.source === 'asset' ? '#eff6ff' : '#f0fdf4', color: w.source === 'asset' ? '#2563eb' : '#16a34a' }}>
+                              {w.source === 'asset' ? 'Assets' : 'Referral'}
+                            </span>
                           </div>
                           <div className="text-xs font-mono mt-0.5 truncate max-w-xs" style={{ color: 'var(--text-3)' }}>
                             {w.walletAddress}

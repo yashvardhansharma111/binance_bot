@@ -50,12 +50,13 @@ export async function PATCH(req) {
     withdrawal.processedAt = new Date();
     await withdrawal.save();
   } else {
-    // Reject → refund the held funds back to user
+    // Reject → refund the held funds back to the correct balance
     withdrawal.status      = 'rejected';
     withdrawal.adminNote   = adminNote || '';
     withdrawal.processedAt = new Date();
     await withdrawal.save();
-    await User.findByIdAndUpdate(withdrawal.userId, { $inc: { fundBalance: withdrawal.amount } });
+    const balanceField = withdrawal.source === 'asset' ? 'assetBalance' : 'fundBalance';
+    await User.findByIdAndUpdate(withdrawal.userId, { $inc: { [balanceField]: withdrawal.amount } });
   }
 
   return NextResponse.json({ withdrawal });

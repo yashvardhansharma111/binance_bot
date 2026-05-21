@@ -113,10 +113,14 @@ export default function AdminWithdrawalsPage() {
                       <div>
                         <div className="font-semibold text-slate-900 text-sm">{w.userId?.name}</div>
                         <div className="text-xs text-slate-400">{w.userId?.email}</div>
-                        <div className="text-xl font-bold text-slate-900 mt-1">
+                        <div className="text-xl font-bold text-slate-900 mt-1 flex items-center gap-2 flex-wrap">
                           ${w.amount.toFixed(2)}
-                          <span className="text-sm font-normal text-slate-500 ml-1.5">
+                          <span className="text-sm font-normal text-slate-500">
                             {w.currency} {w.network && `· ${w.network}`}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                            style={{ background: w.source === 'asset' ? '#eff6ff' : '#f0fdf4', color: w.source === 'asset' ? '#2563eb' : '#16a34a' }}>
+                            {w.source === 'asset' ? 'Assets' : 'Referral'}
                           </span>
                         </div>
                       </div>
