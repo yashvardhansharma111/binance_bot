@@ -1,9 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle, CheckCircle2, Zap } from 'lucide-react';
-import axios from 'axios';
-
-const SYMBOLS = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT','ADAUSDT'];
+import SymbolSearch from '@/components/SymbolSearch';
 
 export default function ManualTradePage() {
   const [symbol,  setSymbol]  = useState('BTCUSDT');
@@ -103,29 +101,17 @@ export default function ManualTradePage() {
 
       {/* Pair selector */}
       <div className="card glow-border p-4 mb-4">
-        <div className="text-xs font-semibold text-slate-500 mb-2">Select Pair</div>
-        <div className="flex flex-wrap gap-1.5">
-          {SYMBOLS.map(s => (
-            <button key={s} onClick={() => setSymbol(s)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-all"
-              style={{
-                background:  symbol === s ? '#0f172a' : '#f8fafc',
-                color:       symbol === s ? '#fff' : '#64748b',
-                borderColor: symbol === s ? '#0f172a' : '#e2e8f0',
-              }}>
-              {s.replace('USDT', '')}
-            </button>
-          ))}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <SymbolSearch value={symbol} onChange={s => { setSymbol(s); }} />
+          {price && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900">
+                ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+              </span>
+              <button onClick={fetchPrice} className="text-xs text-blue-500 hover:underline">Refresh</button>
+            </div>
+          )}
         </div>
-        {price && (
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">
-              ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-            </span>
-            <span className="text-xs text-slate-400">{symbol}</span>
-            <button onClick={fetchPrice} className="ml-auto text-xs text-blue-500 hover:underline">Refresh</button>
-          </div>
-        )}
       </div>
 
       {/* Open position alert */}

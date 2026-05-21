@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Clock, Bot } from 'lucide-react';
+import SymbolSearch from '@/components/SymbolSearch';
 
-const SYMBOLS   = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT','ADAUSDT'];
 const TIMEFRAMES = ['1m','5m','15m','1h','4h'];
 
 function Row({ label, hint, children }) {
@@ -136,19 +136,7 @@ export default function SettingsPage() {
       {/* Settings */}
       <div className="card glow-border px-5 py-2">
         <Row label="Trading Pair" hint="Which coin the bot trades">
-          <div className="flex flex-wrap gap-1.5">
-            {SYMBOLS.map(s => (
-              <button key={s} onClick={() => set('symbol', s)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-all"
-                style={{
-                  background:  form.symbol === s ? '#2563eb' : '#f8fafc',
-                  color:       form.symbol === s ? '#fff' : '#64748b',
-                  borderColor: form.symbol === s ? '#2563eb' : '#e2e8f0',
-                }}>
-                {s.replace('USDT', '')}
-              </button>
-            ))}
-          </div>
+          <SymbolSearch value={form.symbol} onChange={s => set('symbol', s)} size="sm" />
         </Row>
 
         <Row label="Timeframe" hint="Candle interval for signals">

@@ -93,7 +93,11 @@ export default function DashboardPage() {
     }
   }
 
-  useEffect(() => { loadData(); fetchBalance(); }, []);
+  useEffect(() => {
+    if (session === undefined) return; // still loading
+    loadData();
+    fetchBalance();
+  }, [session]);
 
   async function toggleBot() {
     if (!sub?.active) { router.push('/dashboard/subscribe'); return; }

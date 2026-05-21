@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Binance from 'node-binance-api';
+import { createHmac } from 'crypto';
 
 const TESTNET = process.env.BINANCE_TESTNET === 'true';
 
@@ -35,12 +36,13 @@ export async function getCurrentPrice(symbol) {
 
 // ── Authenticated client — testnet or live ────────────────────────────────────
 
-function client(apiKey, apiSecret) {
+// isTestnet: explicit per-call override; falls back to global TESTNET env var
+function client(apiKey, apiSecret, isTestnet = TESTNET) {
   const opts = {
     APIKEY: apiKey, APISECRET: apiSecret,
     useServerTime: true, recvWindow: 60000, family: 4,
   };
-  if (TESTNET) {
+  if (isTestnet) {
     opts.urls = {
       base:   TESTNET_CLIENT,
       stream: TESTNET_WS,
@@ -70,9 +72,9 @@ export async function testConnection(apiKey, apiSecret) {
 
 const stepCache = {};
 async function getStepSize(symbol) {
+  // Always use mainnet for exchange info — testnet has the same symbols/lot sizes
   if (stepCache[symbol]) return stepCache[symbol];
-  const base = TESTNET ? TESTNET_API : BASE;
-  const { data } = await axios.get(`${base}/api/v3/exchangeInfo`, { params: { symbol } });
+  const { data } = await axios.get(`${BASE}/api/v3/exchangeInfo`, { params: { symbol } });
   const lot = data.symbols[0].filters.find(f => f.filterType === 'LOT_SIZE');
   stepCache[symbol] = parseFloat(lot.stepSize);
   return stepCache[symbol];
@@ -81,63 +83,82 @@ function roundStep(qty, step) {
   return parseFloat(qty.toFixed(Math.round(-Math.log10(step))));
 }
 
-// ── Orders ────────────────────────────────────────────────────────────────────
+// ── Orders (direct axios — node-binance-api hangs silently on testnet) ────────
 
-function binanceError(err) {
-  // node-binance-api passes raw JSON strings in err.body — parse for a clean message
-  try {
-    const parsed = JSON.parse(err.body || err.message);
-    const code   = parsed.code ?? '';
-    const msg    = parsed.msg  ?? err.message;
-    if (code === -2015) return new Error(`Binance API key missing Spot Trading permission or VPS IP not whitelisted (code -2015)`);
-    return new Error(`Binance error ${code}: ${msg}`);
-  } catch {
-    return new Error(err.body || err.message || String(err));
-  }
+function orderError(e) {
+  const code = e.response?.data?.code;
+  const msg  = e.response?.data?.msg || e.message;
+  if (code === -2015) return new Error('Binance API key missing Spot Trading permission or IP not whitelisted (code -2015)');
+  return new Error(code ? `Binance error ${code}: ${msg}` : msg);
 }
 
-export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
-  const price = await getCurrentPrice(symbol);
-  const step  = await getStepSize(symbol);
-  const qty   = roundStep(usdtAmount / price, step);
+function signedOrderUrl(base, apiSecret, params) {
+  const p   = { ...params, timestamp: Date.now(), recvWindow: 60000 };
+  const qs  = new URLSearchParams(p).toString();
+  const sig = createHmac('sha256', apiSecret).update(qs).digest('hex');
+  return `${base}/api/v3/order?${qs}&signature=${sig}`;
+}
+
+export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount, isTestnet = TESTNET) {
+  console.log(`[binance] placeMarketBuy symbol=${symbol} usdt=${usdtAmount} testnet=${isTestnet}`);
 
   if (process.env.DRY_RUN === 'true') {
+    const price = await getCurrentPrice(symbol);
+    const step  = await getStepSize(symbol);
+    const qty   = roundStep(usdtAmount / price, step);
     console.log(`[DRY_RUN] BUY ${qty} ${symbol} @ $${price}`);
     return { orderId: `DRY_${Date.now()}`, price, qty, total: qty * price };
   }
 
-  return new Promise((resolve, reject) => {
-    try {
-      client(apiKey, apiSecret).marketBuy(symbol, qty, (err, r) => {
-        if (err) return reject(binanceError(err));
-        const fill = parseFloat(r.fills?.[0]?.price || price);
-        resolve({ orderId: String(r.orderId), price: fill, qty, total: qty * fill });
-      });
-    } catch (e) {
-      reject(binanceError(e));
-    }
-  });
+  const base = isTestnet ? TESTNET_API : BASE;
+  // quoteOrderQty = spend exactly this many USDT; Binance computes qty
+  const url  = signedOrderUrl(base, apiSecret, { symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: usdtAmount });
+  console.log(`[binance] POST ${base}/api/v3/order BUY quoteOrderQty=${usdtAmount}`);
+
+  try {
+    const { data: r } = await axios.post(url, null, {
+      headers: { 'X-MBX-APIKEY': apiKey },
+      timeout: 15000,
+    });
+    const qty   = parseFloat(r.executedQty);
+    const total = parseFloat(r.cummulativeQuoteQty);
+    const price = qty > 0 ? total / qty : await getCurrentPrice(symbol);
+    console.log(`[binance] BUY success orderId=${r.orderId} qty=${qty} price=${price}`);
+    return { orderId: String(r.orderId), price, qty, total };
+  } catch (e) {
+    console.error(`[binance] BUY failed:`, e.response?.data || e.message);
+    throw orderError(e);
+  }
 }
 
-export async function placeMarketSell(apiKey, apiSecret, symbol, qty) {
+export async function placeMarketSell(apiKey, apiSecret, symbol, qty, isTestnet = TESTNET) {
+  console.log(`[binance] placeMarketSell symbol=${symbol} qty=${qty} testnet=${isTestnet}`);
+
   const step    = await getStepSize(symbol);
   const safeQty = roundStep(qty, step);
-  const price   = await getCurrentPrice(symbol);
 
   if (process.env.DRY_RUN === 'true') {
+    const price = await getCurrentPrice(symbol);
     console.log(`[DRY_RUN] SELL ${safeQty} ${symbol} @ $${price}`);
     return { orderId: `DRY_${Date.now()}`, price, qty: safeQty, total: safeQty * price };
   }
 
-  return new Promise((resolve, reject) => {
-    try {
-      client(apiKey, apiSecret).marketSell(symbol, safeQty, (err, r) => {
-        if (err) return reject(binanceError(err));
-        const fill = parseFloat(r.fills?.[0]?.price || price);
-        resolve({ orderId: String(r.orderId), price: fill, qty: safeQty, total: safeQty * fill });
-      });
-    } catch (e) {
-      reject(binanceError(e));
-    }
-  });
+  const base = isTestnet ? TESTNET_API : BASE;
+  const url  = signedOrderUrl(base, apiSecret, { symbol, side: 'SELL', type: 'MARKET', quantity: safeQty });
+  console.log(`[binance] POST ${base}/api/v3/order SELL quantity=${safeQty}`);
+
+  try {
+    const { data: r } = await axios.post(url, null, {
+      headers: { 'X-MBX-APIKEY': apiKey },
+      timeout: 15000,
+    });
+    const executedQty = parseFloat(r.executedQty);
+    const total       = parseFloat(r.cummulativeQuoteQty);
+    const price       = executedQty > 0 ? total / executedQty : await getCurrentPrice(symbol);
+    console.log(`[binance] SELL success orderId=${r.orderId} qty=${executedQty} price=${price}`);
+    return { orderId: String(r.orderId), price, qty: executedQty, total };
+  } catch (e) {
+    console.error(`[binance] SELL failed:`, e.response?.data || e.message);
+    throw orderError(e);
+  }
 }

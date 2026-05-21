@@ -28,6 +28,14 @@ async function log(userId, level, message, data = null) {
 export async function runBotForUser(user) {
   const userId = user._id;
 
+  // Stamp heartbeat first so bot monitor knows the process is alive
+  // regardless of subscription status or early exits below
+  await BotSettings.findOneAndUpdate(
+    { userId },
+    { lastTickAt: new Date() },
+    { upsert: true }
+  ).catch(() => {});
+
   try {
     // 0. Subscription check
     if (!user.subscriptionExpiry || new Date(user.subscriptionExpiry) <= new Date()) {
@@ -49,7 +57,6 @@ export async function runBotForUser(user) {
     // 2. Settings (auto-create defaults)
     let settings = await BotSettings.findOne({ userId });
     if (!settings) settings = await BotSettings.create({ userId });
-    await BotSettings.findOneAndUpdate({ userId }, { lastTickAt: new Date() });
 
     const { symbol, timeframe } = settings;
 

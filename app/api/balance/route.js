@@ -79,7 +79,7 @@ export async function GET() {
   const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
   if (!keyDoc) {
     console.log(`[balance] No API key for user ${user._id}`);
-    return NextResponse.json({ error: 'No API key configured' }, { status: 404 });
+    return NextResponse.json({ error: 'No API key configured' });
   }
 
   console.log(`[balance] Found key — type:${keyDoc.accountType}`);

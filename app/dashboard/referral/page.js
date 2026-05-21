@@ -199,7 +199,7 @@ export default function ReferralPage() {
                 { pct: '10%', label: 'of trade profit', desc: 'Every profitable trade your referral makes — you earn 10% of the 15% commission' },
                 { pct: '10%', label: 'of deposit', desc: 'When your referral deposits funds — you earn 10% of the 15% deposit fee' },
               ].map(({ pct, label, desc }) => (
-                <div key={pct} className="rounded-xl p-4" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
                   <div className="text-2xl font-bold mb-1" style={{ color: 'var(--accent)' }}>{pct}</div>
                   <div className="text-xs font-semibold mb-1" style={{ color: 'var(--text-1)' }}>{label}</div>
                   <div className="text-xs" style={{ color: 'var(--text-3)' }}>{desc}</div>

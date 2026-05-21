@@ -5,8 +5,8 @@ import {
   CandlestickSeries, HistogramSeries, LineSeries,
 } from 'lightweight-charts';
 import { RefreshCw, BarChart2, Wifi, WifiOff, ArrowUp, ArrowDown, Activity } from 'lucide-react';
+import SymbolSearch from '@/components/SymbolSearch';
 
-const SYMBOLS   = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h'];
 
 function calcRSI(closes, period = 14) {
@@ -296,19 +296,7 @@ export default function ChartPage() {
 
       {/* Symbol + Interval selectors */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="flex gap-0.5 bg-slate-100 p-1 rounded-lg">
-          {SYMBOLS.map(s => (
-            <button key={s} onClick={() => setSymbol(s)}
-              className="px-2.5 py-1.5 rounded-md text-xs font-bold transition-all"
-              style={{
-                background: symbol === s ? 'white' : 'transparent',
-                color:      symbol === s ? '#0f172a' : '#64748b',
-                boxShadow:  symbol === s ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              }}>
-              {s.replace('USDT', '')}
-            </button>
-          ))}
-        </div>
+        <SymbolSearch value={symbol} onChange={setSymbol} size="sm" />
         <div className="flex gap-0.5 bg-slate-100 p-1 rounded-lg">
           {INTERVALS.map(iv => (
             <button key={iv} onClick={() => setTimeframe(iv)}
