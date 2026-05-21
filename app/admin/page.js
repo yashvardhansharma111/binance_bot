@@ -33,6 +33,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
   const [saving, setSaving] = useState('');
+  const [grantingId, setGrantingId] = useState(null);
+  const [grantDays, setGrantDays] = useState('30');
+  const [grantLoading, setGrantLoading] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -62,6 +65,19 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, status: newStatus }),
     });
+    load();
+  }
+
+  async function grantSub(userId) {
+    setGrantLoading(true);
+    await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, grantDays: Number(grantDays) }),
+    });
+    setGrantLoading(false);
+    setGrantingId(null);
+    setGrantDays('30');
     load();
   }
 
@@ -238,14 +254,44 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => toggleUser(u._id, u.status)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                          u.status === 'active'
-                            ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                        }`}>
-                        {u.status === 'active' ? <><UserX size={12} /> Block</> : <><UserCheck size={12} /> Activate</>}
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button onClick={() => toggleUser(u._id, u.status)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                            u.status === 'active'
+                              ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                          }`}>
+                          {u.status === 'active' ? <><UserX size={12} /> Block</> : <><UserCheck size={12} /> Activate</>}
+                        </button>
+                        {grantingId === u._id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number" min="1" max="365"
+                              value={grantDays}
+                              onChange={e => setGrantDays(e.target.value)}
+                              className="w-14 px-1.5 py-1 text-xs border border-slate-300 rounded-lg text-center"
+                            />
+                            <span className="text-xs text-slate-400">d</span>
+                            <button
+                              onClick={() => grantSub(u._id)}
+                              disabled={grantLoading}
+                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+                              {grantLoading ? '…' : 'OK'}
+                            </button>
+                            <button
+                              onClick={() => setGrantingId(null)}
+                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200">
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setGrantingId(u._id); setGrantDays('30'); }}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 whitespace-nowrap">
+                            <Star size={11} /> Grant Sub
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

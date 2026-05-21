@@ -33,10 +33,18 @@ export async function GET() {
 export async function PATCH(req) {
   const admin = await adminGuard();
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { userId, status, role } = await req.json();
+  const { userId, status, role, grantDays } = await req.json();
   const update = {};
   if (status) update.status = status;
-  if (role) update.role = role;
+  if (role)   update.role   = role;
+  if (grantDays) {
+    const now  = new Date();
+    const user = await User.findById(userId).select('subscriptionExpiry');
+    const base = user?.subscriptionExpiry && new Date(user.subscriptionExpiry) > now
+      ? new Date(user.subscriptionExpiry)
+      : now;
+    update.subscriptionExpiry = new Date(base.getTime() + Number(grantDays) * 86_400_000);
+  }
   const user = await User.findByIdAndUpdate(userId, { $set: update }, { new: true }).select('-password');
   return NextResponse.json(user);
 }
