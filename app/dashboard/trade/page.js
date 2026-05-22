@@ -1,29 +1,39 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle, CheckCircle2, Zap } from 'lucide-react';
+import {
+  ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle,
+  CheckCircle2, Zap, TrendingUp, TrendingDown, LogOut,
+} from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
 
 export default function ManualTradePage() {
-  const [symbol,  setSymbol]  = useState('BTCUSDT');
-  const [side,    setSide]    = useState('BUY');
-  const [amount,  setAmount]  = useState('');     // USDT for BUY
-  const [qty,     setQty]     = useState('');     // coin qty for SELL
-  const [sl,      setSl]      = useState('');     // stop loss %
-  const [tp,      setTp]      = useState('');     // take profit %
-  const [price,   setPrice]   = useState(null);
-  const [balance, setBalance] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [result,  setResult]  = useState(null);
-  const [error,   setError]   = useState('');
-  const [openPos, setOpenPos] = useState(null);
+  const [symbol,      setSymbol]      = useState('BTCUSDT');
+  const [side,        setSide]        = useState('BUY');
+  const [amount,      setAmount]      = useState('');
+  const [qty,         setQty]         = useState('');
+  const [sl,          setSl]          = useState('');
+  const [tp,          setTp]          = useState('');
+  const [price,       setPrice]       = useState(null);
+  const [balance,     setBalance]     = useState(null);
+  const [loading,     setLoading]     = useState(false);
+  const [result,      setResult]      = useState(null);
+  const [error,       setError]       = useState('');
+  const [openTrades,  setOpenTrades]  = useState([]);
+  const [livePrices,  setLivePrices]  = useState({});
+  const [exitLoading, setExitLoading] = useState('');
+  const [exitResult,  setExitResult]  = useState(null);
+  const [exitError,   setExitError]   = useState('');
 
-  useEffect(() => { fetchPrice(); fetchBalance(); fetchOpen(); }, [symbol]);
+  useEffect(() => { fetchPrice(); }, [symbol]);
+  useEffect(() => { fetchBalance(); fetchOpenTrades(); }, []);
 
   async function fetchPrice() {
     setPrice(null);
-    const res  = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
-    const data = await res.json();
-    setPrice(parseFloat(data.price));
+    try {
+      const res  = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
+      const data = await res.json();
+      setPrice(parseFloat(data.price));
+    } catch { /* ignore */ }
   }
 
   async function fetchBalance() {
@@ -32,10 +42,47 @@ export default function ManualTradePage() {
     setBalance(data);
   }
 
-  async function fetchOpen() {
-    const res  = await fetch(`/api/trades?symbol=${symbol}&status=open&limit=1`);
-    const data = await res.json();
-    setOpenPos(data.trades?.[0] || null);
+  async function fetchOpenTrades() {
+    const res    = await fetch('/api/trades?status=open&limit=50');
+    const data   = await res.json();
+    const trades = data.trades || [];
+    setOpenTrades(trades);
+    const symbols = [...new Set(trades.map(t => t.symbol))];
+    if (!symbols.length) return;
+    const pairs = await Promise.all(
+      symbols.map(async sym => {
+        try {
+          const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`);
+          const d = await r.json();
+          return [sym, parseFloat(d.price)];
+        } catch { return [sym, null]; }
+      })
+    );
+    setLivePrices(Object.fromEntries(pairs));
+  }
+
+  async function exitTrade(tradeId) {
+    setExitError(''); setExitResult(null); setExitLoading(tradeId);
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      const res = await fetch('/api/trade/exit', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal:  controller.signal,
+        body:    JSON.stringify({ tradeId }),
+      });
+      clearTimeout(timer);
+      const data = await res.json();
+      if (!res.ok) { setExitError(data.error || 'Exit failed'); return; }
+      setExitResult(data);
+      await fetchOpenTrades();
+      fetchBalance();
+    } catch (err) {
+      setExitError(err.name === 'AbortError' ? 'Request timed out — check History' : 'Network error');
+    } finally {
+      setExitLoading('');
+    }
   }
 
   async function placeOrder() {
@@ -47,12 +94,11 @@ export default function ManualTradePage() {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 20000);
-
       const res = await fetch('/api/trade/manual', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
+        signal:  controller.signal,
+        body:    JSON.stringify({
           symbol, side,
           usdtAmount:        side === 'BUY' ? parseFloat(amount) : undefined,
           qty:               side === 'SELL' && qty ? parseFloat(qty) : undefined,
@@ -61,25 +107,18 @@ export default function ManualTradePage() {
         }),
       });
       clearTimeout(timer);
-
       let data;
-      try {
-        data = await res.json();
-      } catch {
-        setError(`Server error (HTTP ${res.status}) — order may or may not have been placed. Check History.`);
-        return;
+      try { data = await res.json(); } catch {
+        setError(`Server error (HTTP ${res.status}) — check History.`); return;
       }
-
       if (!res.ok) { setError(data.error || 'Order failed'); return; }
       setResult(data);
       setAmount(''); setQty('');
-      fetchBalance(); fetchOpen();
+      fetchBalance(); fetchOpenTrades();
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setError('Request timed out (20s) — check History to see if the order was placed.');
-      } else {
-        setError(`Network error: ${err.message}`);
-      }
+      setError(err.name === 'AbortError'
+        ? 'Request timed out (20s) — check History to see if order was placed.'
+        : `Network error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -91,8 +130,8 @@ export default function ManualTradePage() {
   const estVal  = price && qty    ? (parseFloat(qty) * price).toFixed(2)   : '—';
 
   return (
-    <div className="max-w-lg">
-      <div className="mb-6">
+    <div className="max-w-lg space-y-5">
+      <div>
         <h1 className="text-xl font-bold text-slate-900 lg:text-2xl flex items-center gap-2">
           <Zap size={20} className="text-blue-500" /> Manual Trade
         </h1>
@@ -100,7 +139,7 @@ export default function ManualTradePage() {
       </div>
 
       {/* Pair selector */}
-      <div className="card glow-border p-4 mb-4">
+      <div className="card glow-border p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <SymbolSearch value={symbol} onChange={s => { setSymbol(s); }} />
           {price && (
@@ -114,20 +153,9 @@ export default function ManualTradePage() {
         </div>
       </div>
 
-      {/* Open position alert */}
-      {openPos && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs flex items-start gap-2">
-          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-          <span>
-            Open {symbol} position: <strong>{openPos.qty} @ ${openPos.price?.toFixed(2)}</strong>
-            {openPos.stopLoss && ` | SL: $${openPos.stopLoss}`}
-            {openPos.takeProfit && ` | TP: $${openPos.takeProfit}`}
-          </span>
-        </div>
-      )}
-
-      {/* BUY / SELL tabs */}
+      {/* Order form */}
       <div className="card glow-border p-5 space-y-4">
+        {/* BUY / SELL tabs */}
         <div className="flex gap-2">
           <button onClick={() => setSide('BUY')}
             className="flex-1 py-2.5 rounded-lg text-sm font-bold border-2 transition-all"
@@ -228,21 +256,137 @@ export default function ManualTradePage() {
 
         <button onClick={placeOrder} disabled={loading}
           className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
-          style={{
-            background: side === 'BUY' ? '#16a34a' : '#dc2626',
-            color: '#fff',
-          }}>
+          style={{ background: side === 'BUY' ? '#16a34a' : '#dc2626', color: '#fff' }}>
           {loading
             ? <RefreshCw size={16} className="animate-spin" />
-            : side === 'BUY' ? <ArrowUpCircle size={16} /> : <ArrowDownCircle size={16} />
-          }
+            : side === 'BUY' ? <ArrowUpCircle size={16} /> : <ArrowDownCircle size={16} />}
           {loading ? 'Placing order...' : `Place ${side} Order`}
         </button>
 
         <p className="text-xs text-center text-slate-400">
           Market order — executes immediately at current price.
-          {process.env.NODE_ENV !== 'production' && ' DRY RUN mode active.'}
         </p>
+      </div>
+
+      {/* Open Positions */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-bold text-slate-700">Open Positions</h2>
+          <button onClick={fetchOpenTrades}
+            className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+            <RefreshCw size={11} /> Refresh
+          </button>
+        </div>
+
+        {exitError && (
+          <div className="mb-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs flex items-center gap-2">
+            <AlertTriangle size={13} /> {exitError}
+          </div>
+        )}
+        {exitResult && (
+          <div className="mb-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+            <CheckCircle2 size={13} />
+            Exited @ ${exitResult.order?.price?.toLocaleString()} · P&L: {exitResult.profit >= 0 ? '+' : ''}${exitResult.profit?.toFixed(4)}
+          </div>
+        )}
+
+        {openTrades.length === 0 ? (
+          <div className="card p-6 text-center text-slate-400 text-xs">
+            No open positions
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {openTrades.map(t => {
+              const live    = livePrices[t.symbol];
+              const pnl     = live ? parseFloat(((live - t.price) * t.qty).toFixed(4)) : null;
+              const pnlPct  = live ? ((live - t.price) / t.price * 100).toFixed(2) : null;
+              const profit  = pnl !== null && pnl >= 0;
+
+              return (
+                <div key={t._id} className="card glow-border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-900 text-sm">{t.symbol}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                          BUY
+                        </span>
+                        {t.source === 'manual' && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-600">
+                            Manual
+                          </span>
+                        )}
+                        {t.source === 'bot' && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-50 text-violet-600">
+                            Bot
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div>
+                          <span className="text-slate-400">Entry</span>
+                          <span className="ml-1.5 font-mono font-semibold text-slate-700">
+                            ${t.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Qty</span>
+                          <span className="ml-1.5 font-mono font-semibold text-slate-700">{t.qty}</span>
+                        </div>
+                        {live && (
+                          <>
+                            <div>
+                              <span className="text-slate-400">Live</span>
+                              <span className="ml-1.5 font-mono font-semibold text-slate-700">
+                                ${live.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-400">P&L</span>
+                              <span className={`ml-1.5 font-bold ${profit ? 'text-emerald-600' : 'text-red-500'}`}>
+                                {profit ? '+' : ''}${pnl} ({profit ? '+' : ''}{pnlPct}%)
+                              </span>
+                              {profit
+                                ? <TrendingUp  size={11} className="text-emerald-500" />
+                                : <TrendingDown size={11} className="text-red-400" />}
+                            </div>
+                          </>
+                        )}
+                        {t.stopLoss && (
+                          <div>
+                            <span className="text-slate-400">SL</span>
+                            <span className="ml-1.5 font-mono text-red-500">${t.stopLoss}</span>
+                          </div>
+                        )}
+                        {t.takeProfit && (
+                          <div>
+                            <span className="text-slate-400">TP</span>
+                            <span className="ml-1.5 font-mono text-emerald-600">${t.takeProfit}</span>
+                          </div>
+                        )}
+                        <div className="col-span-2 text-slate-400">
+                          Opened {new Date(t.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => exitTrade(t._id)}
+                      disabled={exitLoading === t._id}
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                      style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                      {exitLoading === t._id
+                        ? <RefreshCw size={12} className="animate-spin" />
+                        : <LogOut size={12} />}
+                      Exit
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
