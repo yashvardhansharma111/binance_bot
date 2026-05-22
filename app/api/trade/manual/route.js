@@ -42,8 +42,8 @@ export async function POST(req) {
   try {
     let order;
     if (side === 'BUY') {
-      if (!usdtAmount || usdtAmount < 1)
-        return NextResponse.json({ error: 'Enter USDT amount to spend' }, { status: 400 });
+      if (!usdtAmount || usdtAmount < 10)
+        return NextResponse.json({ error: 'Minimum order is $10 (Binance notional filter)' }, { status: 400 });
       console.log(`[manual-trade] Placing BUY ${symbol} $${usdtAmount} testnet=${isTestnet}`);
       order = await placeMarketBuy(apiKey, apiSecret, symbol, parseFloat(usdtAmount), isTestnet);
     } else {

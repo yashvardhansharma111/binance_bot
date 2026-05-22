@@ -87,8 +87,8 @@ export default function ManualTradePage() {
 
   async function placeOrder() {
     setError(''); setResult(null);
-    if (side === 'BUY' && (!amount || parseFloat(amount) < 1)) {
-      setError('Enter USDT amount (min $1)'); return;
+    if (side === 'BUY' && (!amount || parseFloat(amount) < 10)) {
+      setError('Enter USDT amount (min $10)'); return;
     }
     setLoading(true);
     try {
@@ -186,7 +186,7 @@ export default function ManualTradePage() {
         {side === 'BUY' ? (
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Amount to spend (USDT)</label>
-            <input type="number" min="1" placeholder="e.g. 100"
+            <input type="number" min="10" placeholder="e.g. 100"
               value={amount} onChange={e => setAmount(e.target.value)}
               className="input w-full" />
             <div className="text-xs text-slate-400 mt-1.5">
