@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import {
-  Activity, TrendingUp, TrendingDown, AlertTriangle, Info,
+  Activity, TrendingUp, TrendingDown, Info,
   RefreshCw, Play, Square, Wifi, WifiOff, Target, ShieldCheck,
   BarChart2, Clock, Zap, XCircle,
 } from 'lucide-react';
@@ -83,7 +83,7 @@ export default function BotMonitorPage() {
     </div>
   );
 
-  const { stats, openTrade, logs, settings, botActive, testnet, dryRun, todayTrades, lastTickAt, processAlive } = data;
+  const { stats, openTrade, logs, settings, botActive, testnet, dryRun, todayTrades } = data;
   const modeLabel = dryRun ? 'DRY RUN' : testnet ? 'TESTNET' : 'LIVE';
   const modeStyle = dryRun
     ? { color: '#b45309', bg: '#fefce8', border: '#fde68a' }
@@ -137,39 +137,16 @@ export default function BotMonitorPage() {
         </div>
       </div>
 
-      {/* Process-dead warning */}
-      {botActive && !processAlive && (
-        <div className="mb-4 px-4 py-3 rounded-xl border border-red-200 bg-red-50 flex items-start gap-3">
-          <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-red-700">Bot process is not running</p>
-            <p className="text-xs text-red-500 mt-0.5">
-              The bot flag is ON but no tick has been recorded in the last 10 minutes.
-              The bot server is not running — host it on Railway or Render separately from Vercel.
-              {lastTickAt && ` Last tick: ${new Date(lastTickAt).toLocaleString()}`}
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Status bar */}
       <div className="flex items-center gap-3 mb-6 px-4 py-3 rounded-xl border"
         style={{
-          background:  botActive && processAlive ? '#f0fdf4' : botActive ? '#fef2f2' : '#f8fafc',
-          borderColor: botActive && processAlive ? '#bbf7d0' : botActive ? '#fecaca' : '#e2e8f0',
+          background:  botActive ? '#f0fdf4' : '#f8fafc',
+          borderColor: botActive ? '#bbf7d0' : '#e2e8f0',
         }}>
-        <span className={`w-2.5 h-2.5 rounded-full ${
-          botActive && processAlive ? 'bg-emerald-500 animate-pulse'
-          : botActive ? 'bg-red-400 animate-pulse'
-          : 'bg-slate-300'
-        }`} />
-        <span className="text-sm font-medium" style={{
-          color: botActive && processAlive ? '#16a34a' : botActive ? '#dc2626' : '#94a3b8'
-        }}>
-          {botActive && processAlive
+        <span className={`w-2.5 h-2.5 rounded-full ${botActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+        <span className="text-sm font-medium" style={{ color: botActive ? '#16a34a' : '#94a3b8' }}>
+          {botActive
             ? `Bot running — scanning ${settings.symbol || 'BTCUSDT'} every 5 minutes`
-            : botActive
-            ? 'Bot enabled but process not detected'
             : 'Bot stopped'}
         </span>
         {lastRefresh && (
