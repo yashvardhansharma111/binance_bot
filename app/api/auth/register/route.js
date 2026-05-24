@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import { getOtp, deleteOtp } from '@/lib/otpCache';
 import { sendWelcomeEmail } from '@/lib/mail';
+import { validatePassword } from '@/lib/passwordUtils';
 
 function generateReferralCode(name) {
   const base = name.replace(/\s+/g, '').toUpperCase().slice(0, 4);
@@ -17,6 +18,9 @@ export async function POST(req) {
     if (!name || !email || !password || !otp) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 });
     }
+    const { valid, failures } = validatePassword(password);
+    if (!valid)
+      return NextResponse.json({ error: `Weak password: ${failures.map(f => f.label).join(', ')}` }, { status: 400 });
 
     // Verify OTP
     const stored = getOtp('signup', email);

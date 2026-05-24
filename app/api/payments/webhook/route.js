@@ -46,28 +46,26 @@ export async function POST(req) {
       await sub.save();
       await User.findByIdAndUpdate(sub.userId, { subscriptionExpiry: sub.expiresAt });
 
-      // Credit overpayment to fundBalance
-      // e.g. plan = $1, user sent $5 worth → $4 goes to their fundBalance
-      const expectedCrypto  = ipnPayAmount  || sub.payAmount;   // crypto amount for $1
-      const planPriceUsd    = ipnPriceAmount || sub.amount || 1; // plan price in USD
+      // Credit overpayment to assetBalance
+      const expectedCrypto  = ipnPayAmount  || sub.payAmount;
+      const planPriceUsd    = ipnPriceAmount || sub.amount || 1;
       if (actually_paid && expectedCrypto && actually_paid > expectedCrypto * 1.01) {
-        // 1.01 threshold to ignore tiny rounding differences from the payment gateway
         const overpayRatio = (actually_paid - expectedCrypto) / expectedCrypto;
         const overpayUsd   = parseFloat((overpayRatio * planPriceUsd).toFixed(2));
         if (overpayUsd >= 0.01) {
-          await User.findByIdAndUpdate(sub.userId, { $inc: { fundBalance: overpayUsd } });
-          console.log(`[webhook] Sub overpayment: $${overpayUsd} credited to user ${sub.userId}`);
+          await User.findByIdAndUpdate(sub.userId, { $inc: { assetBalance: overpayUsd } });
+          console.log(`[webhook] Sub overpayment: $${overpayUsd} credited to assetBalance ${sub.userId}`);
         }
       }
 
-      // Credit 20% of subscription price to referrer (if any)
+      // Credit 20% of subscription price to referrer's assetBalance
       const buyer = await User.findById(sub.userId).select('referredBy');
       if (buyer?.referredBy) {
         const referrer = await User.findOne({ referralCode: buyer.referredBy }).select('_id');
         if (referrer) {
           const referrerCut = parseFloat(((sub.amount || 1) * 0.20).toFixed(4));
-          await User.findByIdAndUpdate(referrer._id, { $inc: { fundBalance: referrerCut } });
-          console.log(`[webhook] Sub referral: referrer ${referrer._id} credited $${referrerCut}`);
+          await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: referrerCut } });
+          console.log(`[webhook] Sub referral: referrer ${referrer._id} credited $${referrerCut} to assetBalance`);
         }
       }
     } else {
@@ -110,9 +108,9 @@ export async function POST(req) {
         referrerAmount = +(depositAmount * REFERRER_RATE).toFixed(2);
         platformAmount = +(depositAmount * PLATFORM_RATE).toFixed(2);
 
-        // Credit referrer's fundBalance
-        await User.findByIdAndUpdate(referrer._id, { $inc: { fundBalance: referrerAmount } });
-        console.log(`[webhook] Referrer ${referrer._id} credited $${referrerAmount}`);
+        // Credit referrer's assetBalance
+        await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: referrerAmount } });
+        console.log(`[webhook] Referrer ${referrer._id} credited $${referrerAmount} to assetBalance`);
       }
     }
 

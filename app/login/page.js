@@ -1,12 +1,15 @@
 'use client';
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, MonitorSmartphone } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const sessionExpired = searchParams.get('reason') === 'session_expired';
+
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,6 +67,11 @@ export default function LoginPage() {
           <p className="text-slate-500 mb-8">Sign in to your trading account</p>
 
           <div className="card p-8 glow-border">
+            {sessionExpired && (
+              <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-amber-50 border border-amber-200 text-amber-700">
+                <MonitorSmartphone size={15} /> You were signed in on another device. Please log in again.
+              </div>
+            )}
             {error && (
               <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-red-50 border border-red-200 text-red-600">
                 <AlertCircle size={15} /> {error}

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   TrendingUp, TrendingDown, Bot, Wallet, Users, Activity,
   Play, Square, RefreshCw, ArrowRight, Crown, CheckCircle2, Lock,
-  AlertCircle,
+  AlertCircle, Copy, Check,
 } from 'lucide-react';
 
 function StatCard({ title, value, sub, icon: Icon, iconBg, iconColor, trend }) {
@@ -108,6 +108,17 @@ export default function DashboardPage() {
     setBotLoading(false);
   }
 
+  const [refCopied, setRefCopied] = useState(false);
+
+  function copyReferral() {
+    if (!user?.referralCode) return;
+    const link = `${window.location.origin}/register?ref=${user.referralCode}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setRefCopied(true);
+      setTimeout(() => setRefCopied(false), 2000);
+    });
+  }
+
   const totalProfit = trades.reduce((s, t) => s + (t.profit || 0), 0);
   const firstName   = session?.user?.name?.split(' ')[0];
 
@@ -175,15 +186,19 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
         <StatCard
-          title="Fund Balance"
-          value={`$${(user?.fundBalance || 0).toFixed(2)}`}
-          sub="Available for trading"
-          icon={Wallet} iconBg="#eff6ff" iconColor="#2563eb" trend={2.4}
+          title="Binance USDT"
+          value={balLoading && !balances
+            ? '...'
+            : balances?.error
+              ? 'N/A'
+              : `$${(balances?.balances?.find(b => b.asset === 'USDT')?.free ?? 0).toFixed(2)}`}
+          sub="Exchange balance"
+          icon={Wallet} iconBg="#eff6ff" iconColor="#2563eb"
         />
         <StatCard
           title="Asset Balance"
           value={`$${(user?.assetBalance ?? 0).toFixed(2)}`}
-          sub={`Min: $${user?.minAssetRequired || 100}`}
+          sub="Deposits + commissions"
           icon={Activity} iconBg="#ecfeff" iconColor="#0891b2"
         />
         <StatCard
@@ -195,12 +210,29 @@ export default function DashboardPage() {
           iconColor={totalProfit >= 0 ? '#16a34a' : '#dc2626'}
           trend={totalProfit >= 0 ? 5.2 : -1.8}
         />
-        <StatCard
-          title="Referral Code"
-          value={user?.referralCode || '—'}
-          sub="Share to earn"
-          icon={Users} iconBg="#fefce8" iconColor="#b45309"
-        />
+        {/* Referral — clickable copy card */}
+        <button onClick={copyReferral}
+          className="card p-5 glow-border text-left w-full transition-all active:scale-95 hover:shadow-md"
+          style={{ cursor: 'pointer' }}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-slate-500 text-xs mb-1">Referral Code</p>
+              <p className="text-xl font-bold text-slate-900 font-mono tracking-wide">
+                {user?.referralCode || '—'}
+              </p>
+              <p className="text-xs mt-0.5 flex items-center gap-1"
+                style={{ color: refCopied ? '#16a34a' : '#94a3b8' }}>
+                {refCopied ? <><Check size={11} /> Link copied!</> : <><Copy size={11} /> Tap to copy link</>}
+              </p>
+            </div>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+              style={{ background: refCopied ? '#f0fdf4' : '#fefce8' }}>
+              {refCopied
+                ? <Check size={16} className="text-emerald-500" />
+                : <Users size={16} style={{ color: '#b45309' }} />}
+            </div>
+          </div>
+        </button>
       </div>
 
       {/* Binance Account Balance */}
@@ -306,7 +338,7 @@ export default function DashboardPage() {
                   }`}>{trade.side}</span>
                   <div>
                     <div className="text-xs font-semibold text-slate-800">{trade.symbol}</div>
-                    <div className="text-xs text-slate-400">{trade.source === 'manual' ? 'Manual' : 'Bot'}</div>
+                    <div className="text-xs text-slate-400">{trade.source === 'manual' ? 'Manual' : 'Auto Trade'}</div>
                   </div>
                 </div>
                 <div className="text-right">

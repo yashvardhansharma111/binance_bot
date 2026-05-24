@@ -1,9 +1,12 @@
 export const dynamic = 'force-dynamic';
 import { DesktopSidebar, MobileTopBar, MobileTabBar } from '@/components/Sidebar';
+import SessionGuard from '@/components/SessionGuard';
 
 export default function DashboardLayout({ children }) {
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
+      <SessionGuard />
+
       {/* Desktop: left sidebar */}
       <DesktopSidebar />
 

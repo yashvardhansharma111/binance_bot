@@ -38,9 +38,9 @@ async function applyCommission(userId, tradeId, profit) {
       platformRate   = PLATFORM_RATE_WITH;
       referrerRate   = REFERRER_RATE;
 
-      // Credit referrer's fund balance
+      // Credit referrer's asset balance
       await User.findByIdAndUpdate(referrer._id, {
-        $inc: { fundBalance: referrerAmount },
+        $inc: { assetBalance: referrerAmount },
       });
     }
   }

@@ -40,13 +40,15 @@ function StatBox({ label, value, sub, color, icon: Icon }) {
 }
 
 export default function BotMonitorPage() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState(null);
-  const [toggling, setToggling] = useState(false);
-  const logsRef = useRef(null);
-  const intervalRef = useRef(null);
+  const [data,       setData]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [autoRefresh,setAutoRefresh]= useState(true);
+  const [lastRefresh,setLastRefresh]= useState(null);
+  const [toggling,   setToggling]   = useState(false);
+  const [trades,     setTrades]     = useState([]);
+  const logsRef      = useRef(null);
+  const intervalRef  = useRef(null);
+  const tradesRef    = useRef(null);
 
   async function load(silent = false) {
     if (!silent) setLoading(true);
@@ -57,15 +59,28 @@ export default function BotMonitorPage() {
     if (!silent) setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  async function loadTrades() {
+    try {
+      const res = await fetch('/api/bot/trades');
+      const d   = await res.json();
+      setTrades(d.trades || []);
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => { load(); loadTrades(); }, []);
 
   useEffect(() => {
     if (autoRefresh) {
       intervalRef.current = setInterval(() => load(true), 8000);
+      tradesRef.current   = setInterval(() => loadTrades(), 3000);
     } else {
       clearInterval(intervalRef.current);
+      clearInterval(tradesRef.current);
     }
-    return () => clearInterval(intervalRef.current);
+    return () => {
+      clearInterval(intervalRef.current);
+      clearInterval(tradesRef.current);
+    };
   }, [autoRefresh]);
 
   async function toggleBot() {
@@ -244,22 +259,30 @@ export default function BotMonitorPage() {
             )}
           </div>
 
-          {/* Today's trades */}
+          {/* Today's trades — auto-refreshed every 3s, includes Binance trades */}
           <div className="card p-5 glow-border flex-1">
             <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2 text-sm">
               <BarChart2 size={15} className="text-blue-500" /> Today's Trades
+              {autoRefresh && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />}
             </h2>
-            {todayTrades.length === 0 ? (
+            {trades.length === 0 ? (
               <div className="text-center py-4 text-slate-400 text-sm">No trades today yet</div>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {todayTrades.map(t => (
+                {trades.map(t => (
                   <div key={t._id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                         t.side === 'BUY' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
                       }`}>{t.side}</span>
                       <span className="text-xs font-medium text-slate-800">{t.symbol}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                        t.source === 'binance' ? 'bg-orange-50 text-orange-600' :
+                        t.source === 'manual'  ? 'bg-blue-50 text-blue-600' :
+                                                  'bg-violet-50 text-violet-600'
+                      }`}>
+                        {t.source === 'binance' ? 'Binance' : t.source === 'manual' ? 'Manual' : 'Auto'}
+                      </span>
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-slate-600">${t.price?.toFixed(2)}</div>

@@ -2,44 +2,82 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Zap, Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle, Hash, ShieldCheck, RefreshCw } from 'lucide-react';
+import {
+  Zap, Mail, Lock, User, Eye, EyeOff, AlertCircle,
+  CheckCircle, Hash, ShieldCheck, RefreshCw, Wand2, Check, X, Copy,
+} from 'lucide-react';
+import { PASSWORD_RULES, validatePassword, generatePassword } from '@/lib/passwordUtils';
+
+function StrengthChecklist({ password }) {
+  if (!password) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      {PASSWORD_RULES.map(rule => {
+        const pass = rule.test(password);
+        return (
+          <div key={rule.id} className="flex items-center gap-1.5 text-xs">
+            {pass
+              ? <Check size={11} className="text-emerald-500 shrink-0" />
+              : <X     size={11} className="text-red-400 shrink-0" />}
+            <span className={pass ? 'text-emerald-600' : 'text-slate-400'}>{rule.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function RegisterForm() {
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
 
-  const [step, setStep] = useState(1); // 1=form, 2=otp
-  const [form, setForm] = useState({ name: '', email: '', password: '', referralCode: '' });
-  const [otp, setOtp] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [step,       setStep]       = useState(1);
+  const [form,       setForm]       = useState({ name: '', email: '', password: '', referralCode: '' });
+  const [otp,        setOtp]        = useState('');
+  const [showPass,   setShowPass]   = useState(false);
+  const [loading,    setLoading]    = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [countdown, setCountdown] = useState(0);
+  const [error,      setError]      = useState('');
+  const [success,    setSuccess]    = useState('');
+  const [countdown,  setCountdown]  = useState(0);
+  const [copied,     setCopied]     = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
     if (ref) setForm(f => ({ ...f, referralCode: ref }));
   }, [searchParams]);
 
-  // Resend countdown
   useEffect(() => {
     if (countdown <= 0) return;
     const t = setTimeout(() => setCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown]);
 
+  function handleGenerate() {
+    const pwd = generatePassword(14);
+    setForm(f => ({ ...f, password: pwd }));
+    setShowPass(true);
+  }
+
+  function handleCopy() {
+    if (!form.password) return;
+    navigator.clipboard.writeText(form.password).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   async function sendOtp(e) {
     e.preventDefault();
     if (!form.name || !form.email || !form.password) return setError('Please fill all required fields');
-    if (form.password.length < 6) return setError('Password must be at least 6 characters');
+    const { valid, failures } = validatePassword(form.password);
+    if (!valid) return setError(`Password must include: ${failures.map(f => f.label).join(', ')}`);
     setError('');
     setOtpLoading(true);
     const res = await fetch('/api/auth/send-otp', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: form.email, purpose: 'signup' }),
+      body:    JSON.stringify({ email: form.email, purpose: 'signup' }),
     });
     const data = await res.json();
     setOtpLoading(false);
@@ -52,9 +90,9 @@ function RegisterForm() {
     setError('');
     setOtpLoading(true);
     const res = await fetch('/api/auth/send-otp', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: form.email, purpose: 'signup' }),
+      body:    JSON.stringify({ email: form.email, purpose: 'signup' }),
     });
     setOtpLoading(false);
     if (res.ok) setCountdown(60);
@@ -67,9 +105,9 @@ function RegisterForm() {
     setError('');
     setLoading(true);
     const res = await fetch('/api/auth/register', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, otp }),
+      body:    JSON.stringify({ ...form, otp }),
     });
     const data = await res.json();
     setLoading(false);
@@ -77,6 +115,10 @@ function RegisterForm() {
     setSuccess(`Account created! Referral code: ${data.referralCode}`);
     setTimeout(() => router.push('/login'), 2500);
   }
+
+  const { valid: pwdValid } = validatePassword(form.password);
+  const strengthCount = PASSWORD_RULES.filter(r => r.test(form.password)).length;
+  const strengthColor = strengthCount <= 2 ? '#ef4444' : strengthCount <= 3 ? '#f59e0b' : strengthCount === 4 ? '#3b82f6' : '#10b981';
 
   const leftPanel = (
     <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 flex-col justify-between p-12">
@@ -142,18 +184,47 @@ function RegisterForm() {
                     </div>
                   </div>
 
+                  {/* Password with generate + copy */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-sm font-medium text-slate-700">Password</label>
+                      <div className="flex gap-1.5">
+                        {form.password && (
+                          <button type="button" onClick={handleCopy}
+                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2 py-0.5 rounded border border-slate-200 hover:border-slate-300 transition-all">
+                            <Copy size={11} /> {copied ? 'Copied!' : 'Copy'}
+                          </button>
+                        )}
+                        <button type="button" onClick={handleGenerate}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 px-2 py-0.5 rounded border border-blue-200 hover:border-blue-400 bg-blue-50 hover:bg-blue-100 transition-all font-medium">
+                          <Wand2 size={11} /> Generate
+                        </button>
+                      </div>
+                    </div>
+
                     <div className="relative">
                       <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input className="input" style={{ paddingLeft: '2.5rem', paddingRight: '3rem' }}
-                        type={showPass ? 'text' : 'password'} placeholder="Min 6 characters"
+                      <input className="input font-mono" style={{ paddingLeft: '2.5rem', paddingRight: '3rem' }}
+                        type={showPass ? 'text' : 'password'} placeholder="Min 8 chars, mixed case, number, symbol"
                         value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
                       <button type="button" onClick={() => setShowPass(!showPass)}
                         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                         {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
                     </div>
+
+                    {/* Strength bar */}
+                    {form.password && (
+                      <div className="mt-2">
+                        <div className="flex gap-1 mb-1.5">
+                          {[1,2,3,4,5].map(i => (
+                            <div key={i} className="h-1 flex-1 rounded-full transition-all"
+                              style={{ background: i <= strengthCount ? strengthColor : '#e2e8f0' }} />
+                          ))}
+                        </div>
+                        <StrengthChecklist password={form.password} />
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -167,7 +238,7 @@ function RegisterForm() {
                     </div>
                   </div>
 
-                  <button type="submit" disabled={otpLoading}
+                  <button type="submit" disabled={otpLoading || !pwdValid}
                     className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-60 flex items-center justify-center gap-2">
                     {otpLoading ? <><RefreshCw size={14} className="animate-spin" /> Sending code...</> : 'Send Verification Code'}
                   </button>
