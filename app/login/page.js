@@ -1,11 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, MonitorSmartphone } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const sessionExpired = searchParams.get('reason') === 'session_expired';
@@ -29,6 +29,79 @@ export default function LoginPage() {
     router.push('/dashboard');
   }
 
+  return (
+    <div className="card p-8 glow-border">
+      {sessionExpired && (
+        <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-amber-50 border border-amber-200 text-amber-700">
+          <MonitorSmartphone size={15} /> You were signed in on another device. Please log in again.
+        </div>
+      )}
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-red-50 border border-red-200 text-red-600">
+          <AlertCircle size={15} /> {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
+          <div className="relative">
+            <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input"
+              style={{ paddingLeft: '2.5rem' }}
+              type="email"
+              placeholder="you@example.com"
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+          <div className="relative">
+            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input"
+              style={{ paddingLeft: '2.5rem', paddingRight: '3rem' }}
+              type={showPass ? 'text' : 'password'}
+              placeholder="Enter your password"
+              value={form.password}
+              onChange={e => setForm({ ...form, password: e.target.value })}
+              required
+            />
+            <button type="button" onClick={() => setShowPass(!showPass)}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-end -mt-2">
+          <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            Forgot password?
+          </Link>
+        </div>
+
+        <button type="submit" disabled={loading}
+          className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-60">
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
+      </form>
+
+      <p className="text-center text-slate-500 text-sm mt-6">
+        Don&apos;t have an account?{' '}
+        <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
+          Create one
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export default function LoginPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Left panel */}
@@ -66,74 +139,9 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-slate-900 mb-1">Welcome back</h1>
           <p className="text-slate-500 mb-8">Sign in to your trading account</p>
 
-          <div className="card p-8 glow-border">
-            {sessionExpired && (
-              <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-amber-50 border border-amber-200 text-amber-700">
-                <MonitorSmartphone size={15} /> You were signed in on another device. Please log in again.
-              </div>
-            )}
-            {error && (
-              <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-red-50 border border-red-200 text-red-600">
-                <AlertCircle size={15} /> {error}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
-                <div className="relative">
-                  <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    className="input"
-                    style={{ paddingLeft: '2.5rem' }}
-                    type="email"
-                    placeholder="you@example.com"
-                    value={form.email}
-                    onChange={e => setForm({ ...form, email: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-                <div className="relative">
-                  <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    className="input"
-                    style={{ paddingLeft: '2.5rem', paddingRight: '3rem' }}
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    value={form.password}
-                    onChange={e => setForm({ ...form, password: e.target.value })}
-                    required
-                  />
-                  <button type="button" onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex justify-end -mt-2">
-                <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                  Forgot password?
-                </Link>
-              </div>
-
-              <button type="submit" disabled={loading}
-                className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-60">
-                {loading ? 'Signing in...' : 'Sign In'}
-              </button>
-            </form>
-
-            <p className="text-center text-slate-500 text-sm mt-6">
-              Don&apos;t have an account?{' '}
-              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
-                Create one
-              </Link>
-            </p>
-          </div>
+          <Suspense fallback={<div className="card p-8 glow-border text-center text-slate-400 text-sm">Loading...</div>}>
+            <LoginForm />
+          </Suspense>
         </div>
       </div>
     </div>
