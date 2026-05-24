@@ -141,9 +141,6 @@ export function DesktopSidebar() {
             <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-1)' }}>
               {session?.user?.name}
             </div>
-            <div className="text-xs truncate" style={{ color: 'var(--text-3)' }}>
-              {session?.user?.email}
-            </div>
           </div>
         </div>
 
@@ -214,9 +211,6 @@ export function MobileTopBar() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-1)' }}>
                   {session?.user?.name}
-                </div>
-                <div className="text-xs truncate" style={{ color: 'var(--text-3)' }}>
-                  {session?.user?.email}
                 </div>
               </div>
             </div>

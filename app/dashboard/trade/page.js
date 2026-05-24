@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   ArrowUpCircle, ArrowDownCircle, RefreshCw, AlertTriangle,
   CheckCircle2, Zap, TrendingUp, TrendingDown, LogOut,
@@ -23,9 +23,16 @@ export default function ManualTradePage() {
   const [exitLoading, setExitLoading] = useState('');
   const [exitResult,  setExitResult]  = useState(null);
   const [exitError,   setExitError]   = useState('');
+  const openTradesRef = useRef([]);
+  const priceIntervalRef = useRef(null);
 
   useEffect(() => { fetchPrice(); }, [symbol]);
-  useEffect(() => { fetchBalance(); fetchOpenTrades(); }, []);
+  useEffect(() => {
+    fetchBalance();
+    fetchOpenTrades();
+    priceIntervalRef.current = setInterval(refreshPrices, 3000);
+    return () => clearInterval(priceIntervalRef.current);
+  }, []);
 
   async function fetchPrice() {
     setPrice(null);
@@ -47,7 +54,23 @@ export default function ManualTradePage() {
     const data   = await res.json();
     const trades = data.trades || [];
     setOpenTrades(trades);
+    openTradesRef.current = trades;
     const symbols = [...new Set(trades.map(t => t.symbol))];
+    if (!symbols.length) return;
+    const pairs = await Promise.all(
+      symbols.map(async sym => {
+        try {
+          const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`);
+          const d = await r.json();
+          return [sym, parseFloat(d.price)];
+        } catch { return [sym, null]; }
+      })
+    );
+    setLivePrices(Object.fromEntries(pairs));
+  }
+
+  async function refreshPrices() {
+    const symbols = [...new Set(openTradesRef.current.map(t => t.symbol))];
     if (!symbols.length) return;
     const pairs = await Promise.all(
       symbols.map(async sym => {
@@ -272,10 +295,7 @@ export default function ManualTradePage() {
       <div>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-bold text-slate-700">Open Positions</h2>
-          <button onClick={fetchOpenTrades}
-            className="text-xs text-blue-500 hover:underline flex items-center gap-1">
-            <RefreshCw size={11} /> Refresh
-          </button>
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
         </div>
 
         {exitError && (
