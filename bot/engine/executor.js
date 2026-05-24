@@ -65,12 +65,12 @@ async function applyCommission(userId, tradeId, profit) {
   console.log(`[Commission] ${TOTAL_COMMISSION_RATE}% of $${profit.toFixed(4)} = $${totalCut.toFixed(4)} | platform:$${platformAmount.toFixed(4)} referrer:$${referrerAmount.toFixed(4)}`);
 }
 
-export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmount, indicators, sentiment) {
+export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmount, indicators, sentiment, isTestnet = false) {
   const { symbol, stopLossPercent, takeProfitPercent } = settings;
 
   await log(userId, 'info', `BUY $${usdtAmount.toFixed(2)} of ${symbol} | RSI:${indicators.rsi} | sentiment:${sentiment?.sentiment}`);
 
-  const order = await placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount);
+  const order = await placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount, isTestnet);
   const { stopLoss, takeProfit } = calcRiskLevels(order.price, stopLossPercent, takeProfitPercent);
 
   await Trade.create({
@@ -85,12 +85,28 @@ export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmou
   await log(userId, 'info', `✅ BUY @ $${order.price} | SL:$${stopLoss} TP:$${takeProfit}`);
 }
 
-export async function closePosition(userId, apiKey, apiSecret, openTrade, reason) {
+export async function closePosition(userId, apiKey, apiSecret, openTrade, reason, isTestnet = false) {
   const { symbol, qty, price: entry } = openTrade;
 
   await log(userId, 'info', `SELL ${symbol} qty:${qty} | Reason: ${reason}`);
 
-  const order  = await placeMarketSell(apiKey, apiSecret, symbol, qty);
+  let order;
+  try {
+    order = await placeMarketSell(apiKey, apiSecret, symbol, qty, isTestnet);
+  } catch (e) {
+    // -2010: no balance to sell — position is phantom (already sold or never filled).
+    // Mark it closed in DB so the bot stops retrying every tick.
+    if (e.message.includes('-2010') || e.message.includes('insufficient balance')) {
+      await Trade.findByIdAndUpdate(openTrade._id, {
+        status: 'closed', closedAt: new Date(), profit: 0,
+        reason: `${openTrade.reason || ''} | EXIT:${reason} (phantom — no balance, closed without sell)`,
+      });
+      await log(userId, 'warn', `Position ${symbol} had no balance to sell — marked closed (phantom position)`);
+      return;
+    }
+    throw e;
+  }
+
   const profit = parseFloat(((order.price - entry) * qty).toFixed(6));
 
   const closedTrade = await Trade.findByIdAndUpdate(openTrade._id, {

@@ -46,6 +46,8 @@ export async function runBotForUser(user) {
     const keyDoc = await ApiKey.findOne({ userId, isActive: true });
     if (!keyDoc) return await log(userId, 'warn', 'No active API key — skipped');
 
+    const isTestnet = keyDoc.accountType === 'testnet';
+
     let apiKey, apiSecret;
     try {
       apiKey    = decrypt(keyDoc.encryptedKey);
@@ -77,7 +79,7 @@ export async function runBotForUser(user) {
 
       const exitReason = checkExitConditions(openTrade, currentPrice);
       if (exitReason) {
-        await closePosition(userId, apiKey, apiSecret, openTrade, exitReason);
+        await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet);
         return;
       }
 
@@ -92,7 +94,7 @@ export async function runBotForUser(user) {
       );
 
       if (signal === 'SELL') {
-        await closePosition(userId, apiKey, apiSecret, openTrade, `SELL signal — RSI:${indicators.rsi}`);
+        await closePosition(userId, apiKey, apiSecret, openTrade, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
       }
 
       return;
@@ -138,7 +140,7 @@ export async function runBotForUser(user) {
 
     // 8. Execute BUY
     const amount = calcTradeAmount(usdtBalance, settings.tradePercent);
-    await openPosition(userId, apiKey, apiSecret, settings, amount, indicators, sentiment);
+    await openPosition(userId, apiKey, apiSecret, settings, amount, indicators, sentiment, isTestnet);
 
   } catch (err) {
     await log(userId, 'error', `Bot error: ${err.message}`);
