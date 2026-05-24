@@ -20,6 +20,9 @@ export async function GET(req) {
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') || 'pending';
+  const VALID_STATUSES = ['pending', 'approved', 'paid', 'rejected'];
+  if (status !== 'all' && !VALID_STATUSES.includes(status))
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
 
   const withdrawals = await Withdrawal.find(status === 'all' ? {} : { status })
     .sort({ createdAt: -1 })

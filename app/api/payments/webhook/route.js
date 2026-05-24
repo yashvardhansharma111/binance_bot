@@ -10,13 +10,14 @@ export async function POST(req) {
   const rawBody = await req.text();
   const sig     = req.headers.get('x-nowpayments-sig');
 
-  if (sig && process.env.NOWPAYMENTS_IPN_SECRET) {
+  // Signature is mandatory when the secret is configured
+  if (process.env.NOWPAYMENTS_IPN_SECRET) {
     const expected = crypto
       .createHmac('sha512', process.env.NOWPAYMENTS_IPN_SECRET)
       .update(rawBody)
       .digest('hex');
-    if (sig.toLowerCase() !== expected.toLowerCase()) {
-      console.warn('IPN signature mismatch');
+    if (!sig || sig.toLowerCase() !== expected.toLowerCase()) {
+      console.warn('[webhook] IPN signature missing or mismatch');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
     }
   }
@@ -28,7 +29,8 @@ export async function POST(req) {
 
   const { payment_id, payment_status, order_id, actually_paid,
           pay_amount: ipnPayAmount, price_amount: ipnPriceAmount } = body;
-  if (!payment_id) return NextResponse.json({ ok: true });
+  if (!payment_id || !payment_status)
+    return NextResponse.json({ error: 'Missing payment_id or payment_status' }, { status: 400 });
 
   await connectDB();
 

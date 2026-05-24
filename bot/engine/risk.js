@@ -44,10 +44,18 @@ export function checkExitConditions(trade, currentPrice) {
 
 export async function recordTrade(userId) {
   const today = new Date().toISOString().slice(0, 10);
-  const s = await BotSettings.findOne({ userId });
-  await BotSettings.findOneAndUpdate({ userId }, {
-    lastTradeAt: new Date(),
-    dailyTradeDate: today,
-    dailyTradeCount: s?.dailyTradeDate === today ? (s.dailyTradeCount + 1) : 1,
-  });
+  // Atomic: reset counter if date changed, otherwise increment
+  const result = await BotSettings.findOneAndUpdate(
+    { userId, dailyTradeDate: today },
+    { $inc: { dailyTradeCount: 1 }, $set: { lastTradeAt: new Date() } },
+    { new: true }
+  );
+  if (!result) {
+    // Date changed or first trade — reset counter atomically
+    await BotSettings.findOneAndUpdate(
+      { userId },
+      { $set: { dailyTradeDate: today, dailyTradeCount: 1, lastTradeAt: new Date() } },
+      { upsert: true }
+    );
+  }
 }

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import {
-  Activity, TrendingUp, TrendingDown, Info,
+  Activity, TrendingUp, TrendingDown, AlertTriangle, Info,
   RefreshCw, Play, Square, Wifi, WifiOff, Target, ShieldCheck,
   BarChart2, Clock, Zap, XCircle,
 } from 'lucide-react';

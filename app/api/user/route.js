@@ -17,9 +17,15 @@ export async function PATCH(req) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const body = await req.json();
   await connectDB();
-  const allowed = ['name', 'fundBalance', 'assetBalance'];
+  // fundBalance / assetBalance are NOT user-editable — only changed via deposits, withdrawals, trades
   const update = {};
-  allowed.forEach(k => { if (body[k] !== undefined) update[k] = body[k]; });
+  if (body.name !== undefined) {
+    const name = String(body.name).trim().slice(0, 100);
+    if (!name) return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 });
+    update.name = name;
+  }
+  if (!Object.keys(update).length)
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   const user = await User.findOneAndUpdate(
     { email: session.user.email },
     { $set: update },
