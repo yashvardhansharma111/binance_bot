@@ -16,9 +16,9 @@ export async function canTrade(userId, settings, usdtBalance) {
   if (settings.dailyTradeDate === today && settings.dailyTradeCount >= settings.maxDailyTrades)
     return { allowed: false, reason: `Daily limit reached (${settings.maxDailyTrades})` };
 
-  const open = await Trade.findOne({ userId, status: 'open', side: 'BUY' });
+  const open = await Trade.findOne({ userId, status: 'open', side: 'BUY', symbol: settings.symbol });
   if (open)
-    return { allowed: false, reason: 'Position already open' };
+    return { allowed: false, reason: `Position already open on ${settings.symbol}` };
 
   return { allowed: true, reason: null };
 }

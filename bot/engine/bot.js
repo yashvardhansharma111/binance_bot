@@ -62,12 +62,11 @@ export async function runBotForUser(user) {
 
     const { symbol, timeframe } = settings;
 
-    // 3. Current price + open position check
-    const currentPrice = await getCurrentPrice(symbol);
-    const openTrade = await Trade.findOne({ userId, status: 'open', side: 'BUY' });
+    // 3. Check ALL open trades — each against its own symbol's live price
+    const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY' });
 
-    if (openTrade) {
-      // Repair missing SL/TP on old trades (schema was missing those fields)
+    for (const openTrade of openTrades) {
+      // Repair missing SL/TP on old trades
       if (!openTrade.stopLoss || !openTrade.takeProfit) {
         const { stopLossPercent = 2, takeProfitPercent = 4 } = settings;
         const sl = parseFloat((openTrade.price * (1 - stopLossPercent / 100)).toFixed(6));
@@ -77,32 +76,39 @@ export async function runBotForUser(user) {
         openTrade.takeProfit = tp;
       }
 
-      const exitReason = checkExitConditions(openTrade, currentPrice);
+      // Fetch live price for this trade's specific symbol
+      const tradePrice = await getCurrentPrice(openTrade.symbol);
+
+      const exitReason = checkExitConditions(openTrade, tradePrice);
       if (exitReason) {
         await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet);
-        return;
+        continue;
       }
-
-      // Also exit on SELL signal (RSI overbought / bearish MACD cross)
-      const candles    = await getCandles(symbol, timeframe, 100);
-      const indicators = calculateIndicators(candles);
-      const signal     = detectSignal(indicators);
 
       const holdMins = ((Date.now() - new Date(openTrade.createdAt).getTime()) / 60000).toFixed(0);
       await log(userId, 'info',
-        `Holding ${symbol} @ $${openTrade.price} for ${holdMins}m | Now: $${currentPrice} | SL:$${openTrade.stopLoss} TP:$${openTrade.takeProfit} | Signal:${signal}`
+        `Holding ${openTrade.symbol} @ $${openTrade.price} for ${holdMins}m | Now: $${tradePrice} | SL:$${openTrade.stopLoss} TP:$${openTrade.takeProfit}`
       );
+    }
 
-      if (signal === 'SELL') {
-        await closePosition(userId, apiKey, apiSecret, openTrade, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
+    // If any position is still open (on the bot's configured symbol), skip new entry
+    const openOnBotSymbol = openTrades.some(t => t.symbol === symbol);
+    if (openOnBotSymbol) {
+      // Also check SELL signal for bot's symbol
+      const candles    = await getCandles(symbol, timeframe, 100);
+      const indicators = calculateIndicators(candles);
+      const signal     = detectSignal(indicators);
+      const botTrade   = openTrades.find(t => t.symbol === symbol);
+      if (signal === 'SELL' && botTrade) {
+        await closePosition(userId, apiKey, apiSecret, botTrade, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
       }
-
       return;
     }
 
     // 4. Fetch candles + indicators
-    const candles    = await getCandles(symbol, timeframe, 100);
-    const indicators = calculateIndicators(candles);
+    const currentPrice = await getCurrentPrice(symbol);
+    const candles      = await getCandles(symbol, timeframe, 100);
+    const indicators   = calculateIndicators(candles);
 
     await log(userId, 'info',
       `${symbol} RSI:${indicators.rsi} | Trend:${indicators.uptrend ? '↑' : '↓'} | MACD:${indicators.bullishCrossover ? '↑cross' : indicators.bearishCrossover ? '↓cross' : 'flat'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`

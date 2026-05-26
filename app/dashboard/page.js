@@ -8,9 +8,9 @@ import {
   AlertCircle, Copy, Check,
 } from 'lucide-react';
 
-function StatCard({ title, value, sub, icon: Icon, iconBg, iconColor, trend }) {
-  return (
-    <div className="card p-5 glow-border">
+function StatCard({ title, value, sub, icon: Icon, iconBg, iconColor, trend, href }) {
+  const inner = (
+    <>
       <div className="flex items-start justify-between mb-3">
         <div>
           <p className="text-slate-500 text-xs mb-1">{title}</p>
@@ -27,8 +27,14 @@ function StatCard({ title, value, sub, icon: Icon, iconBg, iconColor, trend }) {
           {Math.abs(trend)}% this week
         </div>
       )}
-    </div>
+    </>
   );
+  if (href) return (
+    <a href={href} className="card p-5 glow-border block transition-all hover:shadow-md active:scale-95" style={{ cursor: 'pointer' }}>
+      {inner}
+    </a>
+  );
+  return <div className="card p-5 glow-border">{inner}</div>;
 }
 
 export default function DashboardPage() {
@@ -200,6 +206,7 @@ export default function DashboardPage() {
           value={`$${(user?.assetBalance ?? 0).toFixed(2)}`}
           sub="Deposits + commissions"
           icon={Activity} iconBg="#ecfeff" iconColor="#0891b2"
+          href="/dashboard/deposit"
         />
         <StatCard
           title="Total Profit"
