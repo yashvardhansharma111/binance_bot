@@ -193,28 +193,49 @@ export default function SettingsPage() {
             min={1} max={100} step={1} suffix="trades" />
         </Row>
 
-        <Row label="AI Sentiment Filter" hint="Use Groq AI to confirm signals">
+        <Row label="AI Sentiment Filter" hint="Use Groq AI to confirm buy signals">
           <button onClick={() => set('useGroqFilter', !form.useGroqFilter)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-all"
-            style={{
-              background:  form.useGroqFilter ? '#eff6ff' : '#f8fafc',
-              color:       form.useGroqFilter ? '#2563eb' : '#64748b',
-              borderColor: form.useGroqFilter ? '#2563eb' : '#e2e8f0',
-            }}>
-            <Bot size={14} />
-            {form.useGroqFilter ? 'Enabled' : 'Disabled'}
+            className="relative inline-flex items-center gap-3 cursor-pointer select-none">
+            <div className="relative w-11 h-6 rounded-full transition-colors duration-200"
+              style={{ background: form.useGroqFilter ? '#2563eb' : '#cbd5e1' }}>
+              <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                style={{ transform: form.useGroqFilter ? 'translateX(20px)' : 'translateX(0)' }} />
+            </div>
+            <span className="text-sm font-semibold" style={{ color: form.useGroqFilter ? '#2563eb' : '#94a3b8' }}>
+              {form.useGroqFilter ? 'Enabled' : 'Disabled'}
+            </span>
+          </button>
+        </Row>
+
+        <Row label="Aggressive Mode" hint="Trade fast & ignore cooldown — RSI < 55, no filters">
+          <button onClick={() => set('aggressiveMode', !form.aggressiveMode)}
+            className="relative inline-flex items-center gap-3 cursor-pointer select-none">
+            <div className="relative w-11 h-6 rounded-full transition-colors duration-200"
+              style={{ background: form.aggressiveMode ? '#dc2626' : '#cbd5e1' }}>
+              <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                style={{ transform: form.aggressiveMode ? 'translateX(20px)' : 'translateX(0)' }} />
+            </div>
+            <span className="text-sm font-semibold" style={{ color: form.aggressiveMode ? '#dc2626' : '#94a3b8' }}>
+              {form.aggressiveMode ? 'ON — Trading aggressively' : 'OFF'}
+            </span>
           </button>
         </Row>
       </div>
 
       {/* Risk summary */}
-      <div className="mt-4 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 flex items-start gap-2">
+      <div className="mt-4 px-4 py-3 rounded-xl border text-xs flex items-start gap-2"
+        style={{
+          background:  form.aggressiveMode ? '#fef2f2' : '#eff6ff',
+          borderColor: form.aggressiveMode ? '#fecaca' : '#bfdbfe',
+          color:       form.aggressiveMode ? '#dc2626' : '#1d4ed8',
+        }}>
         <Shield size={14} className="shrink-0 mt-0.5" />
         <span>
-          Bot will BUY when RSI &lt; 60, SELL when RSI &gt; 70 or bearish MACD cross.
-          SL at <strong>{form.stopLossPercent}%</strong> below entry,
-          TP at <strong>{form.takeProfitPercent}%</strong> above entry.
-          Each trade uses <strong>{form.tradePercent}%</strong> of your fund balance.
+          {form.aggressiveMode
+            ? <>⚡ <strong>Aggressive:</strong> BUY when RSI &lt; 55 (frequent), SELL when RSI &gt; 70 or bearish cross. No cooldown. No sentiment filter.</>
+            : <>Normal: BUY when RSI &lt; 40, SELL when RSI &gt; 70 or bearish MACD cross.</>
+          }{' '}
+          SL <strong>{form.stopLossPercent}%</strong> · TP <strong>{form.takeProfitPercent}%</strong> · <strong>{form.tradePercent}%</strong> per trade.
         </span>
       </div>
     </div>

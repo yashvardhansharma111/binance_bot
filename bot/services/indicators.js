@@ -39,11 +39,16 @@ export function calculateIndicators(candles) {
   };
 }
 
-export function detectSignal({ rsi, bullishCrossover, bearishCrossover, uptrend, volumeIncreasing }) {
-  // BUY: RSI below 60 — fires frequently in normal ranging markets
-  const buy = rsi < 60;
+export function detectSignal({ rsi, bullishCrossover, bearishCrossover, uptrend, volumeIncreasing }, aggressive = false) {
+  if (aggressive) {
+    // Aggressive: buy when RSI < 55 (fires frequently in normal markets)
+    const buy  = rsi < 55;
+    const sell = rsi > 70 || bearishCrossover;
+    return buy ? 'BUY' : sell ? 'SELL' : 'HOLD';
+  }
 
-  // SELL: RSI overbought (> 70) OR MACD bearish crossover
+  // Normal: buy when RSI < 40 (moderate — avoids extreme overbought entries)
+  const buy  = rsi < 40;
   const sell = rsi > 70 || bearishCrossover;
 
   return buy ? 'BUY' : sell ? 'SELL' : 'HOLD';

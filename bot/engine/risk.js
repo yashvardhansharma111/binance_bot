@@ -1,11 +1,11 @@
 import BotSettings from '../../lib/models/BotSettings.js';
 import Trade from '../../lib/models/Trade.js';
 
-export async function canTrade(userId, settings, usdtBalance) {
+export async function canTrade(userId, settings, usdtBalance, aggressive = false) {
   if (usdtBalance < 10)
     return { allowed: false, reason: `Low balance: $${usdtBalance.toFixed(2)}` };
 
-  if (settings.lastTradeAt) {
+  if (!aggressive && settings.lastTradeAt) {
     const elapsed = Date.now() - new Date(settings.lastTradeAt).getTime();
     const cooldown = settings.cooldownMinutes * 60_000;
     if (elapsed < cooldown)

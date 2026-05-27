@@ -60,7 +60,7 @@ export async function runBotForUser(user) {
     let settings = await BotSettings.findOne({ userId });
     if (!settings) settings = await BotSettings.create({ userId });
 
-    const { symbol, timeframe } = settings;
+    const { symbol, timeframe, aggressiveMode } = settings;
 
     // 3. Check ALL open trades — each against its own symbol's live price
     const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY' });
@@ -126,10 +126,10 @@ export async function runBotForUser(user) {
     );
 
     // 5. Signal
-    const signal = detectSignal(indicators);
-    await log(userId, 'info', `Signal: ${signal}`);
+    const signal = detectSignal(indicators, aggressiveMode);
+    await log(userId, 'info', `Signal: ${signal}${aggressiveMode ? ' [AGGRESSIVE]' : ''}`);
 
-    // Force-trade logic: if no trade taken in the last 24h and signal is not a strong SELL, buy anyway
+    // Force-trade: if no trade in last 1h and signal not SELL, force a BUY
     const lastTrade = await Trade.findOne({ userId }).sort({ createdAt: -1 });
     const hoursSinceLastTrade = lastTrade
       ? (Date.now() - new Date(lastTrade.createdAt).getTime()) / 3_600_000
@@ -147,17 +147,17 @@ export async function runBotForUser(user) {
       return;
     }
 
-    // 6. Risk checks
+    // 6. Risk checks — aggressive mode skips cooldown
     const usdtBalance = await getUSDTBalance(apiKey, apiSecret);
-    const risk = await canTrade(userId, settings, usdtBalance);
+    const risk = await canTrade(userId, settings, usdtBalance, aggressiveMode);
     if (!risk.allowed) {
       await log(userId, 'info', `Skipped: ${risk.reason}`);
       return;
     }
 
-    // 7. Groq sentiment filter — skip for force trades to guarantee execution
+    // 7. Groq sentiment filter — skipped in aggressive mode and force trades
     let sentiment = { sentiment: 'neutral', confidence: 50, reason: 'Filter off' };
-    if (settings.useGroqFilter && !forceTrade) {
+    if (settings.useGroqFilter && !forceTrade && !aggressiveMode) {
       sentiment = await getSentiment(symbol, indicators);
       await log(userId, 'info', `Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
       if (shouldBlock(signal, sentiment)) {
