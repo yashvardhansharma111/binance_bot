@@ -21,7 +21,7 @@ export async function PUT(req) {
 
   const body = await req.json();
   const allowed = ['symbol','timeframe','tradePercent','stopLossPercent','takeProfitPercent',
-                   'cooldownMinutes','maxDailyTrades','useGroqFilter'];
+                   'cooldownMinutes','maxDailyTrades','useGroqFilter','aggressiveMode'];
   const update = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
