@@ -194,18 +194,20 @@ export default function ChartPage() {
         rsi: rsiValues[i] !== null ? parseFloat(rsiValues[i].toFixed(2)) : null,
       }));
 
+      // Offset timestamps to user's local timezone so chart shows local time
+      const tzOffset = -new Date().getTimezoneOffset() * 60;
       const candles = data.map(c => ({
-        time:  Math.floor(c.timestamp / 1000),
+        time:  Math.floor(c.timestamp / 1000) + tzOffset,
         open:  c.open, high: c.high, low: c.low, close: c.close,
       }));
       const volumes = data.map(c => ({
-        time:  Math.floor(c.timestamp / 1000),
+        time:  Math.floor(c.timestamp / 1000) + tzOffset,
         value: c.volume,
         color: c.close >= c.open ? 'rgba(22,163,74,0.35)' : 'rgba(239,68,68,0.35)',
       }));
       const rsiData = data
         .filter(c => c.rsi !== null)
-        .map(c => ({ time: Math.floor(c.timestamp / 1000), value: c.rsi }));
+        .map(c => ({ time: Math.floor(c.timestamp / 1000) + tzOffset, value: c.rsi }));
 
       candleSerRef.current?.setData(candles);
       volumeSerRef.current?.setData(volumes);
@@ -239,7 +241,8 @@ export default function ChartPage() {
     ws.onerror = () => { ws.close(); };
     ws.onmessage = (e) => {
       const { k } = JSON.parse(e.data);
-      const t = Math.floor(k.t / 1000);
+      const tzOffset = -new Date().getTimezoneOffset() * 60;
+      const t = Math.floor(k.t / 1000) + tzOffset;
       const o = parseFloat(k.o), h = parseFloat(k.h),
             l = parseFloat(k.l), c = parseFloat(k.c);
       const v = parseFloat(k.v);

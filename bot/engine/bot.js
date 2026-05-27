@@ -85,9 +85,20 @@ export async function runBotForUser(user) {
         continue;
       }
 
-      const holdMins = ((Date.now() - new Date(openTrade.createdAt).getTime()) / 60000).toFixed(0);
+      // Force SELL: if position held for more than 1 hour without hitting SL/TP, close it
+      const holdMins = (Date.now() - new Date(openTrade.createdAt).getTime()) / 60000;
+      if (holdMins >= 60) {
+        const pnl = ((tradePrice - openTrade.price) / openTrade.price * 100).toFixed(2);
+        await closePosition(
+          userId, apiKey, apiSecret, openTrade,
+          `Force exit after ${Math.floor(holdMins)}m | P&L: ${pnl}%`,
+          isTestnet
+        );
+        continue;
+      }
+
       await log(userId, 'info',
-        `Holding ${openTrade.symbol} @ $${openTrade.price} for ${holdMins}m | Now: $${tradePrice} | SL:$${openTrade.stopLoss} TP:$${openTrade.takeProfit}`
+        `Holding ${openTrade.symbol} @ $${openTrade.price} for ${holdMins.toFixed(0)}m | Now: $${tradePrice} | SL:$${openTrade.stopLoss} TP:$${openTrade.takeProfit}`
       );
     }
 
@@ -118,9 +129,20 @@ export async function runBotForUser(user) {
     const signal = detectSignal(indicators);
     await log(userId, 'info', `Signal: ${signal}`);
 
-    if (signal === 'HOLD') return;
+    // Force-trade logic: if no trade taken in the last 24h and signal is not a strong SELL, buy anyway
+    const lastTrade = await Trade.findOne({ userId }).sort({ createdAt: -1 });
+    const hoursSinceLastTrade = lastTrade
+      ? (Date.now() - new Date(lastTrade.createdAt).getTime()) / 3_600_000
+      : Infinity;
+    const forceTrade = hoursSinceLastTrade >= 1 && signal !== 'SELL';
 
-    if (signal === 'SELL') {
+    if (forceTrade) {
+      await log(userId, 'warn', `Force trade triggered — no trade in ${Math.floor(hoursSinceLastTrade * 60)}m | Signal was: ${signal}`);
+    }
+
+    if (!forceTrade && signal === 'HOLD') return;
+
+    if (!forceTrade && signal === 'SELL') {
       await log(userId, 'info', 'SELL signal but no open position — nothing to close');
       return;
     }
@@ -133,9 +155,9 @@ export async function runBotForUser(user) {
       return;
     }
 
-    // 7. Groq sentiment filter (BUY only)
+    // 7. Groq sentiment filter — skip for force trades to guarantee execution
     let sentiment = { sentiment: 'neutral', confidence: 50, reason: 'Filter off' };
-    if (settings.useGroqFilter) {
+    if (settings.useGroqFilter && !forceTrade) {
       sentiment = await getSentiment(symbol, indicators);
       await log(userId, 'info', `Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
       if (shouldBlock(signal, sentiment)) {
