@@ -169,7 +169,7 @@ export default function DashboardPage() {
             </div>
             <button onClick={() => router.push('/dashboard/subscribe')}
               className="shrink-0 bg-white text-blue-700 font-bold text-sm px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">
-              Subscribe — $1
+              Subscribe — $39
             </button>
           </div>
         </div>

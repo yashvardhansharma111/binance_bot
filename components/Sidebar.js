@@ -146,7 +146,7 @@ export function DesktopSidebar() {
 
         <ThemeToggle />
 
-        <button onClick={() => signOut({ callbackUrl: '/' })}
+        <button onClick={() => signOut({ callbackUrl: window.location.origin + '/' })}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-colors mt-0.5"
           style={{ color: 'var(--text-2)' }}
           onMouseEnter={e => {
@@ -261,7 +261,7 @@ export function MobileTopBar() {
             )}
 
             <div className="mt-2" style={{ borderTop: '1px solid var(--border)' }} />
-            <button onClick={() => { signOut({ callbackUrl: '/' }); setOpen(false); }}
+            <button onClick={() => { signOut({ callbackUrl: window.location.origin + '/' }); setOpen(false); }}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-colors mt-1"
               style={{ color: '#ef4444' }}>
               <LogOut size={15} /> Sign Out

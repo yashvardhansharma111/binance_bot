@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/trickyx';
 
-const ADMIN_EMAIL = 'admin@trickyx.ai';
+const ADMIN_EMAIL = 'boby.soni1997@gmail.com';
 const ADMIN_PASSWORD = 'Admin@123';
 const ADMIN_NAME = 'Admin';
 

@@ -7,7 +7,7 @@ export default function SessionGuard() {
 
   useEffect(() => {
     if (session?.error === 'SessionInvalidated') {
-      signOut({ callbackUrl: '/login?reason=session_expired' });
+      signOut({ callbackUrl: window.location.origin + '/login?reason=session_expired' });
     }
   }, [session]);
 

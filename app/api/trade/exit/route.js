@@ -5,8 +5,46 @@ import { connectDB } from '@/lib/db';
 import ApiKey from '@/lib/models/ApiKey';
 import Trade from '@/lib/models/Trade';
 import User from '@/lib/models/User';
+import Commission from '@/lib/models/Commission';
 import { decrypt } from '@/lib/encryption';
 import { placeMarketSell } from '@/bot/services/binance';
+
+const TOTAL_COMMISSION_RATE = 15;
+const REFERRER_RATE         = 10;
+const PLATFORM_RATE_WITH    = 5;
+const PLATFORM_RATE_WITHOUT = 15;
+
+async function applyCommission(user, tradeId, profit) {
+  if (profit <= 0) return;
+
+  const totalCut = parseFloat((profit * TOTAL_COMMISSION_RATE / 100).toFixed(8));
+
+  let referrerId     = null;
+  let referrerAmount = 0;
+  let platformAmount = totalCut;
+  let platformRate   = PLATFORM_RATE_WITHOUT;
+  let referrerRate   = 0;
+
+  if (user.referredBy) {
+    const referrer = await User.findOne({ referralCode: user.referredBy });
+    if (referrer) {
+      referrerId     = referrer._id;
+      referrerAmount = parseFloat((profit * REFERRER_RATE / 100).toFixed(8));
+      platformAmount = parseFloat((profit * PLATFORM_RATE_WITH / 100).toFixed(8));
+      platformRate   = PLATFORM_RATE_WITH;
+      referrerRate   = REFERRER_RATE;
+      await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: referrerAmount } });
+    }
+  }
+
+  await User.findByIdAndUpdate(user._id, { $inc: { assetBalance: -totalCut } });
+
+  await Commission.create({
+    tradeId, userId: user._id, referrerId, profit,
+    platformRate, referrerRate, platformAmount, referrerAmount,
+    totalAmount: totalCut,
+  });
+}
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -32,12 +70,11 @@ export async function POST(req) {
   const order  = await placeMarketSell(apiKey, apiSecret, trade.symbol, trade.qty, isTestnet);
   const profit = parseFloat(((order.price - trade.price) * trade.qty).toFixed(6));
 
-  await Trade.findByIdAndUpdate(trade._id, {
-    status:    'closed',
-    closedAt:  new Date(),
-    profit,
-    reason:    'Manual exit',
-  });
+  const closedTrade = await Trade.findByIdAndUpdate(trade._id, {
+    status: 'closed', closedAt: new Date(), profit, reason: 'Manual exit',
+  }, { new: true });
+
+  await applyCommission(user, closedTrade._id, profit);
 
   return NextResponse.json({ order, profit });
 }

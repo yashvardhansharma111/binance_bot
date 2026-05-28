@@ -42,7 +42,12 @@ export async function runBotForUser(user) {
       return await log(userId, 'warn', 'No active subscription — bot paused. Subscribe at /dashboard/subscribe');
     }
 
-    // 1. API keys
+    // 1. Asset balance check — need ≥ $10 to cover commissions
+    if ((user.assetBalance ?? 0) < 10) {
+      return await log(userId, 'warn', `Insufficient asset balance $${(user.assetBalance ?? 0).toFixed(2)} — deposit at least $10 to run the bot`);
+    }
+
+    // 2. API keys
     const keyDoc = await ApiKey.findOne({ userId, isActive: true });
     if (!keyDoc) return await log(userId, 'warn', 'No active API key — skipped');
 
