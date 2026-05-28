@@ -53,14 +53,24 @@ function client(apiKey, apiSecret, isTestnet = TESTNET) {
 
 // ── Balance ───────────────────────────────────────────────────────────────────
 
-export async function getUSDTBalance(apiKey, apiSecret) {
-  if (process.env.DRY_RUN === 'true') return 10000; // simulated balance in dry-run mode
-  return new Promise((resolve, reject) => {
-    client(apiKey, apiSecret).balance((err, b) => {
-      if (err) return reject(new Error(err.body || err.message));
-      resolve(parseFloat(b?.USDT?.available || 0));
+export async function getUSDTBalance(apiKey, apiSecret, isTestnet = TESTNET) {
+  if (process.env.DRY_RUN === 'true') return 10000;
+  const base = isTestnet ? TESTNET_API : BASE;
+  const url  = signedOrderUrl(base, apiSecret, { timestamp: undefined }); // reuse signer
+  // Build manually to avoid node-binance-api (hangs with no timeout)
+  const params = { timestamp: Date.now(), recvWindow: 60000 };
+  const qs  = new URLSearchParams(params).toString();
+  const sig = createHmac('sha256', apiSecret).update(qs).digest('hex');
+  try {
+    const { data } = await axios.get(`${base}/api/v3/account?${qs}&signature=${sig}`, {
+      headers: { 'X-MBX-APIKEY': apiKey },
+      timeout: 10000,
     });
-  });
+    const usdt = data.balances?.find(b => b.asset === 'USDT');
+    return parseFloat(usdt?.free || 0);
+  } catch (e) {
+    throw orderError(e);
+  }
 }
 
 export async function testConnection(apiKey, apiSecret) {

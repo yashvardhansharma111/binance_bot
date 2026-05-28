@@ -14,8 +14,13 @@ async function tick() {
 
     console.log(`[Cron] Tick — ${users.length} active bot(s)`);
     for (const user of users) {
-      await runBotForUser(user);
-      await new Promise(r => setTimeout(r, 500)); // rate limit buffer
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Bot tick timed out after 60s')), 60_000)
+      );
+      await Promise.race([runBotForUser(user), timeout]).catch(err => {
+        console.error(`[Cron] Bot ${user._id} error: ${err.message}`);
+      });
+      await new Promise(r => setTimeout(r, 500));
     }
   } catch (err) {
     console.error('[Cron] Error:', err.message);
