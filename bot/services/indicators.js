@@ -41,9 +41,9 @@ export function calculateIndicators(candles) {
 
 export function detectSignal({ rsi, bullishCrossover, bearishCrossover, uptrend, volumeIncreasing }, aggressive = false) {
   if (aggressive) {
-    // Aggressive: buy when RSI < 55 (fires frequently in normal markets)
-    const buy  = rsi < 55;
-    const sell = rsi > 70 || bearishCrossover;
+    // Aggressive: buy when RSI < 65 (fires very frequently)
+    const buy  = rsi < 65;
+    const sell = rsi > 75 || bearishCrossover;
     return buy ? 'BUY' : sell ? 'SELL' : 'HOLD';
   }
 

@@ -232,7 +232,7 @@ export default function SettingsPage() {
         <Shield size={14} className="shrink-0 mt-0.5" />
         <span>
           {form.aggressiveMode
-            ? <>⚡ <strong>Aggressive:</strong> BUY when RSI &lt; 55 (frequent), SELL when RSI &gt; 70 or bearish cross. No cooldown. No sentiment filter.</>
+            ? <>⚡ <strong>Aggressive:</strong> BUY when RSI &lt; 65 (very frequent), SELL when RSI &gt; 75 or bearish cross. No cooldown. No sentiment filter.</>
             : <>Normal: BUY when RSI &lt; 40, SELL when RSI &gt; 70 or bearish MACD cross.</>
           }{' '}
           SL <strong>{form.stopLossPercent}%</strong> · TP <strong>{form.takeProfitPercent}%</strong> · <strong>{form.tradePercent}%</strong> per trade.
