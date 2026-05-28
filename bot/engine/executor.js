@@ -4,6 +4,7 @@ import Trade from '../../lib/models/Trade.js';
 import User from '../../lib/models/User.js';
 import Commission from '../../lib/models/Commission.js';
 import BotLog from '../../lib/models/BotLog.js';
+import { sendTradeEmail } from '../../lib/mail.js';
 
 const TOTAL_COMMISSION_RATE = 15;  // 15% of profit
 const REFERRER_RATE         = 10;  // referrer gets 10%
@@ -83,6 +84,13 @@ export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmou
 
   await recordTrade(userId);
   await log(userId, 'info', `✅ BUY @ $${order.price} | SL:$${stopLoss} TP:$${takeProfit}`);
+
+  const user = await User.findById(userId);
+  sendTradeEmail(user.email, user.name, 'BUY', {
+    symbol, price: order.price, qty: order.qty, total: order.total,
+    stopLoss, takeProfit,
+    reason: `RSI:${indicators.rsi} sentiment:${sentiment?.sentiment}`,
+  }).catch(() => {});
 }
 
 export async function closePosition(userId, apiKey, apiSecret, openTrade, reason, isTestnet = false) {
@@ -135,4 +143,10 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   await log(userId, profit >= 0 ? 'info' : 'warn',
     `${profit >= 0 ? '✅' : '❌'} SELL @ $${order.price} | P&L: ${profit >= 0 ? '+' : ''}$${profit}${commissionNote}`
   );
+
+  const sellUser = await User.findById(userId);
+  sendTradeEmail(sellUser.email, sellUser.name, 'SELL', {
+    symbol, price: order.price, qty: order.qty,
+    profit, reason,
+  }).catch(() => {});
 }
