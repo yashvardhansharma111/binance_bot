@@ -130,8 +130,8 @@ export default function SubscribePage() {
         <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center mx-auto mb-3">
           <Zap size={20} className="text-white" />
         </div>
-        <div className="text-3xl font-bold text-slate-900 mb-0.5">$39 <span className="text-lg text-slate-400 font-normal">USDT</span></div>
-        <div className="text-sm text-slate-500 mb-4">6 months access — $6.50/mo</div>
+        <div className="text-3xl font-bold text-slate-900 mb-0.5">$49 <span className="text-lg text-slate-400 font-normal">USDT</span></div>
+        <div className="text-sm text-slate-500 mb-4">6 months access — $8.17/mo</div>
         <ul className="text-sm text-slate-600 space-y-1.5 text-left mb-4 pl-2">
           {['24/7 AI bot running on Binance','RSI + MACD + Groq sentiment signals','Auto stop-loss & take-profit','Manual trading panel','Real-time chart & bot monitor'].map(f => (
             <li key={f} className="flex items-center gap-2">
@@ -171,7 +171,7 @@ export default function SubscribePage() {
           <button onClick={subscribe} disabled={creating}
             className="btn-primary w-full py-3 flex items-center justify-center gap-2">
             {creating ? <RefreshCw size={15} className="animate-spin" /> : <Crown size={15} />}
-            {creating ? 'Generating address...' : 'Subscribe Now — $1 USDT'}
+            {creating ? 'Generating address...' : 'Subscribe Now — $49 USDT'}
           </button>
         </div>
 
