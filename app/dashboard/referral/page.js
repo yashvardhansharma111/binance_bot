@@ -196,7 +196,7 @@ export default function ReferralPage() {
             <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-1)' }}>How You Earn</h2>
             <div className="grid sm:grid-cols-3 gap-3">
               {[
-                { pct: '20%', label: 'of subscription price', desc: 'When your referral buys the bot ($1 plan → you get $0.20)' },
+                { pct: '20%', label: 'of subscription price', desc: 'When your referral buys the bot ($49 plan → you get $9.80)' },
                 { pct: '10%', label: 'of trade profit', desc: 'Every profitable trade your referral makes — you earn 10% of the 15% commission' },
                 { pct: '10%', label: 'of deposit', desc: 'When your referral deposits funds — you earn 10% of the 15% deposit fee' },
               ].map(({ pct, label, desc }) => (
