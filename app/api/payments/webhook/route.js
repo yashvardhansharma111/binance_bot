@@ -5,6 +5,7 @@ import Payment from '@/lib/models/Payment';
 import Subscription from '@/lib/models/Subscription';
 import User from '@/lib/models/User';
 import DepositCommission from '@/lib/models/DepositCommission';
+import SubscriptionCommission from '@/lib/models/SubscriptionCommission';
 
 export async function POST(req) {
   const rawBody = await req.text();
@@ -59,12 +60,29 @@ export async function POST(req) {
       }
 
       // Credit 20% of subscription price to referrer's assetBalance
+      const SUB_REFERRER_RATE = 0.20;
       const buyer = await User.findById(sub.userId).select('referredBy');
       if (buyer?.referredBy) {
         const referrer = await User.findOne({ referralCode: buyer.referredBy }).select('_id');
         if (referrer) {
-          const referrerCut = parseFloat(((sub.amount || 1) * 0.20).toFixed(4));
+          const planAmount  = sub.amount || 1;
+          const referrerCut = parseFloat((planAmount * SUB_REFERRER_RATE).toFixed(4));
           await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: referrerCut } });
+
+          // Record the commission so it appears in referral totals / history.
+          // unique index on subscriptionId makes this idempotent across webhook retries.
+          await SubscriptionCommission.updateOne(
+            { subscriptionId: sub._id },
+            { $setOnInsert: {
+                subscriptionId: sub._id,
+                userId:         sub.userId,
+                referrerId:     referrer._id,
+                planAmount,
+                referrerRate:   SUB_REFERRER_RATE,
+                referrerAmount: referrerCut,
+            } },
+            { upsert: true },
+          );
           console.log(`[webhook] Sub referral: referrer ${referrer._id} credited $${referrerCut} to assetBalance`);
         }
       }
