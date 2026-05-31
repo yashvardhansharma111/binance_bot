@@ -80,17 +80,31 @@ export async function testConnection(apiKey, apiSecret) {
 
 // ── Step size (LOT_SIZE) ──────────────────────────────────────────────────────
 
-const stepCache = {};
-async function getStepSize(symbol) {
+const symbolCache = {};
+async function getSymbolInfo(symbol) {
   // Always use mainnet for exchange info — testnet has the same symbols/lot sizes
-  if (stepCache[symbol]) return stepCache[symbol];
+  if (symbolCache[symbol]) return symbolCache[symbol];
   const { data } = await axios.get(`${BASE}/api/v3/exchangeInfo`, { params: { symbol } });
-  const lot = data.symbols[0].filters.find(f => f.filterType === 'LOT_SIZE');
-  stepCache[symbol] = parseFloat(lot.stepSize);
-  return stepCache[symbol];
+  const s   = data.symbols[0];
+  const lot = s.filters.find(f => f.filterType === 'LOT_SIZE');
+  symbolCache[symbol] = {
+    stepSize:       parseFloat(lot.stepSize),
+    quotePrecision: s.quoteAssetPrecision, // max decimals allowed for quoteOrderQty
+  };
+  return symbolCache[symbol];
+}
+async function getStepSize(symbol) {
+  return (await getSymbolInfo(symbol)).stepSize;
 }
 function roundStep(qty, step) {
   return parseFloat(qty.toFixed(Math.round(-Math.log10(step))));
+}
+// Trim a quote (USDT) amount to the symbol's allowed precision, rounding DOWN
+// so we never try to spend more than the user has. Strips JS float noise that
+// otherwise triggers Binance error -1111 "quoteOrderQty has too much precision".
+function roundQuote(amount, precision) {
+  const factor = 10 ** precision;
+  return parseFloat((Math.floor(amount * factor) / factor).toFixed(precision));
 }
 
 // ── Orders (direct axios — node-binance-api hangs silently on testnet) ────────
@@ -121,9 +135,12 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount, isTe
   }
 
   const base = isTestnet ? TESTNET_API : BASE;
-  // quoteOrderQty = spend exactly this many USDT; Binance computes qty
-  const url  = signedOrderUrl(base, apiSecret, { symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: usdtAmount });
-  console.log(`[binance] POST ${base}/api/v3/order BUY quoteOrderQty=${usdtAmount}`);
+  // quoteOrderQty = spend exactly this many USDT; Binance computes qty.
+  // Must be trimmed to the symbol's quote precision or Binance rejects with -1111.
+  const { quotePrecision } = await getSymbolInfo(symbol);
+  const spend = roundQuote(usdtAmount, quotePrecision);
+  const url  = signedOrderUrl(base, apiSecret, { symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: spend });
+  console.log(`[binance] POST ${base}/api/v3/order BUY quoteOrderQty=${spend}`);
 
   try {
     const { data: r } = await axios.post(url, null, {
