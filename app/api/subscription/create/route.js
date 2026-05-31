@@ -56,6 +56,7 @@ export async function POST(req) {
     userId:        user._id,
     nowpaymentsId: String(npData.payment_id),
     orderId,
+    amount:        PLAN_PRICE,   // USD plan price — referral commission is a % of this
     payCurrency:   npData.pay_currency,
     payAddress:    npData.pay_address,
     payAmount:     npData.pay_amount,
