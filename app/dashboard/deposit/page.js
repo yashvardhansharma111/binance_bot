@@ -32,7 +32,7 @@ export default function DepositPage() {
   const [currency,  setCurrency]  = useState('usdttrc20');
   const [custom,    setCustom]    = useState('');
   const [loading,   setLoading]   = useState(false);
-  const [payment,   setPayment]   = useState(null);   // { paymentId, payAddress, payAmount, payCurrency, status }
+  const [payment,   setPayment]   = useState(null);   // { paymentId, payAddress, payAmount, payCurrency, gasFee, status }
   const [status,    setStatus]    = useState(null);
   const [balance,   setBalance]   = useState(null);
   const [copied,    setCopied]    = useState(false);
@@ -227,7 +227,12 @@ export default function DepositPage() {
                 <div className="text-3xl font-bold text-slate-900">
                   {payment.payAmount} <span className="text-blue-500">{payment.payCurrency?.toUpperCase()}</span>
                 </div>
-                <div className="text-sm text-slate-400 mt-0.5">≈ ${finalAmt} USD</div>
+                <div className="text-sm text-slate-400 mt-0.5">
+                  ${finalAmt} deposit
+                  {payment.gasFee > 0 && (
+                    <span className="ml-1 text-amber-600 font-medium">+ ${payment.gasFee} network fee</span>
+                  )}
+                </div>
               </div>
 
               {/* QR */}

@@ -21,6 +21,7 @@ const STATUS_META = {
 export default function SubscribePage() {
   const [currency, setCurrency]  = useState('usdttrc20');
   const [sub,      setSub]       = useState(null);
+  const [gasFee,   setGasFee]    = useState(2);
   const [status,   setStatus]    = useState(null);
   const [expiry,   setExpiry]    = useState(null);
   const [loading,  setLoading]   = useState(true);
@@ -76,6 +77,7 @@ export default function SubscribePage() {
     setCreating(false);
     if (!res.ok) { setError(data.error || 'Failed to create payment'); return; }
     setSub(data);
+    setGasFee(data.gasFee ?? 2);
     setStatus(data.status);
     startPolling();
   }
@@ -131,7 +133,10 @@ export default function SubscribePage() {
           <Zap size={20} className="text-white" />
         </div>
         <div className="text-3xl font-bold text-slate-900 mb-0.5">$49 <span className="text-lg text-slate-400 font-normal">USDT</span></div>
-        <div className="text-sm text-slate-500 mb-4">6 months access — $8.17/mo</div>
+        <div className="text-sm text-slate-500 mb-1">6 months access — $8.17/mo</div>
+        <div className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 mb-3">
+          +$2 network fee buffer included in payment — covers exchange withdrawal fees
+        </div>
         <ul className="text-sm text-slate-600 space-y-1.5 text-left mb-4 pl-2">
           {['24/7 AI bot running on Binance','RSI + MACD + Groq sentiment signals','Auto stop-loss & take-profit','Manual trading panel','Real-time chart & bot monitor'].map(f => (
             <li key={f} className="flex items-center gap-2">
@@ -193,6 +198,9 @@ export default function SubscribePage() {
                 <div className="text-xs text-slate-400 mb-1">Send exactly</div>
                 <div className="text-2xl font-bold text-slate-900">
                   {sub.payAmount} <span className="text-blue-500">{sub.payCurrency?.toUpperCase()}</span>
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  Includes <span className="text-amber-600 font-semibold">${gasFee} network fee buffer</span> — plan price is $49
                 </div>
               </div>
               <div className="flex justify-center p-3 bg-white border border-slate-100 rounded-xl">

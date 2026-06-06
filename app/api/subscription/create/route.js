@@ -10,7 +10,10 @@ const NP_BASE = process.env.NOWPAYMENTS_SANDBOX === 'true'
   : 'https://api.nowpayments.io/v1';
 
 const PLAN_PRICE = 49;
-const PLAN_MONTHS = 6;
+// Exchange withdrawal fees are deducted from the sent USDT (e.g. Binance TRC20: ~1 USDT, BEP20: ~0.8 USDT).
+// We pad the requested amount so the user knows to include the fee in what they send.
+const GAS_BUFFER = { usdttrc20: 2, usdtbsc: 2 };
+const DEFAULT_GAS = 2;
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -23,23 +26,25 @@ export async function POST(req) {
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  // Check if already has active subscription
   if (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
     return NextResponse.json({ error: 'Already has active subscription' }, { status: 400 });
   }
 
-  const orderId = `sub_${user._id}_${Date.now()}`;
+  const gasFee   = GAS_BUFFER[currency.toLowerCase()] ?? DEFAULT_GAS;
+  const totalAsk = PLAN_PRICE + gasFee; // what we tell NOWPayments to require
+
+  const orderId     = `sub_${user._id}_${Date.now()}`;
   const callbackUrl = `${process.env.NEXTAUTH_URL}/api/payments/webhook`;
 
   const npRes = await fetch(`${NP_BASE}/payment`, {
     method: 'POST',
     headers: { 'x-api-key': process.env.NOWPAYMENTS_API_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      price_amount:     PLAN_PRICE,
-      price_currency:   'usd',
-      pay_currency:     currency.toLowerCase(),
-      ipn_callback_url: callbackUrl,
-      order_id:         orderId,
+      price_amount:      totalAsk,
+      price_currency:    'usd',
+      pay_currency:      currency.toLowerCase(),
+      ipn_callback_url:  callbackUrl,
+      order_id:          orderId,
       order_description: `TrickyX.ai Bot — 6-month subscription for ${user.email}`,
     }),
   });
@@ -56,7 +61,7 @@ export async function POST(req) {
     userId:        user._id,
     nowpaymentsId: String(npData.payment_id),
     orderId,
-    amount:        PLAN_PRICE,   // USD plan price — referral commission is a % of this
+    amount:        PLAN_PRICE,   // actual plan price for referral/commission calculations
     payCurrency:   npData.pay_currency,
     payAddress:    npData.pay_address,
     payAmount:     npData.pay_amount,
@@ -69,6 +74,8 @@ export async function POST(req) {
     payAddress:     npData.pay_address,
     payAmount:      npData.pay_amount,
     payCurrency:    npData.pay_currency,
+    gasFee,
+    planPrice:      PLAN_PRICE,
     status:         sub.status,
   });
 }

@@ -16,9 +16,10 @@ export async function canTrade(userId, settings, usdtBalance, aggressive = false
   if (settings.dailyTradeDate === today && settings.dailyTradeCount >= settings.maxDailyTrades)
     return { allowed: false, reason: `Daily limit reached (${settings.maxDailyTrades})` };
 
-  const open = await Trade.findOne({ userId, status: 'open', side: 'BUY', symbol: settings.symbol });
-  if (open)
-    return { allowed: false, reason: `Position already open on ${settings.symbol}` };
+  const max       = settings.maxConcurrentTrades ?? 1;
+  const openCount = await Trade.countDocuments({ userId, status: 'open', side: 'BUY', symbol: settings.symbol });
+  if (openCount >= max)
+    return { allowed: false, reason: `Max concurrent positions reached (${openCount}/${max}) on ${settings.symbol}` };
 
   return { allowed: true, reason: null };
 }

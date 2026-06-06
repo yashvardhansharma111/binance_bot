@@ -107,16 +107,17 @@ export async function runBotForUser(user) {
       );
     }
 
-    // If any position is still open (on the bot's configured symbol), skip new entry
-    const openOnBotSymbol = openTrades.some(t => t.symbol === symbol);
-    if (openOnBotSymbol) {
-      // Also check SELL signal for bot's symbol
+    // Skip new entry only when at the concurrent position limit
+    const maxConcurrent    = settings.maxConcurrentTrades ?? 1;
+    const openOnBotSymbol  = openTrades.filter(t => t.symbol === symbol);
+    if (openOnBotSymbol.length >= maxConcurrent) {
       const candles    = await getCandles(symbol, timeframe, 100);
       const indicators = calculateIndicators(candles);
       const signal     = detectSignal(indicators);
-      const botTrade   = openTrades.find(t => t.symbol === symbol);
-      if (signal === 'SELL' && botTrade) {
-        await closePosition(userId, apiKey, apiSecret, botTrade, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
+      if (signal === 'SELL') {
+        for (const t of openOnBotSymbol) {
+          await closePosition(userId, apiKey, apiSecret, t, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
+        }
       }
       return;
     }
@@ -171,8 +172,8 @@ export async function runBotForUser(user) {
       }
     }
 
-    // 8. Execute BUY
-    const amount = calcTradeAmount(usdtBalance, settings.tradePercent);
+    // 8. Execute BUY — fixed USDT amount, capped to 99% of available balance
+    const amount = Math.min(settings.tradeUSDT || 50, usdtBalance * 0.99);
     await openPosition(userId, apiKey, apiSecret, settings, amount, indicators, sentiment, isTestnet);
 
   } catch (err) {

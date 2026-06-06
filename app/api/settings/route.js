@@ -20,16 +20,18 @@ export async function PUT(req) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const allowed = ['symbol','timeframe','tradePercent','stopLossPercent','takeProfitPercent',
-                   'cooldownMinutes','maxDailyTrades','useGroqFilter','aggressiveMode'];
+  const allowed = ['symbol','timeframe','tradeUSDT','stopLossPercent','takeProfitPercent',
+                   'cooldownMinutes','maxDailyTrades','maxConcurrentTrades','useGroqFilter','aggressiveMode'];
   const update = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
   }
 
   // Validate ranges
-  if (update.tradePercent    && (update.tradePercent < 1 || update.tradePercent > 100))
-    return NextResponse.json({ error: 'tradePercent must be 1–100' }, { status: 400 });
+  if (update.tradeUSDT !== undefined && (update.tradeUSDT < 1 || update.tradeUSDT > 100000))
+    return NextResponse.json({ error: 'tradeUSDT must be $1–$100,000' }, { status: 400 });
+  if (update.maxConcurrentTrades !== undefined && (update.maxConcurrentTrades < 1 || update.maxConcurrentTrades > 10))
+    return NextResponse.json({ error: 'maxConcurrentTrades must be 1–10' }, { status: 400 });
   if (update.stopLossPercent && (update.stopLossPercent < 0.1 || update.stopLossPercent > 50))
     return NextResponse.json({ error: 'stopLossPercent must be 0.1–50' }, { status: 400 });
   if (update.takeProfitPercent && (update.takeProfitPercent < 0.1 || update.takeProfitPercent > 100))

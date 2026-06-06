@@ -155,13 +155,13 @@ export default function SettingsPage() {
           </div>
         </Row>
 
-        <Row label="Trade Size" hint="% of fund balance per trade">
+        <Row label="Trade Size" hint="Fixed USDT amount per trade">
           <div className="flex items-center gap-3">
-            <NumberInput value={form.tradePercent} onChange={v => set('tradePercent', v)}
-              min={1} max={100} step={1} suffix="%" />
+            <NumberInput value={form.tradeUSDT ?? 50} onChange={v => set('tradeUSDT', v)}
+              min={1} max={100000} step={1} suffix="USDT" />
             {usdt && (
               <span className="text-xs text-slate-400">
-                ≈ ${((usdt.free * form.tradePercent) / 100).toFixed(2)} USDT per trade
+                {(((form.tradeUSDT ?? 50) / usdt.free) * 100).toFixed(1)}% of balance
               </span>
             )}
           </div>
@@ -191,6 +191,11 @@ export default function SettingsPage() {
         <Row label="Max Daily Trades" hint="Hard limit per day">
           <NumberInput value={form.maxDailyTrades} onChange={v => set('maxDailyTrades', v)}
             min={1} max={100} step={1} suffix="trades" />
+        </Row>
+
+        <Row label="Max Concurrent Trades" hint="Open positions the bot can hold at once">
+          <NumberInput value={form.maxConcurrentTrades ?? 3} onChange={v => set('maxConcurrentTrades', v)}
+            min={1} max={10} step={1} suffix="positions" />
         </Row>
 
         <Row label="AI Sentiment Filter" hint="Use Groq AI to confirm buy signals">
@@ -235,7 +240,7 @@ export default function SettingsPage() {
             ? <>⚡ <strong>Aggressive:</strong> BUY when RSI &lt; 65 (very frequent), SELL when RSI &gt; 75 or bearish cross. No cooldown. No sentiment filter.</>
             : <>Normal: BUY when RSI &lt; 40, SELL when RSI &gt; 70 or bearish MACD cross.</>
           }{' '}
-          SL <strong>{form.stopLossPercent}%</strong> · TP <strong>{form.takeProfitPercent}%</strong> · <strong>{form.tradePercent}%</strong> per trade.
+          SL <strong>{form.stopLossPercent}%</strong> · TP <strong>{form.takeProfitPercent}%</strong> · <strong>${form.tradeUSDT ?? 50}</strong> per trade.
         </span>
       </div>
     </div>

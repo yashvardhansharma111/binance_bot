@@ -38,10 +38,21 @@ export async function POST(req) {
   // ── Subscription payment ────────────────────────────────────────────────────
   if (order_id?.startsWith('sub_')) {
     const sub = await Subscription.findOne({ nowpaymentsId: String(payment_id) });
-    if (!sub || sub.status === payment_status) return NextResponse.json({ ok: true });
+    if (!sub) return NextResponse.json({ ok: true });
 
-    sub.status = payment_status;
-    if (payment_status === 'finished') {
+    // Accept partially_paid if the user paid ≥ 96% of the required crypto amount.
+    // This covers exchange withdrawal fees (~1–2 USDT) that are deducted from the sent amount.
+    const isPartiallyPaid = payment_status === 'partially_paid';
+    const partialAccepted = isPartiallyPaid && actually_paid != null
+      && (actually_paid / (ipnPayAmount || sub.payAmount)) >= 0.96;
+    const effectiveStatus = partialAccepted ? 'finished' : payment_status;
+
+    if (sub.status === effectiveStatus) return NextResponse.json({ ok: true });
+
+    sub.status = effectiveStatus;
+    if (effectiveStatus === 'finished') {
+      if (partialAccepted) console.log(`[webhook] Sub partial accepted: paid ${actually_paid} / required ${ipnPayAmount || sub.payAmount}`);
+
       sub.activatedAt = new Date();
       sub.expiresAt   = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
       await sub.save();
@@ -94,11 +105,20 @@ export async function POST(req) {
 
   // ── Deposit payment ─────────────────────────────────────────────────────────
   const payment = await Payment.findOne({ nowpaymentsId: String(payment_id) });
-  if (!payment || payment.status === payment_status) return NextResponse.json({ ok: true });
+  if (!payment) return NextResponse.json({ ok: true });
 
-  payment.status = payment_status;
+  // Accept partially_paid deposits when ≥ 96% received (covers exchange withdrawal fees)
+  const isPartialDep    = payment_status === 'partially_paid';
+  const partialDepOk    = isPartialDep && actually_paid != null
+    && (actually_paid / (ipnPayAmount || payment.payAmount)) >= 0.96;
+  const effectiveDepSt  = partialDepOk ? 'finished' : payment_status;
 
-  if (payment_status === 'finished') {
+  if (payment.status === effectiveDepSt) return NextResponse.json({ ok: true });
+
+  payment.status = effectiveDepSt;
+
+  if (effectiveDepSt === 'finished') {
+    if (partialDepOk) console.log(`[webhook] Deposit partial accepted: paid ${actually_paid} / required ${ipnPayAmount || payment.payAmount}`);
     payment.actuallyPaid = actually_paid ?? payment.payAmount;
     payment.completedAt  = new Date();
     await payment.save();

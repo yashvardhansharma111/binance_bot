@@ -10,6 +10,9 @@ const NP_BASE = process.env.NOWPAYMENTS_SANDBOX === 'true'
   ? 'https://api-sandbox.nowpayments.io/v1'
   : 'https://api.nowpayments.io/v1';
 
+const GAS_BUFFER = { usdttrc20: 2, usdtbsc: 2 };
+const DEFAULT_GAS = 2;
+
 export async function POST(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -22,21 +25,21 @@ export async function POST(req) {
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const orderId = `dep_${user._id}_${Date.now()}`;
+  const gasFee   = GAS_BUFFER[currency.toLowerCase()] ?? DEFAULT_GAS;
+  const totalAsk = amount + gasFee; // inflated so gas fee doesn't cause partial_payment
+
+  const orderId     = `dep_${user._id}_${Date.now()}`;
   const callbackUrl = `${process.env.NEXTAUTH_URL}/api/payments/webhook`;
 
   const npRes = await fetch(`${NP_BASE}/payment`, {
     method: 'POST',
-    headers: {
-      'x-api-key': process.env.NOWPAYMENTS_API_KEY,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'x-api-key': process.env.NOWPAYMENTS_API_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      price_amount:    amount,
-      price_currency:  'usd',
-      pay_currency:    currency.toLowerCase(),
-      ipn_callback_url: callbackUrl,
-      order_id:        orderId,
+      price_amount:      totalAsk,
+      price_currency:    'usd',
+      pay_currency:      currency.toLowerCase(),
+      ipn_callback_url:  callbackUrl,
+      order_id:          orderId,
       order_description: `Fund deposit for ${user.email}`,
     }),
   });
@@ -53,7 +56,7 @@ export async function POST(req) {
     userId:        user._id,
     nowpaymentsId: String(npData.payment_id),
     orderId,
-    priceAmount:   amount,
+    priceAmount:   amount,       // intended credit amount (no gas) — used for commission math
     priceCurrency: 'usd',
     payCurrency:   npData.pay_currency,
     payAddress:    npData.pay_address,
@@ -67,6 +70,8 @@ export async function POST(req) {
     payAddress:  npData.pay_address,
     payAmount:   npData.pay_amount,
     payCurrency: npData.pay_currency,
+    gasFee,
+    depositAmount: amount,
     status:      payment.status,
   });
 }
