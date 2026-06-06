@@ -28,7 +28,7 @@ function calcRSI(closes, period = 14) {
   return rsi;
 }
 
-const BASE_OPTS = {
+const CHART_OPTS = {
   layout: {
     background: { type: ColorType.Solid, color: '#ffffff' },
     textColor: '#64748b',
@@ -43,11 +43,12 @@ const BASE_OPTS = {
   crosshair: { mode: CrosshairMode.Normal },
   rightPriceScale: { borderColor: '#e2e8f0' },
   timeScale: { borderColor: '#e2e8f0', timeVisible: true, secondsVisible: false },
+  autoSize: true,
 };
 
 export default function ChartPage() {
-  const mainRef  = useRef(null);
-  const rsiRef   = useRef(null);
+  const mainRef        = useRef(null);
+  const rsiRef         = useRef(null);
   const chartRef       = useRef(null);
   const rsiChartRef    = useRef(null);
   const candleSerRef   = useRef(null);
@@ -55,7 +56,8 @@ export default function ChartPage() {
   const rsiSerRef      = useRef(null);
   const wsRef          = useRef(null);
   const wsRetryRef     = useRef(null);
-  const wsActiveRef    = useRef(true);
+  const wsActiveRef    = useRef(false);
+  const syncingRef     = useRef(false); // guard against scroll sync ping-pong
 
   const [symbol,    setSymbol]    = useState('BTCUSDT');
   const [timeframe, setTimeframe] = useState('5m');
@@ -66,15 +68,14 @@ export default function ChartPage() {
   const [rsiNow,    setRsiNow]    = useState(null);
   const [ohlc,      setOhlc]      = useState(null);
 
-  // ── Create charts once on mount ─────────────────────────────────────────────
+  // ── Create charts once on mount ────────────────────────────────────────
   useEffect(() => {
     if (!mainRef.current || !rsiRef.current) return;
 
-    // Main chart — shorter on small screens
     const isMobile = window.innerWidth < 640;
+
     const chart = createChart(mainRef.current, {
-      ...BASE_OPTS,
-      width:  mainRef.current.clientWidth,
+      ...CHART_OPTS,
       height: isMobile ? 260 : 380,
     });
 
@@ -96,11 +97,9 @@ export default function ChartPage() {
       scaleMargins: { top: 0.85, bottom: 0 },
     });
 
-    // RSI chart
     const rsiChart = createChart(rsiRef.current, {
-      ...BASE_OPTS,
-      width:  rsiRef.current.clientWidth,
-      height: 130,
+      ...CHART_OPTS,
+      height: isMobile ? 100 : 130,
     });
     rsiChart.priceScale('right').applyOptions({
       minimum: 0, maximum: 100,
@@ -113,7 +112,6 @@ export default function ChartPage() {
       priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
     });
 
-    // RSI reference lines via price lines on the series
     [
       { price: 70, color: '#ef4444', label: '70' },
       { price: 60, color: '#2563eb', label: '60' },
@@ -133,29 +131,32 @@ export default function ChartPage() {
     volumeSerRef.current = volumeSer;
     rsiSerRef.current    = rsiSer;
 
-    // Sync scrolling between charts
+    // Scroll sync with ping-pong guard
     chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-      if (range) rsiChart.timeScale().setVisibleLogicalRange(range);
+      if (syncingRef.current || !range) return;
+      syncingRef.current = true;
+      rsiChart.timeScale().setVisibleLogicalRange(range);
+      syncingRef.current = false;
     });
     rsiChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-      if (range) chart.timeScale().setVisibleLogicalRange(range);
+      if (syncingRef.current || !range) return;
+      syncingRef.current = true;
+      chart.timeScale().setVisibleLogicalRange(range);
+      syncingRef.current = false;
     });
 
-    const onResize = () => {
-      const mobile = window.innerWidth < 640;
-      if (mainRef.current) chart.applyOptions({ width: mainRef.current.clientWidth, height: mobile ? 260 : 380 });
-      if (rsiRef.current)  rsiChart.applyOptions({ width: rsiRef.current.clientWidth, height: mobile ? 100 : 130 });
-    };
-    window.addEventListener('resize', onResize);
-
     return () => {
-      window.removeEventListener('resize', onResize);
       chart.remove();
       rsiChart.remove();
+      chartRef.current     = null;
+      rsiChartRef.current  = null;
+      candleSerRef.current = null;
+      volumeSerRef.current = null;
+      rsiSerRef.current    = null;
     };
   }, []);
 
-  // ── Reload history + reconnect WS when symbol / timeframe changes ────────────
+  // ── Reload history + reconnect WS when symbol / timeframe changes ──────
   useEffect(() => {
     wsActiveRef.current = true;
     loadHistory();
@@ -163,14 +164,19 @@ export default function ChartPage() {
     return () => {
       wsActiveRef.current = false;
       clearTimeout(wsRetryRef.current);
-      wsRef.current?.close();
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // prevent retry on intentional close
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setWsOk(false);
     };
   }, [symbol, timeframe]); // eslint-disable-line
 
   async function loadHistory() {
+    if (!candleSerRef.current) return;
     setLoading(true);
     try {
-      // Fetch directly from Binance (supports CORS) — avoids server geo-blocks
       const res = await fetch(
         `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${timeframe}&limit=200`
       );
@@ -189,57 +195,69 @@ export default function ChartPage() {
 
       const closes    = parsed.map(c => c.close);
       const rsiValues = calcRSI(closes, 14);
-      const data = parsed.map((c, i) => ({
-        ...c,
-        rsi: rsiValues[i] !== null ? parseFloat(rsiValues[i].toFixed(2)) : null,
-      }));
 
-      // Offset timestamps to user's local timezone so chart shows local time
       const tzOffset = -new Date().getTimezoneOffset() * 60;
-      const candles = data.map(c => ({
+
+      const candles = parsed.map(c => ({
         time:  Math.floor(c.timestamp / 1000) + tzOffset,
         open:  c.open, high: c.high, low: c.low, close: c.close,
       }));
-      const volumes = data.map(c => ({
+      const volumes = parsed.map(c => ({
         time:  Math.floor(c.timestamp / 1000) + tzOffset,
         value: c.volume,
         color: c.close >= c.open ? 'rgba(22,163,74,0.35)' : 'rgba(239,68,68,0.35)',
       }));
-      const rsiData = data
-        .filter(c => c.rsi !== null)
-        .map(c => ({ time: Math.floor(c.timestamp / 1000) + tzOffset, value: c.rsi }));
+      const rsiData = parsed
+        .map((c, i) => ({ time: Math.floor(c.timestamp / 1000) + tzOffset, value: rsiValues[i] }))
+        .filter(d => d.value !== null);
 
-      candleSerRef.current?.setData(candles);
-      volumeSerRef.current?.setData(volumes);
-      rsiSerRef.current?.setData(rsiData);
+      // Guard: refs may have been cleared if component unmounted during fetch
+      if (!candleSerRef.current) return;
+
+      candleSerRef.current.setData(candles);
+      volumeSerRef.current.setData(volumes);
+      rsiSerRef.current.setData(rsiData);
       chartRef.current?.timeScale().scrollToRealTime();
 
-      const last  = data[data.length - 1];
-      const first = data[0];
+      const last  = parsed[parsed.length - 1];
+      const first = parsed[0];
+      const lastRsi = rsiValues[rsiValues.length - 1];
       setPrice(last.close);
       setChange24(((last.close - first.close) / first.close * 100).toFixed(2));
-      setRsiNow(last.rsi);
+      setRsiNow(lastRsi !== null ? parseFloat(lastRsi.toFixed(2)) : null);
       setOhlc({ o: last.open, h: last.high, l: last.low, c: last.close });
+    } catch {
+      /* silently ignore — user can hit Reload */
     } finally {
       setLoading(false);
     }
   }
 
   function connectWS() {
-    wsRef.current?.close();
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
     clearTimeout(wsRetryRef.current);
+
     const ws = new WebSocket(
       `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@kline_${timeframe}`
     );
-    ws.onopen  = () => setWsOk(true);
+
+    ws.onopen = () => { if (wsActiveRef.current) setWsOk(true); };
+
     ws.onclose = () => {
       setWsOk(false);
       if (wsActiveRef.current) {
         wsRetryRef.current = setTimeout(connectWS, 5000);
       }
     };
+
     ws.onerror = () => { ws.close(); };
+
     ws.onmessage = (e) => {
+      if (!wsActiveRef.current || !candleSerRef.current) return;
       const { k } = JSON.parse(e.data);
       const tzOffset = -new Date().getTimezoneOffset() * 60;
       const t = Math.floor(k.t / 1000) + tzOffset;
@@ -252,10 +270,10 @@ export default function ChartPage() {
         time: t, value: v,
         color: c >= o ? 'rgba(22,163,74,0.35)' : 'rgba(239,68,68,0.35)',
       });
-
       setPrice(c);
       setOhlc({ o, h, l, c });
     };
+
     wsRef.current = ws;
   }
 
@@ -297,7 +315,7 @@ export default function ChartPage() {
         </div>
       </div>
 
-      {/* Symbol + Interval selectors */}
+      {/* Symbol + Interval */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <SymbolSearch value={symbol} onChange={setSymbol} size="sm" />
         <div className="flex gap-0.5 bg-slate-100 p-1 rounded-lg">

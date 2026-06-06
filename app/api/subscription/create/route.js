@@ -4,16 +4,13 @@ import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import Subscription from '@/lib/models/Subscription';
 import User from '@/lib/models/User';
+import { getNetworkFee } from '@/lib/networkFee';
 
 const NP_BASE = process.env.NOWPAYMENTS_SANDBOX === 'true'
   ? 'https://api-sandbox.nowpayments.io/v1'
   : 'https://api.nowpayments.io/v1';
 
 const PLAN_PRICE = 49;
-// Exchange withdrawal fees are deducted from the sent USDT (e.g. Binance TRC20: ~1 USDT, BEP20: ~0.8 USDT).
-// We pad the requested amount so the user knows to include the fee in what they send.
-const GAS_BUFFER = { usdttrc20: 2, usdtbsc: 2 };
-const DEFAULT_GAS = 2;
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -30,8 +27,8 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Already has active subscription' }, { status: 400 });
   }
 
-  const gasFee   = GAS_BUFFER[currency.toLowerCase()] ?? DEFAULT_GAS;
-  const totalAsk = PLAN_PRICE + gasFee; // what we tell NOWPayments to require
+  const gasFee   = getNetworkFee(currency);
+  const totalAsk = PLAN_PRICE + gasFee;
 
   const orderId     = `sub_${user._id}_${Date.now()}`;
   const callbackUrl = `${process.env.NEXTAUTH_URL}/api/payments/webhook`;

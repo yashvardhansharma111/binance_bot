@@ -5,13 +5,11 @@ import { connectDB } from '@/lib/db';
 import Payment from '@/lib/models/Payment';
 import User from '@/lib/models/User';
 import crypto from 'crypto';
+import { getNetworkFee } from '@/lib/networkFee';
 
 const NP_BASE = process.env.NOWPAYMENTS_SANDBOX === 'true'
   ? 'https://api-sandbox.nowpayments.io/v1'
   : 'https://api.nowpayments.io/v1';
-
-const GAS_BUFFER = { usdttrc20: 2, usdtbsc: 2 };
-const DEFAULT_GAS = 2;
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -25,8 +23,8 @@ export async function POST(req) {
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const gasFee   = GAS_BUFFER[currency.toLowerCase()] ?? DEFAULT_GAS;
-  const totalAsk = amount + gasFee; // inflated so gas fee doesn't cause partial_payment
+  const gasFee   = getNetworkFee(currency);
+  const totalAsk = amount + gasFee;
 
   const orderId     = `dep_${user._id}_${Date.now()}`;
   const callbackUrl = `${process.env.NEXTAUTH_URL}/api/payments/webhook`;

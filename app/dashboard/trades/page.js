@@ -97,7 +97,7 @@ export default function TradesPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  {['Symbol', 'Side', 'Price', 'Qty', 'Total', 'P&L', 'Date', 'Status'].map(h => (
+                  {['Symbol', 'Side', 'Price', 'Qty', 'Total', 'P&L', 'Opened', 'Closed', 'Status'].map(h => (
                     <th key={h} className="text-left px-5 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -120,7 +120,18 @@ export default function TradesPage() {
                         {trade.profit >= 0 ? '+' : ''}{trade.profit?.toFixed(4)}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-slate-500">{new Date(trade.createdAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-4 text-slate-500 whitespace-nowrap">
+                      <div>{new Date(trade.createdAt).toLocaleDateString()}</div>
+                      <div className="text-xs text-slate-400">{new Date(trade.createdAt).toLocaleTimeString()}</div>
+                    </td>
+                    <td className="px-5 py-4 text-slate-500 whitespace-nowrap">
+                      {trade.closedAt ? (
+                        <>
+                          <div>{new Date(trade.closedAt).toLocaleDateString()}</div>
+                          <div className="text-xs text-slate-400">{new Date(trade.closedAt).toLocaleTimeString()}</div>
+                        </>
+                      ) : <span className="text-xs text-slate-300">—</span>}
+                    </td>
                     <td className="px-5 py-4">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         trade.status === 'closed' ? 'bg-slate-100 text-slate-500'

@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import {
   Users, Bot, ShieldCheck, TrendingUp, RefreshCw, UserX, UserCheck,
-  Settings, DollarSign, Percent, Star, CreditCard, Activity,
+  Settings, DollarSign, Percent, Star, CreditCard, Activity, Ticket,
+  Send,
 } from 'lucide-react';
 
 const DEFAULT_CONFIGS = [
@@ -37,6 +38,12 @@ export default function AdminPage() {
   const [grantDays, setGrantDays] = useState('30');
   const [grantLoading, setGrantLoading] = useState(false);
 
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [replyingId, setReplyingId] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [replyLoading, setReplyLoading] = useState(false);
+
   async function load() {
     setLoading(true);
     const [sRes, uRes, cRes] = await Promise.all([
@@ -57,6 +64,34 @@ export default function AdminPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  async function loadTickets() {
+    setTicketsLoading(true);
+    const res = await fetch('/api/admin/tickets');
+    const d = await res.json();
+    setTickets(d.tickets || []);
+    setTicketsLoading(false);
+  }
+
+  useEffect(() => { if (tab === 'tickets') loadTickets(); }, [tab]);
+
+  async function updateTicket(ticketId, update) {
+    await fetch('/api/admin/tickets', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticketId, ...update }),
+    });
+    loadTickets();
+  }
+
+  async function sendReply(ticketId) {
+    if (!replyText.trim()) return;
+    setReplyLoading(true);
+    await updateTicket(ticketId, { adminReply: replyText.trim(), status: 'in_progress' });
+    setReplyingId(null);
+    setReplyText('');
+    setReplyLoading(false);
+  }
 
   async function toggleUser(userId, currentStatus) {
     const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
@@ -101,6 +136,7 @@ export default function AdminPage() {
     { id: 'overview', label: 'Overview' },
     { id: 'users', label: 'Users' },
     { id: 'commissions', label: 'Commissions' },
+    { id: 'tickets', label: 'Tickets' },
     { id: 'config', label: 'Config' },
   ];
 
@@ -346,6 +382,104 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Tickets */}
+      {tab === 'tickets' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-slate-900">Support Tickets</h2>
+            <button onClick={loadTickets} className="btn-outline py-1.5 px-3 flex items-center gap-1.5 text-xs">
+              <RefreshCw size={12} /> Refresh
+            </button>
+          </div>
+
+          {ticketsLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <RefreshCw size={22} className="text-blue-500 animate-spin" />
+            </div>
+          ) : !tickets.length ? (
+            <div className="card p-10 glow-border text-center text-slate-400">
+              <Ticket size={32} className="mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No tickets yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tickets.map(t => {
+                const PRIORITY_COLOR = { low: '#16a34a', medium: '#b45309', high: '#dc2626' };
+                const STATUS_BG = { open: '#eff6ff', in_progress: '#fefce8', closed: '#f1f5f9' };
+                const STATUS_COLOR = { open: '#2563eb', in_progress: '#b45309', closed: '#64748b' };
+                return (
+                  <div key={t._id} className="card glow-border p-5">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-bold text-slate-900 text-sm">{t.subject}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+                            style={{ background: STATUS_BG[t.status] || '#f1f5f9', color: STATUS_COLOR[t.status] || '#64748b' }}>
+                            {t.status?.replace('_', ' ')}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                            style={{ background: '#fef9c3', color: PRIORITY_COLOR[t.priority] || '#b45309' }}>
+                            {t.priority}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 mb-2">
+                          {t.userId?.name} · {t.userId?.email} · {new Date(t.createdAt).toLocaleString()}
+                        </div>
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{t.message}</p>
+                        {t.adminReply && (
+                          <div className="mt-3 px-3 py-2.5 rounded-xl text-sm"
+                            style={{ background: '#eff6ff', borderLeft: '3px solid #2563eb' }}>
+                            <span className="text-xs font-bold text-blue-600 block mb-1">Admin Reply · {new Date(t.repliedAt).toLocaleString()}</span>
+                            <p className="text-slate-700 whitespace-pre-wrap">{t.adminReply}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <select
+                          value={t.status}
+                          onChange={e => updateTicket(t._id, { status: e.target.value })}
+                          className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700">
+                          <option value="open">Open</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                        <button
+                          onClick={() => { setReplyingId(replyingId === t._id ? null : t._id); setReplyText(t.adminReply || ''); }}
+                          className="btn-outline py-1.5 px-3 text-xs flex items-center gap-1.5">
+                          <Send size={11} /> {t.adminReply ? 'Edit Reply' : 'Reply'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {replyingId === t._id && (
+                      <div className="mt-3 pt-3" style={{ borderTop: '1px solid #e2e8f0' }}>
+                        <textarea
+                          rows={3}
+                          value={replyText}
+                          onChange={e => setReplyText(e.target.value)}
+                          placeholder="Type your reply to the user…"
+                          className="input w-full text-sm resize-none mb-2" />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => { setReplyingId(null); setReplyText(''); }}
+                            className="btn-outline py-1.5 px-3 text-xs">Cancel</button>
+                          <button onClick={() => sendReply(t._id)}
+                            disabled={replyLoading || !replyText.trim()}
+                            className="btn-primary py-1.5 px-4 text-xs flex items-center gap-1.5 disabled:opacity-50">
+                            {replyLoading ? <RefreshCw size={11} className="animate-spin" /> : <Send size={11} />}
+                            Send Reply
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

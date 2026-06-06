@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { DesktopSidebar, MobileTopBar, MobileTabBar } from '@/components/Sidebar';
 import SessionGuard from '@/components/SessionGuard';
+import ChatBot from '@/components/ChatBot';
 
 export default function DashboardLayout({ children }) {
   return (
@@ -24,6 +25,9 @@ export default function DashboardLayout({ children }) {
 
       {/* Mobile: bottom tab bar */}
       <MobileTabBar />
+
+      {/* Floating support chatbot */}
+      <ChatBot />
     </div>
   );
 }

@@ -265,7 +265,8 @@ export default function ReferralPage() {
                           {c.type} commission
                         </div>
                         <div className="text-xs" style={{ color: 'var(--text-3)' }}>
-                          {new Date(c.createdAt).toLocaleDateString()}
+                          {new Date(c.createdAt).toLocaleDateString()}&nbsp;
+                          {new Date(c.createdAt).toLocaleTimeString()}
                         </div>
                       </div>
                       <span className="font-bold text-sm" style={{ color: 'var(--accent)' }}>
