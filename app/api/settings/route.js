@@ -20,11 +20,17 @@ export async function PUT(req) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const allowed = ['symbol','timeframe','tradeUSDT','stopLossPercent','takeProfitPercent',
+  const allowed = ['symbol','symbols','timeframe','tradeUSDT','stopLossPercent','takeProfitPercent',
                    'cooldownMinutes','maxDailyTrades','maxConcurrentTrades','useGroqFilter','aggressiveMode'];
   const update = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
+  }
+
+  // Validate symbols array
+  if (update.symbols !== undefined) {
+    if (!Array.isArray(update.symbols)) return NextResponse.json({ error: 'symbols must be an array' }, { status: 400 });
+    update.symbols = [...new Set(update.symbols.map(s => s.trim().toUpperCase()).filter(Boolean))].slice(0, 10);
   }
 
   // Validate ranges

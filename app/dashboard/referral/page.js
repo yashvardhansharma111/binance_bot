@@ -194,11 +194,10 @@ export default function ReferralPage() {
           {/* How it works */}
           <div className="card p-5 glow-border">
             <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-1)' }}>How You Earn</h2>
-            <div className="grid sm:grid-cols-3 gap-3">
+            <div className="grid sm:grid-cols-2 gap-3">
               {[
                 { pct: '20%', label: 'of subscription price', desc: 'When your referral buys the bot ($49 plan → you get $9.80)' },
-                { pct: '10%', label: 'of trade profit', desc: 'Every profitable trade your referral makes — you earn 10% of the 15% commission' },
-                { pct: '10%', label: 'of deposit', desc: 'When your referral deposits funds — you earn 10% of the 15% deposit fee' },
+                { pct: '10%', label: 'of trade profit', desc: 'Every profitable trade your referral makes — you earn 10% of the 15% platform commission' },
               ].map(({ pct, label, desc }) => (
                 <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
                   <div className="text-2xl font-bold mb-1" style={{ color: 'var(--accent)' }}>{pct}</div>
@@ -235,13 +234,22 @@ export default function ReferralPage() {
                           <div className="text-xs" style={{ color: 'var(--text-3)' }}>{new Date(r.createdAt).toLocaleDateString()}</div>
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 rounded text-xs font-semibold"
-                        style={{
-                          background: r.botActive ? 'rgba(34,197,94,0.1)' : 'var(--surface)',
-                          color:      r.botActive ? '#16a34a' : 'var(--text-3)',
-                        }}>
-                        {r.botActive ? 'Trading' : 'Inactive'}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="px-2 py-0.5 rounded text-xs font-semibold"
+                          style={{
+                            background: r.subscriptionExpiry && new Date(r.subscriptionExpiry) > new Date() ? 'rgba(37,99,235,0.1)' : 'var(--surface)',
+                            color:      r.subscriptionExpiry && new Date(r.subscriptionExpiry) > new Date() ? '#2563eb' : 'var(--text-3)',
+                          }}>
+                          {r.subscriptionExpiry && new Date(r.subscriptionExpiry) > new Date() ? 'Subscribed' : 'No Sub'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-xs font-semibold"
+                          style={{
+                            background: r.botActive ? 'rgba(34,197,94,0.1)' : 'var(--surface)',
+                            color:      r.botActive ? '#16a34a' : 'var(--text-3)',
+                          }}>
+                          {r.botActive ? 'Trading' : 'Inactive'}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>

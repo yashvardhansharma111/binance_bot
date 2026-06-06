@@ -4,7 +4,6 @@ import { connectDB } from '@/lib/db';
 import Payment from '@/lib/models/Payment';
 import Subscription from '@/lib/models/Subscription';
 import User from '@/lib/models/User';
-import DepositCommission from '@/lib/models/DepositCommission';
 import SubscriptionCommission from '@/lib/models/SubscriptionCommission';
 
 export async function POST(req) {
@@ -54,7 +53,7 @@ export async function POST(req) {
       if (partialAccepted) console.log(`[webhook] Sub partial accepted: paid ${actually_paid} / required ${ipnPayAmount || sub.payAmount}`);
 
       sub.activatedAt = new Date();
-      sub.expiresAt   = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+      sub.expiresAt   = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
       await sub.save();
       await User.findByIdAndUpdate(sub.userId, { subscriptionExpiry: sub.expiresAt });
 
@@ -125,51 +124,10 @@ export async function POST(req) {
 
     const depositAmount = payment.priceAmount;
 
-    // Commission split
-    const COMMISSION_RATE = 0.15;
-    const REFERRER_RATE   = 0.10;
-    const PLATFORM_RATE   = 0.05;
+    // Credit full deposit amount to user's assetBalance — no deposit commission
+    await User.findByIdAndUpdate(payment.userId, { $inc: { assetBalance: depositAmount } });
 
-    const totalCommission = +(depositAmount * COMMISSION_RATE).toFixed(2);
-    const netCredited     = +(depositAmount - totalCommission).toFixed(2);
-
-    // Load depositing user to check for referrer
-    const depositor = await User.findById(payment.userId).select('referredBy');
-    let referrerId     = null;
-    let referrerAmount = 0;
-    let platformAmount = totalCommission; // default: all 15% to platform
-
-    if (depositor?.referredBy) {
-      const referrer = await User.findOne({ referralCode: depositor.referredBy }).select('_id');
-      if (referrer) {
-        referrerId     = referrer._id;
-        referrerAmount = +(depositAmount * REFERRER_RATE).toFixed(2);
-        platformAmount = +(depositAmount * PLATFORM_RATE).toFixed(2);
-
-        // Credit referrer's assetBalance
-        await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: referrerAmount } });
-        console.log(`[webhook] Referrer ${referrer._id} credited $${referrerAmount} to assetBalance`);
-      }
-    }
-
-    // Credit depositor's assetBalance (net after commission)
-    await User.findByIdAndUpdate(payment.userId, { $inc: { assetBalance: netCredited } });
-
-    // Record commission
-    await DepositCommission.create({
-      paymentId:      payment._id,
-      userId:         payment.userId,
-      referrerId,
-      depositAmount,
-      netCredited,
-      referrerAmount,
-      platformAmount,
-    });
-
-    console.log(
-      `[webhook] Deposit finished — user:${payment.userId} deposit:$${depositAmount} ` +
-      `net:$${netCredited} referrer:$${referrerAmount} platform:$${platformAmount}`
-    );
+    console.log(`[webhook] Deposit finished — user:${payment.userId} credited $${depositAmount} to assetBalance`);
   } else {
     await payment.save();
   }

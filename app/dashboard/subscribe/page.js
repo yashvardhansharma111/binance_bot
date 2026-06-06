@@ -133,7 +133,7 @@ export default function SubscribePage() {
           <Zap size={20} className="text-white" />
         </div>
         <div className="text-3xl font-bold text-slate-900 mb-0.5">$49 <span className="text-lg text-slate-400 font-normal">USDT</span></div>
-        <div className="text-sm text-slate-500 mb-1">6 months access — $8.17/mo</div>
+        <div className="text-sm text-slate-500 mb-1">12 months access — $4.08/mo</div>
         <div className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5 mb-3">
           +$2 network fee buffer included in payment — covers exchange withdrawal fees
         </div>

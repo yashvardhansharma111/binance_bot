@@ -149,18 +149,21 @@ function QuickTrade({ balances, onTradeComplete }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           symbol,
-          side:       side === 'BUY' ? 'BUY' : 'SELL',
-          usdtMargin: parseFloat(margin),
+          side:              side === 'BUY' ? 'BUY' : 'SELL',
+          usdtMargin:        parseFloat(margin),
           leverage,
-          orderType:  'MARKET',
+          stopLossPercent:   sl ? parseFloat(sl) : undefined,
+          takeProfitPercent: tp ? parseFloat(tp) : undefined,
         }),
       });
       clearTimeout(timer);
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Order failed'); return; }
-      const s = data.summary;
-      setResult(`${side === 'BUY' ? 'LONG' : 'SHORT'} ${s.qty} ${symbol.replace('USDT','')} @ $${s.entryPrice?.toLocaleString()} × ${leverage}x`);
-      setMargin('');
+      const s = data.trade;
+      setResult(`${side === 'BUY' ? 'LONG' : 'SHORT'} ${s.qty} ${symbol.replace('USDT','')} @ $${s.price?.toLocaleString()} × ${leverage}x${s.stopLoss ? ` | SL:$${s.stopLoss}` : ''}${s.takeProfit ? ` | TP:$${s.takeProfit}` : ''}`);
+      setMargin(''); setSl(''); setTp('');
+      onTradeComplete?.();
+      fetchOpenTrades();
     } catch (err) {
       setError(err.name === 'AbortError' ? 'Request timed out — check History' : `Error: ${err.message}`);
     } finally { setLoading(false); }
@@ -328,6 +331,34 @@ function QuickTrade({ balances, onTradeComplete }) {
             <div className="flex gap-4 mt-1.5 text-xs text-slate-400">
               {posValue && <span>Position: <strong className="text-slate-700">${posValue}</strong></span>}
               {liqEst   && <span>Est. Liq: <strong className="text-red-500">${liqEst}</strong></span>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">SL % <span className="text-slate-400 font-normal">(opt)</span></label>
+              <div className="flex items-center gap-1">
+                <input type="number" min="0.1" max="50" step="0.1" placeholder="2"
+                  value={sl} onChange={e => setSl(e.target.value)} className="input flex-1 text-sm" />
+                <span className="text-xs text-slate-400">%</span>
+              </div>
+              {sl && price && (
+                <div className="text-[10px] text-red-400 mt-0.5">
+                  Liq at ${(price * (isLong ? 1 - parseFloat(sl)/100 : 1 + parseFloat(sl)/100)).toFixed(2)}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">TP % <span className="text-slate-400 font-normal">(opt)</span></label>
+              <div className="flex items-center gap-1">
+                <input type="number" min="0.1" max="500" step="0.1" placeholder="4"
+                  value={tp} onChange={e => setTp(e.target.value)} className="input flex-1 text-sm" />
+                <span className="text-xs text-slate-400">%</span>
+              </div>
+              {tp && price && (
+                <div className="text-[10px] text-emerald-500 mt-0.5">
+                  Target ${(price * (isLong ? 1 + parseFloat(tp)/100 : 1 - parseFloat(tp)/100)).toFixed(2)}
+                </div>
+              )}
             </div>
           </div>
         </>
@@ -523,7 +554,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1">
               <div className="text-white font-bold text-base">Unlock AI Trading Bot</div>
-              <div className="text-blue-200 text-xs mt-0.5">Subscribe for 6 months and let AI trade for you 24/7</div>
+              <div className="text-blue-200 text-xs mt-0.5">Subscribe for 12 months and let AI trade for you 24/7</div>
             </div>
             <button onClick={() => router.push('/dashboard/subscribe')}
               className="shrink-0 bg-white text-blue-700 font-bold text-sm px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">

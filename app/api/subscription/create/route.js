@@ -42,7 +42,7 @@ export async function POST(req) {
       pay_currency:      currency.toLowerCase(),
       ipn_callback_url:  callbackUrl,
       order_id:          orderId,
-      order_description: `TrickyX.ai Bot — 6-month subscription for ${user.email}`,
+      order_description: `TrickyX.ai Bot — 12-month subscription for ${user.email}`,
     }),
   });
 

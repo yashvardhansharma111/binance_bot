@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Clock, Bot } from 'lucide-react';
+import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Plus, X } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
 
 const TIMEFRAMES = ['1m','5m','15m','1h','4h'];
@@ -29,13 +29,14 @@ function NumberInput({ value, onChange, min, max, step = 0.1, suffix }) {
 }
 
 export default function SettingsPage() {
-  const [form,    setForm]    = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
-  const [saved,   setSaved]   = useState(false);
-  const [error,   setError]   = useState('');
-  const [balance, setBalance] = useState(null);
+  const [form,       setForm]       = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [saving,     setSaving]     = useState(false);
+  const [saved,      setSaved]      = useState(false);
+  const [error,      setError]      = useState('');
+  const [balance,    setBalance]    = useState(null);
   const [balLoading, setBalLoading] = useState(false);
+  const [addSymbol,  setAddSymbol]  = useState('ETHUSDT');
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => { setForm(d); setLoading(false); });
@@ -135,8 +136,54 @@ export default function SettingsPage() {
 
       {/* Settings */}
       <div className="card glow-border px-5 py-2">
-        <Row label="Trading Pair" hint="Which coin the bot trades">
-          <SymbolSearch value={form.symbol} onChange={s => set('symbol', s)} size="sm" />
+        <Row label="Trading Pairs" hint={`Bot trades all listed pairs (max 10). Each pair runs independently.`}>
+          <div className="space-y-2">
+            {/* Active symbol chips */}
+            <div className="flex flex-wrap gap-2">
+              {(form.symbols?.length ? form.symbols : [form.symbol]).map(sym => (
+                <span key={sym}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-semibold"
+                  style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8' }}>
+                  {sym}
+                  <button
+                    onClick={() => {
+                      const current = form.symbols?.length ? form.symbols : [form.symbol];
+                      const next    = current.filter(s => s !== sym);
+                      if (next.length === 0) return; // must keep at least one
+                      set('symbols', next);
+                      set('symbol', next[0]);
+                    }}
+                    className="hover:text-red-500 transition-colors ml-0.5">
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            {/* Add new symbol row */}
+            {(form.symbols?.length || 1) < 10 && (
+              <div className="flex items-center gap-2">
+                <SymbolSearch value={addSymbol} onChange={setAddSymbol} size="sm" />
+                <button
+                  onClick={() => {
+                    const sym     = addSymbol.trim().toUpperCase();
+                    if (!sym) return;
+                    const current = form.symbols?.length ? form.symbols : [form.symbol];
+                    if (current.includes(sym)) return;
+                    const next = [...current, sym];
+                    set('symbols', next);
+                    set('symbol', next[0]);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                  style={{ background: '#2563eb', color: '#fff' }}>
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-slate-400">
+              {(form.symbols?.length || 1)} pair{(form.symbols?.length || 1) !== 1 ? 's' : ''} active · remove a pair by clicking ×
+            </p>
+          </div>
         </Row>
 
         <Row label="Timeframe" hint="Candle interval for signals">
@@ -240,7 +287,7 @@ export default function SettingsPage() {
             ? <>⚡ <strong>Aggressive:</strong> BUY when RSI &lt; 65 (very frequent), SELL when RSI &gt; 75 or bearish cross. No cooldown. No sentiment filter.</>
             : <>Normal: BUY when RSI &lt; 40, SELL when RSI &gt; 70 or bearish MACD cross.</>
           }{' '}
-          SL <strong>{form.stopLossPercent}%</strong> · TP <strong>{form.takeProfitPercent}%</strong> · <strong>${form.tradeUSDT ?? 50}</strong> per trade.
+          SL <strong>{form.stopLossPercent}%</strong> · TP <strong>{form.takeProfitPercent}%</strong> · <strong>${form.tradeUSDT ?? 50}</strong> per trade · <strong>{form.symbols?.length || 1}</strong> pair{(form.symbols?.length || 1) !== 1 ? 's' : ''}.
         </span>
       </div>
     </div>

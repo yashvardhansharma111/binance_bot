@@ -21,6 +21,7 @@ export async function GET() {
     totalTrades, closedTrades, recentTrades,
     totalSubs, activeSubs,
     commissions,
+    fundAgg,
   ] = await Promise.all([
     User.countDocuments({}),
     User.countDocuments({ status: 'active' }),
@@ -32,6 +33,7 @@ export async function GET() {
     Subscription.countDocuments({ status: 'finished' }),
     User.countDocuments({ subscriptionExpiry: { $gt: now } }),
     Commission.find({}).select('platformAmount referrerAmount totalAmount createdAt'),
+    User.aggregate([{ $group: { _id: null, total: { $sum: '$assetBalance' } } }]),
   ]);
 
   const totalPlatformRevenue = commissions.reduce((s, c) => s + c.platformAmount, 0);
@@ -51,5 +53,6 @@ export async function GET() {
     totalCommission:      parseFloat(totalCommission.toFixed(4)),
     totalProfit:          parseFloat((totalProfit[0]?.total || 0).toFixed(4)),
     commissionCount:      commissions.length,
+    totalFunds:           parseFloat((fundAgg[0]?.total || 0).toFixed(2)),
   });
 }

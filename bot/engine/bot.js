@@ -55,7 +55,9 @@ export async function runBotForUser(user) {
     let settings = await BotSettings.findOne({ userId });
     if (!settings) settings = await BotSettings.create({ userId });
 
-    const { symbol, timeframe, aggressiveMode } = settings;
+    const { timeframe, aggressiveMode } = settings;
+    // Resolve which symbols to trade — multi-symbol list takes priority over legacy single field
+    const tradingSymbols = settings.symbols?.length ? settings.symbols : [settings.symbol || 'BTCUSDT'];
 
     // 3. Check ALL open trades — SL/TP/force-exit runs unconditionally,
     //    regardless of subscription or balance status, so positions are
@@ -73,16 +75,13 @@ export async function runBotForUser(user) {
         openTrade.takeProfit = tp;
       }
 
-      // Fetch live price for this trade's specific symbol
       const tradePrice = await getCurrentPrice(openTrade.symbol);
-
       const exitReason = checkExitConditions(openTrade, tradePrice);
       if (exitReason) {
         await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet);
         continue;
       }
 
-      // Force SELL: if position held for more than 1 hour without hitting SL/TP, close it
       const holdMins = (Date.now() - new Date(openTrade.createdAt).getTime()) / 60000;
       if (holdMins >= 60) {
         const pnl = ((tradePrice - openTrade.price) / openTrade.price * 100).toFixed(2);
@@ -111,74 +110,80 @@ export async function runBotForUser(user) {
       return;
     }
 
-    // Skip new entry only when at the concurrent position limit
-    const maxConcurrent    = settings.maxConcurrentTrades ?? 1;
-    const openOnBotSymbol  = openTrades.filter(t => t.symbol === symbol);
-    if (openOnBotSymbol.length >= maxConcurrent) {
-      const candles    = await getCandles(symbol, timeframe, 100);
-      const indicators = calculateIndicators(candles);
-      const signal     = detectSignal(indicators);
-      if (signal === 'SELL') {
-        for (const t of openOnBotSymbol) {
-          await closePosition(userId, apiKey, apiSecret, t, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
+    // 5. Fetch USDT balance once — shared across all symbol iterations
+    const usdtBalance = await getUSDTBalance(apiKey, apiSecret);
+
+    // 6. Run new-entry logic for each configured symbol independently
+    const maxConcurrent = settings.maxConcurrentTrades ?? 1;
+
+    for (const sym of tradingSymbols) {
+      const openOnSym = openTrades.filter(t => t.symbol === sym);
+
+      // At concurrent limit for this symbol — check SELL signal to close
+      if (openOnSym.length >= maxConcurrent) {
+        const candles    = await getCandles(sym, timeframe, 100);
+        const indicators = calculateIndicators(candles);
+        const signal     = detectSignal(indicators);
+        if (signal === 'SELL') {
+          for (const t of openOnSym) {
+            await closePosition(userId, apiKey, apiSecret, t, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
+          }
+        }
+        continue;
+      }
+
+      // Fetch candles + indicators for this symbol
+      const currentPrice = await getCurrentPrice(sym);
+      const candles      = await getCandles(sym, timeframe, 100);
+      const indicators   = calculateIndicators(candles);
+
+      await log(userId, 'info',
+        `[${sym}] RSI:${indicators.rsi} | Trend:${indicators.uptrend ? '↑' : '↓'} | MACD:${indicators.bullishCrossover ? '↑cross' : indicators.bearishCrossover ? '↓cross' : 'flat'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
+      );
+
+      const signal = detectSignal(indicators, aggressiveMode);
+      await log(userId, 'info', `[${sym}] Signal: ${signal}${aggressiveMode ? ' [AGGRESSIVE]' : ''}`);
+
+      // Force-trade: if no trade on this symbol in last 1h and signal not SELL
+      const lastSymTrade = await Trade.findOne({ userId, symbol: sym }).sort({ createdAt: -1 });
+      const hoursSinceLast = lastSymTrade
+        ? (Date.now() - new Date(lastSymTrade.createdAt).getTime()) / 3_600_000
+        : Infinity;
+      const forceTrade = hoursSinceLast >= 1 && signal !== 'SELL';
+
+      if (forceTrade) {
+        await log(userId, 'warn', `[${sym}] Force trade — no trade in ${Math.floor(hoursSinceLast * 60)}m | Signal was: ${signal}`);
+      }
+
+      if (!forceTrade && signal === 'HOLD') continue;
+      if (!forceTrade && signal === 'SELL') {
+        await log(userId, 'info', `[${sym}] SELL signal but no open position — nothing to close`);
+        continue;
+      }
+
+      // Risk checks
+      const risk = await canTrade(userId, settings, usdtBalance, aggressiveMode);
+      if (!risk.allowed) {
+        await log(userId, 'info', `[${sym}] Skipped: ${risk.reason}`);
+        continue;
+      }
+
+      // Groq sentiment filter
+      let sentiment = { sentiment: 'neutral', confidence: 50, reason: 'Filter off' };
+      if (settings.useGroqFilter && !forceTrade && !aggressiveMode) {
+        sentiment = await getSentiment(sym, indicators);
+        await log(userId, 'info', `[${sym}] Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
+        if (shouldBlock(signal, sentiment)) {
+          await log(userId, 'warn', `[${sym}] Trade BLOCKED — bearish sentiment (${sentiment.confidence}%)`);
+          continue;
         }
       }
-      return;
+
+      // Execute BUY
+      const tradeSettings = { ...settings.toObject(), symbol: sym };
+      const amount = Math.min(settings.tradeUSDT || 50, usdtBalance * 0.99);
+      await openPosition(userId, apiKey, apiSecret, tradeSettings, amount, indicators, sentiment, isTestnet);
     }
-
-    // 4. Fetch candles + indicators
-    const currentPrice = await getCurrentPrice(symbol);
-    const candles      = await getCandles(symbol, timeframe, 100);
-    const indicators   = calculateIndicators(candles);
-
-    await log(userId, 'info',
-      `${symbol} RSI:${indicators.rsi} | Trend:${indicators.uptrend ? '↑' : '↓'} | MACD:${indicators.bullishCrossover ? '↑cross' : indicators.bearishCrossover ? '↓cross' : 'flat'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
-    );
-
-    // 5. Signal
-    const signal = detectSignal(indicators, aggressiveMode);
-    await log(userId, 'info', `Signal: ${signal}${aggressiveMode ? ' [AGGRESSIVE]' : ''}`);
-
-    // Force-trade: if no trade in last 1h and signal not SELL, force a BUY
-    const lastTrade = await Trade.findOne({ userId }).sort({ createdAt: -1 });
-    const hoursSinceLastTrade = lastTrade
-      ? (Date.now() - new Date(lastTrade.createdAt).getTime()) / 3_600_000
-      : Infinity;
-    const forceTrade = hoursSinceLastTrade >= 1 && signal !== 'SELL';
-
-    if (forceTrade) {
-      await log(userId, 'warn', `Force trade triggered — no trade in ${Math.floor(hoursSinceLastTrade * 60)}m | Signal was: ${signal}`);
-    }
-
-    if (!forceTrade && signal === 'HOLD') return;
-
-    if (!forceTrade && signal === 'SELL') {
-      await log(userId, 'info', 'SELL signal but no open position — nothing to close');
-      return;
-    }
-
-    // 6. Risk checks — aggressive mode skips cooldown
-    const usdtBalance = await getUSDTBalance(apiKey, apiSecret);
-    const risk = await canTrade(userId, settings, usdtBalance, aggressiveMode);
-    if (!risk.allowed) {
-      await log(userId, 'info', `Skipped: ${risk.reason}`);
-      return;
-    }
-
-    // 7. Groq sentiment filter — skipped in aggressive mode and force trades
-    let sentiment = { sentiment: 'neutral', confidence: 50, reason: 'Filter off' };
-    if (settings.useGroqFilter && !forceTrade && !aggressiveMode) {
-      sentiment = await getSentiment(symbol, indicators);
-      await log(userId, 'info', `Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
-      if (shouldBlock(signal, sentiment)) {
-        await log(userId, 'warn', `Trade BLOCKED — bearish sentiment (${sentiment.confidence}%)`);
-        return;
-      }
-    }
-
-    // 8. Execute BUY — fixed USDT amount, capped to 99% of available balance
-    const amount = Math.min(settings.tradeUSDT || 50, usdtBalance * 0.99);
-    await openPosition(userId, apiKey, apiSecret, settings, amount, indicators, sentiment, isTestnet);
 
   } catch (err) {
     await log(userId, 'error', `Bot error: ${err.message}`);

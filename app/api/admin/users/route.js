@@ -48,3 +48,14 @@ export async function PATCH(req) {
   const user = await User.findByIdAndUpdate(userId, { $set: update }, { new: true }).select('-password');
   return NextResponse.json(user);
 }
+
+export async function DELETE(req) {
+  const admin = await adminGuard();
+  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { userId } = await req.json();
+  if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+  if (String(userId) === String(admin._id))
+    return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 });
+  await User.findByIdAndDelete(userId);
+  return NextResponse.json({ ok: true });
+}

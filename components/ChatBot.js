@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   MessageCircle, X, Send, RefreshCw, Ticket,
   ChevronLeft, AlertCircle, CheckCircle2,
@@ -21,11 +21,42 @@ export default function ChatBot() {
   const [tSuccess, setTSuccess] = useState('');
   const [tError,   setTError]   = useState('');
 
+  // Drag state for the floating button
+  const [pos,      setPos]      = useState({ x: null, y: null }); // null = default bottom-right
+  const dragRef    = useRef(null);
+  const dragging   = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
   const bottomRef = useRef(null);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs, open]);
+
+  const onPointerDown = useCallback((e) => {
+    // Only drag on the button itself, not child elements that handle clicks
+    dragging.current = true;
+    const rect = dragRef.current.getBoundingClientRect();
+    dragOffset.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+    dragRef.current.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }, []);
+
+  const onPointerMove = useCallback((e) => {
+    if (!dragging.current) return;
+    const x = e.clientX - dragOffset.current.x;
+    const y = e.clientY - dragOffset.current.y;
+    const maxX = window.innerWidth  - 56;
+    const maxY = window.innerHeight - 56;
+    setPos({ x: Math.max(0, Math.min(x, maxX)), y: Math.max(0, Math.min(y, maxY)) });
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
 
   async function send() {
     if (!input.trim() || sending) return;
@@ -64,20 +95,39 @@ export default function ChatBot() {
 
   return (
     <>
-      {/* Floating button */}
+      {/* Floating button — draggable */}
       <button
-        onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-        style={{ background: 'var(--accent)', color: '#fff' }}
+        ref={dragRef}
+        onClick={() => { if (!dragging.current) setOpen(o => !o); }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        className="fixed z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center select-none touch-none"
+        style={{
+          background: 'var(--accent)',
+          color: '#fff',
+          ...(pos.x !== null
+            ? { left: pos.x, top: pos.y, bottom: 'auto', right: 'auto' }
+            : { bottom: 24, right: 24 }),
+          cursor: dragging.current ? 'grabbing' : 'grab',
+        }}
         aria-label="Open support chat">
         {open ? <X size={22} /> : <MessageCircle size={22} />}
       </button>
 
-      {/* Chat window */}
-      {open && (
+      {/* Chat window — anchors above the button */}
+      {open && (() => {
+        const winStyle = pos.x !== null
+          ? {
+              left: Math.min(pos.x, window.innerWidth - 368),
+              top:  Math.max(8, pos.y - 528),
+              bottom: 'auto', right: 'auto',
+            }
+          : { bottom: 96, right: 24 };
+        return (
         <div
-          className="fixed bottom-24 right-6 z-50 w-[360px] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', height: 520 }}>
+          className="fixed z-50 w-[360px] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', height: 520, ...winStyle }}>
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 shrink-0"
@@ -231,7 +281,8 @@ export default function ChatBot() {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
     </>
   );
 }

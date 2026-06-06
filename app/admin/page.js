@@ -37,6 +37,8 @@ export default function AdminPage() {
   const [grantingId, setGrantingId] = useState(null);
   const [grantDays, setGrantDays] = useState('30');
   const [grantLoading, setGrantLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(false);
@@ -82,6 +84,18 @@ export default function AdminPage() {
       body: JSON.stringify({ ticketId, ...update }),
     });
     loadTickets();
+  }
+
+  async function deleteUser(userId) {
+    setDeleteLoading(true);
+    await fetch('/api/admin/users', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    setDeleteLoading(false);
+    setDeleteConfirm(null);
+    load();
   }
 
   async function sendReply(ticketId) {
@@ -191,11 +205,11 @@ export default function AdminPage() {
           </div>
 
           {/* Revenue stats */}
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Revenue</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Revenue & Funds</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <StatCard label="Platform Revenue"  value={stats?.totalPlatformRevenue?.toFixed(4)} icon={DollarSign}  iconBg="#ecfdf5" iconColor="#059669" prefix="$" />
-            <StatCard label="Referrer Paid Out" value={stats?.totalReferrerPaid?.toFixed(4)}    icon={Star}        iconBg="#fffbeb" iconColor="#d97706" prefix="$" />
-            <StatCard label="Total Commission"  value={stats?.totalCommission?.toFixed(4)}      icon={Percent}     iconBg="#faf5ff" iconColor="#7c3aed" prefix="$" />
+            <StatCard label="Total User Funds"  value={stats?.totalFunds?.toFixed(2)}           icon={DollarSign}  iconBg="#f0fdf4" iconColor="#16a34a" prefix="$" />
+            <StatCard label="Platform Revenue"  value={stats?.totalPlatformRevenue?.toFixed(2)} icon={TrendingUp}  iconBg="#ecfdf5" iconColor="#059669" prefix="$" />
+            <StatCard label="Referrer Paid Out" value={stats?.totalReferrerPaid?.toFixed(2)}    icon={Star}        iconBg="#fffbeb" iconColor="#d97706" prefix="$" />
             <StatCard label="Active Subs"       value={stats?.activeSubs}                       icon={CreditCard}  iconBg="#eff6ff" iconColor="#2563eb" />
           </div>
 
@@ -242,7 +256,7 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  {['Name', 'Email', 'Referral', 'Fund Bal', 'Asset Bal', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
+                  {['Name', 'Email', 'Referral', 'Balance', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -263,8 +277,7 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-500 text-xs">{u.email}</td>
                     <td className="px-4 py-3 font-mono text-blue-600 font-medium text-xs">{u.referralCode}</td>
-                    <td className="px-4 py-3 text-slate-700 font-mono text-xs">${(u.fundBalance || 0).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-slate-700 font-mono text-xs">${(u.assetBalance || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-slate-700 font-mono text-xs font-semibold">${(u.assetBalance || 0).toFixed(2)}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         u.botActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -325,6 +338,28 @@ export default function AdminPage() {
                             onClick={() => { setGrantingId(u._id); setGrantDays('30'); }}
                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 whitespace-nowrap">
                             <Star size={11} /> Grant Sub
+                          </button>
+                        )}
+                        {deleteConfirm === u._id ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-red-600 font-semibold whitespace-nowrap">Delete?</span>
+                            <button
+                              onClick={() => deleteUser(u._id)}
+                              disabled={deleteLoading}
+                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                              {deleteLoading ? '…' : 'Yes'}
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(null)}
+                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200">
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirm(u._id)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 whitespace-nowrap">
+                            🗑 Delete
                           </button>
                         )}
                       </div>
