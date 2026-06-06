@@ -37,17 +37,7 @@ export async function runBotForUser(user) {
   ).catch(() => {});
 
   try {
-    // 0. Subscription check
-    if (!user.subscriptionExpiry || new Date(user.subscriptionExpiry) <= new Date()) {
-      return await log(userId, 'warn', 'No active subscription — bot paused. Subscribe at /dashboard/subscribe');
-    }
-
-    // 1. Asset balance check — need ≥ $10 to cover commissions
-    if ((user.assetBalance ?? 0) < 10) {
-      return await log(userId, 'warn', `Insufficient asset balance $${(user.assetBalance ?? 0).toFixed(2)} — deposit at least $10 to run the bot`);
-    }
-
-    // 2. API keys
+    // 1. API keys — needed for both exit management and new entries
     const keyDoc = await ApiKey.findOne({ userId, isActive: true });
     if (!keyDoc) return await log(userId, 'warn', 'No active API key — skipped');
 
@@ -67,7 +57,9 @@ export async function runBotForUser(user) {
 
     const { symbol, timeframe, aggressiveMode } = settings;
 
-    // 3. Check ALL open trades — each against its own symbol's live price
+    // 3. Check ALL open trades — SL/TP/force-exit runs unconditionally,
+    //    regardless of subscription or balance status, so positions are
+    //    always honoured even after subscription expires.
     const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY' });
 
     for (const openTrade of openTrades) {
@@ -105,6 +97,18 @@ export async function runBotForUser(user) {
       await log(userId, 'info',
         `Holding ${openTrade.symbol} @ $${openTrade.price} for ${holdMins.toFixed(0)}m | Now: $${tradePrice} | SL:$${openTrade.stopLoss} TP:$${openTrade.takeProfit}`
       );
+    }
+
+    // 4. Gate new entries — subscription and balance checks only block opening new trades,
+    //    never the exit loop above.
+    const subActive = user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date();
+    if (!subActive) {
+      await log(userId, 'warn', 'No active subscription — skipping new entries');
+      return;
+    }
+    if ((user.assetBalance ?? 0) < 10) {
+      await log(userId, 'warn', `Low asset balance $${(user.assetBalance ?? 0).toFixed(2)} — skipping new entries`);
+      return;
     }
 
     // Skip new entry only when at the concurrent position limit
