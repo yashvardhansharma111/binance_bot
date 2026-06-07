@@ -214,6 +214,9 @@ function QuickTrade({ balances, onTradeComplete }) {
                 boxShadow:   mode === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
               }}>
               {m.charAt(0).toUpperCase() + m.slice(1)}
+              {m === 'futures' && balances?.accountType === 'testnet' && (
+                <span className="ml-1 text-[9px] font-bold text-amber-500">N/A</span>
+              )}
             </button>
           ))}
         </div>
@@ -306,6 +309,16 @@ function QuickTrade({ balances, onTradeComplete }) {
         </>
       ) : (
         <>
+          {/* Testnet block */}
+          {balances?.accountType === 'testnet' && (
+            <div className="mb-4 px-3 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-xs flex items-start gap-2">
+              <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+              <span>
+                <strong>Testnet API key detected.</strong> Futures trading is only available with a live Binance account.
+                Switch to a real API key in <a href="/dashboard/apikeys" className="underline font-semibold">API Keys</a>.
+              </span>
+            </div>
+          )}
           {/* Futures form */}
           <div className="mb-3">
             <label className="block text-xs font-semibold text-slate-600 mb-2">Leverage</label>
@@ -377,8 +390,8 @@ function QuickTrade({ balances, onTradeComplete }) {
 
       <button
         onClick={mode === 'spot' ? placeSpot : placeFutures}
-        disabled={loading}
-        className="w-full mt-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all"
+        disabled={loading || (mode === 'futures' && balances?.accountType === 'testnet')}
+        className="w-full mt-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: isLong ? '#16a34a' : '#dc2626', color: '#fff' }}>
         {loading
           ? <RefreshCw size={15} className="animate-spin" />

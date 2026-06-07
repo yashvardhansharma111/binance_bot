@@ -36,6 +36,7 @@ function fapiError(e) {
     return new Error('Binance API key rejected — enable "Futures Trading" permission on your API key at binance.com/en/my/api-management');
   if (code === -4061) return new Error('Order side must match position side — disable Hedge Mode in Binance Futures settings');
   if (code === -1021) return new Error('Timestamp out of sync — check your server clock');
+  if (code === -1013 || code === -4003) return new Error(`Order too small — increase margin or use a lower-price pair (${msg})`);
   return new Error(code ? `Binance Futures error ${code}: ${msg}` : msg);
 }
 
@@ -99,6 +100,11 @@ export async function POST(req) {
   if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
 
   const isTestnet = keyDoc.accountType === 'testnet';
+  if (isTestnet)
+    return NextResponse.json({
+      error: 'Futures trading requires a live Binance account. Testnet API keys only support spot trading — switch to a real Binance API key in API Keys settings.',
+    }, { status: 400 });
+
   let apiKey, apiSecret;
   try {
     apiKey    = decrypt(keyDoc.encryptedKey);
@@ -111,10 +117,13 @@ export async function POST(req) {
     // Get current price to calculate qty
     const entryPrice = await getCurrentPrice(symbol);
     const positionSize = usdtMargin * leverage;
-    // Round qty to 3 decimal places (most futures pairs allow this)
-    const qty = parseFloat((positionSize / entryPrice).toFixed(3));
+    // Use 6 decimal places so high-price pairs like BTC don't round to 0.
+    // Binance will enforce symbol-specific lot-size minimums with a clear error.
+    const qty = parseFloat((positionSize / entryPrice).toFixed(6));
 
-    if (qty <= 0) return NextResponse.json({ error: 'Calculated qty is 0 — increase margin' }, { status: 400 });
+    if (qty <= 0) return NextResponse.json({
+      error: `Position too small — need at least $${(entryPrice * 0.001 / leverage).toFixed(2)} margin for ${symbol} at ${leverage}x`,
+    }, { status: 400 });
 
     // Set leverage
     try {
