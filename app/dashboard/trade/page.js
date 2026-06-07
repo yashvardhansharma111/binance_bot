@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Activity, RefreshCw, TrendingUp, TrendingDown, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export default function TradePage() {
@@ -9,12 +9,14 @@ export default function TradePage() {
   const [exitLoading, setExitLoading] = useState('');
   const [exitError,   setExitError]   = useState('');
   const [exitResult,  setExitResult]  = useState(null);
+  const tradesRef = useRef([]);
 
   async function load() {
     setLoading(true);
     const res  = await fetch('/api/trades?status=open&limit=50');
     const data = await res.json();
     const list = data.trades || [];
+    tradesRef.current = list;
     setTrades(list);
     setLoading(false);
     fetchLivePrices(list);
@@ -37,9 +39,9 @@ export default function TradePage() {
 
   useEffect(() => {
     load();
-    const iv = setInterval(() => fetchLivePrices(trades), 4000);
+    const iv = setInterval(() => fetchLivePrices(tradesRef.current), 4000);
     return () => clearInterval(iv);
-  }, []); // eslint-disable-line
+  }, []);
 
   async function exitTrade(tradeId) {
     setExitError(''); setExitResult(null); setExitLoading(tradeId);
