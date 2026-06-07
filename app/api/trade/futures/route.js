@@ -57,6 +57,26 @@ async function placeFuturesMarket(apiKey, apiSecret, symbol, side, qty, isTestne
   return data;
 }
 
+// Cache exchange info so we don't fetch on every order
+const symbolInfoCache = {};
+async function getFuturesStepSize(symbol, isTestnet) {
+  const key = `${symbol}:${isTestnet}`;
+  if (symbolInfoCache[key]) return symbolInfoCache[key];
+  const base = fapiBase(isTestnet);
+  const { data } = await axios.get(`${base}/fapi/v1/exchangeInfo`, { params: { symbol }, timeout: 8000 });
+  const sym = data.symbols?.[0];
+  if (!sym) throw new Error(`Symbol ${symbol} not found on Binance Futures`);
+  const lot = sym.filters.find(f => f.filterType === 'LOT_SIZE');
+  const info = { stepSize: parseFloat(lot.stepSize), minQty: parseFloat(lot.minQty) };
+  symbolInfoCache[key] = info;
+  return info;
+}
+
+function roundStep(qty, step) {
+  const precision = Math.max(0, Math.round(-Math.log10(step)));
+  return parseFloat((Math.floor(qty / step) * step).toFixed(precision));
+}
+
 async function placeFuturesStopOrder(apiKey, apiSecret, symbol, side, type, stopPrice, isTestnet) {
   const base = fapiBase(isTestnet);
   const qs   = signedParams(apiSecret, {
@@ -114,16 +134,21 @@ export async function POST(req) {
   }
 
   try {
-    // Get current price to calculate qty
-    const entryPrice = await getCurrentPrice(symbol);
+    // Get current price + symbol lot-size rules
+    const [entryPrice, { stepSize, minQty }] = await Promise.all([
+      getCurrentPrice(symbol),
+      getFuturesStepSize(symbol, isTestnet),
+    ]);
     const positionSize = usdtMargin * leverage;
-    // Use 6 decimal places so high-price pairs like BTC don't round to 0.
-    // Binance will enforce symbol-specific lot-size minimums with a clear error.
-    const qty = parseFloat((positionSize / entryPrice).toFixed(6));
+    const rawQty = positionSize / entryPrice;
+    const qty    = roundStep(rawQty, stepSize);
 
-    if (qty <= 0) return NextResponse.json({
-      error: `Position too small — need at least $${(entryPrice * 0.001 / leverage).toFixed(2)} margin for ${symbol} at ${leverage}x`,
-    }, { status: 400 });
+    if (qty < minQty) {
+      const minMargin = (minQty * entryPrice / leverage).toFixed(2);
+      return NextResponse.json({
+        error: `Position too small — minimum ${minQty} ${symbol.replace('USDT','')} requires $${minMargin} margin at ${leverage}x`,
+      }, { status: 400 });
+    }
 
     // Set leverage
     try {
