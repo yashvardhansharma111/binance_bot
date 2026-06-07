@@ -111,7 +111,7 @@ export async function runBotForUser(user) {
     }
 
     // 5. Fetch USDT balance once — shared across all symbol iterations
-    const usdtBalance = await getUSDTBalance(apiKey, apiSecret);
+    const usdtBalance = await getUSDTBalance(apiKey, apiSecret, isTestnet);
 
     // 6. Run new-entry logic for each configured symbol independently
     const maxConcurrent = settings.maxConcurrentTrades ?? 1;
