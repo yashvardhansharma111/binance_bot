@@ -29,10 +29,13 @@ function fapiHeaders(apiKey) {
 }
 
 function fapiError(e) {
-  const code = e.response?.data?.code;
-  const msg  = e.response?.data?.msg || e.message;
-  if (code === -2015) return new Error('Futures API key missing Futures Trading permission (code -2015)');
-  if (code === -4061) return new Error('Order side must match position side in hedge mode');
+  const status = e.response?.status;
+  const code   = e.response?.data?.code;
+  const msg    = e.response?.data?.msg || e.message;
+  if (status === 401 || code === -2015)
+    return new Error('Binance API key rejected — enable "Futures Trading" permission on your API key at binance.com/en/my/api-management');
+  if (code === -4061) return new Error('Order side must match position side — disable Hedge Mode in Binance Futures settings');
+  if (code === -1021) return new Error('Timestamp out of sync — check your server clock');
   return new Error(code ? `Binance Futures error ${code}: ${msg}` : msg);
 }
 
@@ -114,10 +117,15 @@ export async function POST(req) {
     if (qty <= 0) return NextResponse.json({ error: 'Calculated qty is 0 — increase margin' }, { status: 400 });
 
     // Set leverage
-    await setLeverage(apiKey, apiSecret, symbol, leverage, isTestnet);
+    try {
+      await setLeverage(apiKey, apiSecret, symbol, leverage, isTestnet);
+    } catch (e) { throw fapiError(e); }
 
     // Place market order
-    const order = await placeFuturesMarket(apiKey, apiSecret, symbol, side, qty, isTestnet);
+    let order;
+    try {
+      order = await placeFuturesMarket(apiKey, apiSecret, symbol, side, qty, isTestnet);
+    } catch (e) { throw fapiError(e); }
 
     const fillPrice = parseFloat(order.avgPrice) || entryPrice;
     const filledQty = parseFloat(order.executedQty) || qty;
