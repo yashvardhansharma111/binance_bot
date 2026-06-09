@@ -46,11 +46,19 @@ export default function AdminPage() {
   const [replyText, setReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
 
-  const [symbols, setSymbols] = useState([]);
+  const [symbols, setSymbols] = useState([]);           // DB symbols
   const [symbolsLoading, setSymbolsLoading] = useState(false);
   const [newSymbol, setNewSymbol] = useState('');
   const [addingSymbol, setAddingSymbol] = useState(false);
   const [symbolFilter, setSymbolFilter] = useState('');
+
+  // Binance sync modal
+  const [showBinanceModal, setShowBinanceModal] = useState(false);
+  const [binanceList, setBinanceList] = useState([]);
+  const [binanceLoading, setBinanceLoading] = useState(false);
+  const [binanceFilter, setBinanceFilter] = useState('');
+  const [selected, setSelected] = useState(new Set());
+  const [bulkAdding, setBulkAdding] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -124,6 +132,56 @@ export default function AdminPage() {
       body: JSON.stringify({ symbol }),
     });
     setSymbols(prev => prev.filter(s => s.symbol !== symbol));
+  }
+
+  async function openBinanceModal() {
+    setShowBinanceModal(true);
+    setBinanceFilter('');
+    if (binanceList.length) return; // already loaded
+    setBinanceLoading(true);
+    const res = await fetch('/api/admin/symbols/binance');
+    const d = await res.json();
+    setBinanceList(d.symbols || []);
+    setBinanceLoading(false);
+    // pre-select already-enabled DB symbols
+    const dbSet = new Set(symbols.filter(s => s.isEnabled).map(s => s.symbol));
+    setSelected(dbSet);
+  }
+
+  function toggleSelect(sym) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(sym) ? next.delete(sym) : next.add(sym);
+      return next;
+    });
+  }
+
+  async function applyBinanceSelection() {
+    setBulkAdding(true);
+    const dbMap = new Map(symbols.map(s => [s.symbol, s]));
+
+    // Add or enable selected
+    await Promise.all([...selected].map(sym =>
+      fetch('/api/admin/symbols', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: sym }),
+      })
+    ));
+
+    // Disable DB symbols that were deselected
+    const toDisable = symbols.filter(s => s.isEnabled && !selected.has(s.symbol));
+    await Promise.all(toDisable.map(s =>
+      fetch('/api/admin/symbols', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: s.symbol, isEnabled: false }),
+      })
+    ));
+
+    setBulkAdding(false);
+    setShowBinanceModal(false);
+    loadSymbols();
   }
 
   async function updateTicket(ticketId, update) {
@@ -574,52 +632,44 @@ export default function AdminPage() {
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">Trading Symbols</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Manage which coins are available for users to trade</p>
+              <p className="text-xs text-slate-400 mt-0.5">Select from real Binance pairs — only enabled coins show to users</p>
             </div>
-            <button onClick={loadSymbols} className="btn-outline py-1.5 px-3 flex items-center gap-1.5 text-xs">
-              <RefreshCw size={12} /> Refresh
-            </button>
-          </div>
-
-          {/* Add symbol */}
-          <div className="card p-4 glow-border mb-5">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Add New Symbol</p>
             <div className="flex gap-2">
-              <input
-                className="input flex-1 text-sm uppercase"
-                placeholder="e.g. BTC or BTCUSDT"
-                value={newSymbol}
-                onChange={e => setNewSymbol(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addSymbol()}
-              />
+              <button onClick={loadSymbols} className="btn-outline py-1.5 px-3 flex items-center gap-1.5 text-xs">
+                <RefreshCw size={12} /> Refresh
+              </button>
               <button
-                onClick={addSymbol}
-                disabled={addingSymbol || !newSymbol.trim()}
-                className="btn-primary py-2 px-4 text-sm flex items-center gap-1.5 disabled:opacity-50 shrink-0">
-                {addingSymbol ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={13} />}
-                Add
+                onClick={openBinanceModal}
+                className="btn-primary py-1.5 px-4 flex items-center gap-1.5 text-xs font-semibold">
+                <Plus size={13} /> Sync from Binance
               </button>
             </div>
-            <p className="text-[10px] text-slate-400 mt-1.5">USDT is appended automatically if omitted</p>
           </div>
 
           {/* Filter */}
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-4 flex items-center gap-3 flex-wrap">
             <input
               className="input text-sm max-w-xs"
-              placeholder="Filter symbols…"
+              placeholder="Filter enabled symbols…"
               value={symbolFilter}
               onChange={e => setSymbolFilter(e.target.value.toUpperCase())}
             />
             <span className="text-xs text-slate-400">
               {symbols.filter(s => !symbolFilter || s.symbol.includes(symbolFilter)).length} / {symbols.length} shown
-              · {symbols.filter(s => s.isEnabled).length} enabled
+              · <span className="text-emerald-600 font-semibold">{symbols.filter(s => s.isEnabled).length} enabled</span>
             </span>
           </div>
 
           {symbolsLoading ? (
             <div className="flex items-center justify-center h-40">
               <RefreshCw size={22} className="text-blue-500 animate-spin" />
+            </div>
+          ) : symbols.length === 0 ? (
+            <div className="card p-10 glow-border text-center text-slate-400">
+              <p className="text-sm mb-3">No symbols yet.</p>
+              <button onClick={openBinanceModal} className="btn-primary py-2 px-5 text-sm flex items-center gap-2 mx-auto">
+                <Plus size={14} /> Load from Binance
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
@@ -658,6 +708,107 @@ export default function AdminPage() {
                     </div>
                   );
                 })}
+            </div>
+          )}
+
+          {/* Binance Sync Modal */}
+          {showBinanceModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+              <div className="bg-white rounded-2xl shadow-2xl flex flex-col" style={{ width: '100%', maxWidth: 680, maxHeight: '85vh' }}>
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base">Binance USDT Pairs</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {binanceLoading ? 'Fetching from Binance…' : `${binanceList.length} live pairs · check to enable for users`}
+                    </p>
+                  </div>
+                  <button onClick={() => setShowBinanceModal(false)} className="text-slate-400 hover:text-slate-700 text-lg font-bold px-2">✕</button>
+                </div>
+
+                {/* Search + select all */}
+                <div className="px-5 py-3 border-b border-slate-100 shrink-0 flex items-center gap-3">
+                  <input
+                    className="input flex-1 text-sm"
+                    placeholder="Search coin name e.g. BTC, DOGE…"
+                    value={binanceFilter}
+                    onChange={e => setBinanceFilter(e.target.value.toUpperCase())}
+                    autoFocus
+                  />
+                  <span className="text-xs text-slate-400 whitespace-nowrap">{selected.size} selected</span>
+                  <button
+                    className="text-xs text-blue-600 font-semibold whitespace-nowrap hover:underline"
+                    onClick={() => {
+                      const visible = binanceList.filter(b => !binanceFilter || b.base.includes(binanceFilter) || b.symbol.includes(binanceFilter));
+                      const allSel = visible.every(b => selected.has(b.symbol));
+                      setSelected(prev => {
+                        const next = new Set(prev);
+                        visible.forEach(b => allSel ? next.delete(b.symbol) : next.add(b.symbol));
+                        return next;
+                      });
+                    }}>
+                    Toggle all
+                  </button>
+                </div>
+
+                {/* Coin grid */}
+                <div className="overflow-y-auto flex-1 p-4">
+                  {binanceLoading ? (
+                    <div className="flex items-center justify-center h-40">
+                      <RefreshCw size={22} className="text-blue-500 animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {binanceList
+                        .filter(b => !binanceFilter || b.base.includes(binanceFilter) || b.symbol.includes(binanceFilter))
+                        .map(b => {
+                          const isSelected = selected.has(b.symbol);
+                          const inDb = symbols.some(s => s.symbol === b.symbol);
+                          return (
+                            <button
+                              key={b.symbol}
+                              onClick={() => toggleSelect(b.symbol)}
+                              className="rounded-xl border p-2.5 text-left transition-all flex items-center gap-2"
+                              style={{
+                                background: isSelected ? '#eff6ff' : '#f8fafc',
+                                borderColor: isSelected ? '#2563eb' : '#e2e8f0',
+                              }}>
+                              <div
+                                className="w-4 h-4 rounded flex items-center justify-center shrink-0 border"
+                                style={{
+                                  background: isSelected ? '#2563eb' : 'white',
+                                  borderColor: isSelected ? '#2563eb' : '#cbd5e1',
+                                }}>
+                                {isSelected && <span className="text-white text-[10px] font-bold">✓</span>}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-bold text-xs text-slate-800 truncate">{b.base}</div>
+                                {inDb && <div className="text-[9px] text-emerald-500 font-semibold">in DB</div>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between shrink-0">
+                  <p className="text-xs text-slate-400">
+                    Selected coins will be <span className="text-emerald-600 font-semibold">enabled</span> for users · deselected DB coins will be <span className="text-red-500 font-semibold">disabled</span>
+                  </p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowBinanceModal(false)} className="btn-outline py-2 px-4 text-sm">Cancel</button>
+                    <button
+                      onClick={applyBinanceSelection}
+                      disabled={bulkAdding || selected.size === 0}
+                      className="btn-primary py-2 px-5 text-sm flex items-center gap-2 disabled:opacity-50">
+                      {bulkAdding ? <RefreshCw size={13} className="animate-spin" /> : null}
+                      Apply ({selected.size})
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
