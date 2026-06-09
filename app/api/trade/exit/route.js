@@ -73,7 +73,7 @@ export async function POST(req) {
     profit = parseFloat(((order.price - trade.price) * trade.qty).toFixed(6));
   } catch (e) {
     // -2010: position already closed on exchange (SL/TP triggered) — estimate P&L from SL/TP price
-    if (e.message.includes('-2010') || e.message.includes('insufficient balance') || e.message.includes('Insufficient')) {
+    if (e.message.includes('-2010') || e.message.includes('insufficient balance') || e.message.includes('Insufficient') || e.message.includes('-1013') || e.message.includes('notional too small')) {
       const exitPrice = trade.takeProfit && trade.stopLoss
         ? (trade.price > trade.stopLoss ? trade.takeProfit : trade.stopLoss)
         : (trade.stopLoss || trade.takeProfit || trade.price);

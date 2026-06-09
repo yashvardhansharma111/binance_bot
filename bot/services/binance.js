@@ -82,14 +82,15 @@ export async function testConnection(apiKey, apiSecret) {
 
 const symbolCache = {};
 async function getSymbolInfo(symbol) {
-  // Always use mainnet for exchange info — testnet has the same symbols/lot sizes
   if (symbolCache[symbol]) return symbolCache[symbol];
   const { data } = await axios.get(`${BASE}/api/v3/exchangeInfo`, { params: { symbol } });
-  const s   = data.symbols[0];
-  const lot = s.filters.find(f => f.filterType === 'LOT_SIZE');
+  const s          = data.symbols[0];
+  const lot        = s.filters.find(f => f.filterType === 'LOT_SIZE');
+  const notional   = s.filters.find(f => f.filterType === 'MIN_NOTIONAL' || f.filterType === 'NOTIONAL');
   symbolCache[symbol] = {
     stepSize:       parseFloat(lot.stepSize),
-    quotePrecision: s.quoteAssetPrecision, // max decimals allowed for quoteOrderQty
+    quotePrecision: s.quoteAssetPrecision,
+    minNotional:    notional ? parseFloat(notional.minNotional ?? notional.applyMinToMarket ?? 0) : 0,
   };
   return symbolCache[symbol];
 }
@@ -113,6 +114,7 @@ function orderError(e) {
   const code = e.response?.data?.code;
   const msg  = e.response?.data?.msg || e.message;
   if (code === -2015) return new Error('Binance API key missing Spot Trading permission or IP not whitelisted (code -2015)');
+  if (code === -1013) return new Error(`Binance error -1013: order notional too small (qty × price below exchange minimum)`);
   return new Error(code ? `Binance error ${code}: ${msg}` : msg);
 }
 
@@ -137,7 +139,9 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount, isTe
   const base = isTestnet ? TESTNET_API : BASE;
   // quoteOrderQty = spend exactly this many USDT; Binance computes qty.
   // Must be trimmed to the symbol's quote precision or Binance rejects with -1111.
-  const { quotePrecision } = await getSymbolInfo(symbol);
+  const { quotePrecision, minNotional } = await getSymbolInfo(symbol);
+  if (minNotional && usdtAmount < minNotional)
+    throw new Error(`Trade amount $${usdtAmount.toFixed(2)} is below Binance minimum notional $${minNotional} for ${symbol} — increase Trade Size in Bot Config`);
   const spend = roundQuote(usdtAmount, quotePrecision);
   const url  = signedOrderUrl(base, apiSecret, { symbol, side: 'BUY', type: 'MARKET', quoteOrderQty: spend });
   console.log(`[binance] POST ${base}/api/v3/order BUY quoteOrderQty=${spend}`);

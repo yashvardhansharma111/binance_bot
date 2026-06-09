@@ -104,15 +104,19 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   } catch (e) {
     // -2010: position already closed on exchange (SL/TP triggered before bot could sell).
     // Estimate P&L from current market price so history shows a real number, not $0.
-    if (e.message.includes('-2010') || e.message.includes('insufficient balance')) {
+    const isPhantom   = e.message.includes('-2010') || e.message.includes('insufficient balance');
+    const isTooSmall  = e.message.includes('-1013') || e.message.includes('notional too small');
+    if (isPhantom || isTooSmall) {
       const { getCurrentPrice } = await import('../services/binance.js');
       const exitPrice     = await getCurrentPrice(symbol).catch(() => entry);
       const phantomProfit = parseFloat(((exitPrice - entry) * qty).toFixed(6));
+      const closeReason   = isTooSmall
+        ? `${openTrade.reason || ''} | EXIT:${reason} (notional too small to sell — position written off)`
+        : `${openTrade.reason || ''} | EXIT:${reason} (SL/TP closed on exchange)`;
       await Trade.findByIdAndUpdate(openTrade._id, {
-        status: 'closed', closedAt: new Date(), profit: phantomProfit,
-        reason: `${openTrade.reason || ''} | EXIT:${reason} (SL/TP closed on exchange)`,
+        status: 'closed', closedAt: new Date(), profit: phantomProfit, reason: closeReason,
       });
-      await log(userId, 'warn', `Position ${symbol} already closed on exchange (SL/TP) — estimated P&L: $${phantomProfit}`);
+      await log(userId, 'warn', `Position ${symbol} closed (${isTooSmall ? 'notional too small' : 'already on exchange'}) — estimated P&L: $${phantomProfit}`);
       return;
     }
     throw e;
