@@ -19,7 +19,7 @@ const STATUS_META = {
   confirming:     { label: 'Confirming on-chain',  color: '#2563eb', bg: '#eff6ff', icon: RefreshCw },
   confirmed:      { label: 'Confirmed',             color: '#2563eb', bg: '#eff6ff', icon: RefreshCw },
   sending:        { label: 'Sending funds',         color: '#7c3aed', bg: '#f5f3ff', icon: RefreshCw },
-  partially_paid: { label: 'Partially paid',        color: '#b45309', bg: '#fefce8', icon: Clock },
+  partially_paid: { label: 'Partial payment received — funds credited to wallet!', color: '#16a34a', bg: '#f0fdf4', icon: CheckCircle2 },
   finished:       { label: 'Payment complete!',     color: '#16a34a', bg: '#f0fdf4', icon: CheckCircle2 },
   failed:         { label: 'Payment failed',        color: '#dc2626', bg: '#fef2f2', icon: XCircle },
   expired:        { label: 'Payment expired',       color: '#dc2626', bg: '#fef2f2', icon: XCircle },
@@ -71,7 +71,7 @@ export default function DepositPage() {
       const data = await res.json();
       setStatus(data.status);
       if (data.assetBalance !== undefined) setBalance(data.assetBalance);
-      if (['finished','failed','expired','refunded'].includes(data.status)) {
+      if (['finished','partially_paid','failed','expired','refunded'].includes(data.status)) {
         clearInterval(pollRef.current);
       }
     }, 8000);

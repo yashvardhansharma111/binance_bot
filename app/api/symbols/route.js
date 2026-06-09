@@ -1,26 +1,27 @@
 import { NextResponse } from 'next/server';
+import { connectDB } from '@/lib/db';
+import TradingSymbol from '@/lib/models/TradingSymbol';
 
-let cache = { symbols: [], at: 0 };
-const TTL = 10 * 60 * 1000; // 10 min
+const SEED_SYMBOLS = [
+  'BTCUSDT','ETHUSDT','SOLUSDT','DOGEUSDT','SHIBUSDT','PEPEUSDT',
+  'TONUSDT','LINKUSDT','DOTUSDT','ATOMUSDT','AAVEUSDT','UNIUSDT',
+  'ZECUSDT','XAUTUSDT','DASHUSDT','NEOUSDT','FILUSDT','GRTUSDT',
+  'SANDUSDT','MANAUSDT','CAKEUSDT','COMPUSDT','CRVUSDT','HBARUSDT',
+  'IOTAUSDT','IOTXUSDT','WINUSDT','XECUSDT','XTZUSDT','YFIUSDT',
+  'SUSHIUSDT','SXPUSDT','XVGUSDT','ICPUSDT','1000SATSUSDT',
+];
 
 export async function GET() {
-  if (Date.now() - cache.at < TTL && cache.symbols.length) {
-    return NextResponse.json({ symbols: cache.symbols });
+  await connectDB();
+
+  // Auto-seed on first run
+  const count = await TradingSymbol.countDocuments();
+  if (count === 0) {
+    await TradingSymbol.insertMany(
+      SEED_SYMBOLS.map(symbol => ({ symbol, isEnabled: true }))
+    );
   }
 
-  try {
-    const res  = await fetch('https://api.binance.com/api/v3/exchangeInfo', { next: { revalidate: 600 } });
-    const data = await res.json();
-
-    const symbols = data.symbols
-      .filter(s => s.quoteAsset === 'USDT' && s.status === 'TRADING')
-      .map(s => s.symbol)
-      .sort();
-
-    cache = { symbols, at: Date.now() };
-    return NextResponse.json({ symbols });
-  } catch {
-    // Return stale cache or empty on error
-    return NextResponse.json({ symbols: cache.symbols });
-  }
+  const docs = await TradingSymbol.find({ isEnabled: true }).sort({ symbol: 1 }).lean();
+  return NextResponse.json({ symbols: docs.map(d => d.symbol) });
 }

@@ -106,29 +106,58 @@ export async function POST(req) {
   const payment = await Payment.findOne({ nowpaymentsId: String(payment_id) });
   if (!payment) return NextResponse.json({ ok: true });
 
-  // Accept partially_paid deposits when ≥ 96% received (covers exchange withdrawal fees)
-  const isPartialDep    = payment_status === 'partially_paid';
-  const partialDepOk    = isPartialDep && actually_paid != null
-    && (actually_paid / (ipnPayAmount || payment.payAmount)) >= 0.96;
-  const effectiveDepSt  = partialDepOk ? 'finished' : payment_status;
+  // For USDT payments, actually_paid ≈ USD value (1:1 peg).
+  // Credit whatever arrived immediately so users never lose funds to fees.
+  const alreadyCredited = payment.creditedAmount || 0;
 
-  if (payment.status === effectiveDepSt) return NextResponse.json({ ok: true });
+  if (payment_status === 'partially_paid' && actually_paid != null) {
+    // Credit whatever came in (capped at priceAmount to avoid crediting overpay here)
+    const creditNow = parseFloat(
+      Math.max(0, Math.min(actually_paid, payment.priceAmount) - alreadyCredited).toFixed(2)
+    );
+    if (creditNow >= 0.01) {
+      await User.findByIdAndUpdate(payment.userId, { $inc: { assetBalance: creditNow } });
+      payment.creditedAmount = alreadyCredited + creditNow;
+      console.log(`[webhook] Deposit partial — credited $${creditNow} to user:${payment.userId} (${actually_paid} paid / ${payment.priceAmount} requested)`);
+    }
+    payment.actuallyPaid = actually_paid;
+    payment.status       = 'partially_paid';
+    await payment.save();
+    return NextResponse.json({ ok: true });
+  }
 
-  payment.status = effectiveDepSt;
-
-  if (effectiveDepSt === 'finished') {
-    if (partialDepOk) console.log(`[webhook] Deposit partial accepted: paid ${actually_paid} / required ${ipnPayAmount || payment.payAmount}`);
+  if (payment_status === 'finished') {
     payment.actuallyPaid = actually_paid ?? payment.payAmount;
     payment.completedAt  = new Date();
+    payment.status       = 'finished';
+
+    // Credit whatever hasn't been credited yet (partial may have already run)
+    const remaining = parseFloat(
+      Math.max(0, payment.priceAmount - alreadyCredited).toFixed(2)
+    );
+    if (remaining >= 0.01) {
+      await User.findByIdAndUpdate(payment.userId, { $inc: { assetBalance: remaining } });
+      payment.creditedAmount = payment.priceAmount;
+      console.log(`[webhook] Deposit finished — credited remaining $${remaining} to user:${payment.userId}`);
+    }
+
+    // Overpayment: credit surplus above priceAmount
+    if (actually_paid && actually_paid > payment.priceAmount * 1.01) {
+      const surplus = parseFloat((actually_paid - payment.priceAmount).toFixed(2));
+      if (surplus >= 0.01) {
+        await User.findByIdAndUpdate(payment.userId, { $inc: { assetBalance: surplus } });
+        console.log(`[webhook] Deposit overpay — credited extra $${surplus} to user:${payment.userId}`);
+      }
+    }
+
     await payment.save();
+    console.log(`[webhook] Deposit fully finished — user:${payment.userId} priceAmount:$${payment.priceAmount}`);
+    return NextResponse.json({ ok: true });
+  }
 
-    const depositAmount = payment.priceAmount;
-
-    // Credit full deposit amount to user's assetBalance — no deposit commission
-    await User.findByIdAndUpdate(payment.userId, { $inc: { assetBalance: depositAmount } });
-
-    console.log(`[webhook] Deposit finished — user:${payment.userId} credited $${depositAmount} to assetBalance`);
-  } else {
+  // Other status transitions (confirming, failed, expired, etc.)
+  if (payment.status !== payment_status) {
+    payment.status = payment_status;
     await payment.save();
   }
 

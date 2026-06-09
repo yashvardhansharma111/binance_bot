@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   Users, Bot, ShieldCheck, TrendingUp, RefreshCw, UserX, UserCheck,
   Settings, DollarSign, Percent, Star, CreditCard, Activity, Ticket,
-  Send,
+  Send, BarChart2, Plus, Trash2, Eye, EyeOff,
 } from 'lucide-react';
 
 const DEFAULT_CONFIGS = [
@@ -46,6 +46,12 @@ export default function AdminPage() {
   const [replyText, setReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
 
+  const [symbols, setSymbols] = useState([]);
+  const [symbolsLoading, setSymbolsLoading] = useState(false);
+  const [newSymbol, setNewSymbol] = useState('');
+  const [addingSymbol, setAddingSymbol] = useState(false);
+  const [symbolFilter, setSymbolFilter] = useState('');
+
   async function load() {
     setLoading(true);
     const [sRes, uRes, cRes] = await Promise.all([
@@ -76,6 +82,49 @@ export default function AdminPage() {
   }
 
   useEffect(() => { if (tab === 'tickets') loadTickets(); }, [tab]);
+
+  async function loadSymbols() {
+    setSymbolsLoading(true);
+    const res = await fetch('/api/admin/symbols');
+    const d = await res.json();
+    setSymbols(d.symbols || []);
+    setSymbolsLoading(false);
+  }
+
+  useEffect(() => { if (tab === 'symbols') loadSymbols(); }, [tab]);
+
+  async function addSymbol() {
+    const clean = newSymbol.trim().toUpperCase();
+    if (!clean) return;
+    setAddingSymbol(true);
+    const sym = clean.endsWith('USDT') ? clean : `${clean}USDT`;
+    await fetch('/api/admin/symbols', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: sym }),
+    });
+    setNewSymbol('');
+    setAddingSymbol(false);
+    loadSymbols();
+  }
+
+  async function toggleSymbol(symbol, isEnabled) {
+    await fetch('/api/admin/symbols', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, isEnabled: !isEnabled }),
+    });
+    setSymbols(prev => prev.map(s => s.symbol === symbol ? { ...s, isEnabled: !isEnabled } : s));
+  }
+
+  async function deleteSymbol(symbol) {
+    await fetch('/api/admin/symbols', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol }),
+    });
+    setSymbols(prev => prev.filter(s => s.symbol !== symbol));
+  }
 
   async function updateTicket(ticketId, update) {
     await fetch('/api/admin/tickets', {
@@ -151,6 +200,7 @@ export default function AdminPage() {
     { id: 'users', label: 'Users' },
     { id: 'commissions', label: 'Commissions' },
     { id: 'tickets', label: 'Tickets' },
+    { id: 'symbols', label: 'Symbols' },
     { id: 'config', label: 'Config' },
   ];
 
@@ -513,6 +563,101 @@ export default function AdminPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Symbols */}
+      {tab === 'symbols' && (
+        <div>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Trading Symbols</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Manage which coins are available for users to trade</p>
+            </div>
+            <button onClick={loadSymbols} className="btn-outline py-1.5 px-3 flex items-center gap-1.5 text-xs">
+              <RefreshCw size={12} /> Refresh
+            </button>
+          </div>
+
+          {/* Add symbol */}
+          <div className="card p-4 glow-border mb-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Add New Symbol</p>
+            <div className="flex gap-2">
+              <input
+                className="input flex-1 text-sm uppercase"
+                placeholder="e.g. BTC or BTCUSDT"
+                value={newSymbol}
+                onChange={e => setNewSymbol(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addSymbol()}
+              />
+              <button
+                onClick={addSymbol}
+                disabled={addingSymbol || !newSymbol.trim()}
+                className="btn-primary py-2 px-4 text-sm flex items-center gap-1.5 disabled:opacity-50 shrink-0">
+                {addingSymbol ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={13} />}
+                Add
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1.5">USDT is appended automatically if omitted</p>
+          </div>
+
+          {/* Filter */}
+          <div className="mb-4 flex items-center gap-3">
+            <input
+              className="input text-sm max-w-xs"
+              placeholder="Filter symbols…"
+              value={symbolFilter}
+              onChange={e => setSymbolFilter(e.target.value.toUpperCase())}
+            />
+            <span className="text-xs text-slate-400">
+              {symbols.filter(s => !symbolFilter || s.symbol.includes(symbolFilter)).length} / {symbols.length} shown
+              · {symbols.filter(s => s.isEnabled).length} enabled
+            </span>
+          </div>
+
+          {symbolsLoading ? (
+            <div className="flex items-center justify-center h-40">
+              <RefreshCw size={22} className="text-blue-500 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              {symbols
+                .filter(s => !symbolFilter || s.symbol.includes(symbolFilter))
+                .map(s => {
+                  const coin = s.symbol.replace('USDT', '');
+                  return (
+                    <div
+                      key={s.symbol}
+                      className="rounded-xl border p-3 flex items-center justify-between gap-2 transition-all"
+                      style={{
+                        background: s.isEnabled ? '#f0fdf4' : '#f8fafc',
+                        borderColor: s.isEnabled ? '#86efac' : '#e2e8f0',
+                      }}>
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm text-slate-800 truncate">{coin}</div>
+                        <div className="text-[10px] text-slate-400">USDT</div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => toggleSymbol(s.symbol, s.isEnabled)}
+                          title={s.isEnabled ? 'Disable' : 'Enable'}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white"
+                          style={{ color: s.isEnabled ? '#16a34a' : '#94a3b8' }}>
+                          {s.isEnabled ? <Eye size={13} /> : <EyeOff size={13} />}
+                        </button>
+                        <button
+                          onClick={() => deleteSymbol(s.symbol)}
+                          title="Remove"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-50"
+                          style={{ color: '#ef4444' }}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
