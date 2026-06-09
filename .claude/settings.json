@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-Content \"d:\\\\binance_bot\\\\app\\\\dashboard\\\\page.js\")"
+    ]
+  }
+}
