@@ -102,14 +102,17 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   try {
     order = await placeMarketSell(apiKey, apiSecret, symbol, qty, isTestnet);
   } catch (e) {
-    // -2010: no balance to sell — position is phantom (already sold or never filled).
-    // Mark it closed in DB so the bot stops retrying every tick.
+    // -2010: position already closed on exchange (SL/TP triggered before bot could sell).
+    // Estimate P&L from current market price so history shows a real number, not $0.
     if (e.message.includes('-2010') || e.message.includes('insufficient balance')) {
+      const { getCurrentPrice } = await import('../services/binance.js');
+      const exitPrice     = await getCurrentPrice(symbol).catch(() => entry);
+      const phantomProfit = parseFloat(((exitPrice - entry) * qty).toFixed(6));
       await Trade.findByIdAndUpdate(openTrade._id, {
-        status: 'closed', closedAt: new Date(), profit: 0,
-        reason: `${openTrade.reason || ''} | EXIT:${reason} (phantom — no balance, closed without sell)`,
+        status: 'closed', closedAt: new Date(), profit: phantomProfit,
+        reason: `${openTrade.reason || ''} | EXIT:${reason} (SL/TP closed on exchange)`,
       });
-      await log(userId, 'warn', `Position ${symbol} had no balance to sell — marked closed (phantom position)`);
+      await log(userId, 'warn', `Position ${symbol} already closed on exchange (SL/TP) — estimated P&L: $${phantomProfit}`);
       return;
     }
     throw e;

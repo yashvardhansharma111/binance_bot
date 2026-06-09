@@ -67,8 +67,22 @@ export async function POST(req) {
   const apiKey    = decrypt(keyDoc.encryptedKey);
   const apiSecret = decrypt(keyDoc.encryptedSecret);
 
-  const order  = await placeMarketSell(apiKey, apiSecret, trade.symbol, trade.qty, isTestnet);
-  const profit = parseFloat(((order.price - trade.price) * trade.qty).toFixed(6));
+  let order, profit;
+  try {
+    order  = await placeMarketSell(apiKey, apiSecret, trade.symbol, trade.qty, isTestnet);
+    profit = parseFloat(((order.price - trade.price) * trade.qty).toFixed(6));
+  } catch (e) {
+    // -2010: position already closed on exchange (SL/TP triggered) — estimate P&L from SL/TP price
+    if (e.message.includes('-2010') || e.message.includes('insufficient balance') || e.message.includes('Insufficient')) {
+      const exitPrice = trade.takeProfit && trade.stopLoss
+        ? (trade.price > trade.stopLoss ? trade.takeProfit : trade.stopLoss)
+        : (trade.stopLoss || trade.takeProfit || trade.price);
+      profit = parseFloat(((exitPrice - trade.price) * trade.qty).toFixed(6));
+      order  = { price: exitPrice };
+    } else {
+      return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+  }
 
   const closedTrade = await Trade.findByIdAndUpdate(trade._id, {
     status: 'closed', closedAt: new Date(), profit, reason: 'Manual exit',
