@@ -15,17 +15,14 @@ function generateReferralCode(name) {
 export async function POST(req) {
   try {
     const { name, email, password, referralCode, otp } = await req.json();
-    if (!name || !email || !password || !otp) {
+    if (!name || !email || !password) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 });
     }
     const { valid, failures } = validatePassword(password);
     if (!valid)
       return NextResponse.json({ error: `Weak password: ${failures.map(f => f.label).join(', ')}` }, { status: 400 });
 
-    // Verify OTP
-    const stored = getOtp('signup', email);
-    if (!stored) return NextResponse.json({ error: 'OTP expired. Request a new code.' }, { status: 400 });
-    if (stored !== otp) return NextResponse.json({ error: 'Invalid OTP' }, { status: 400 });
+    // OTP verification temporarily disabled
 
     await connectDB();
     const exists = await User.findOne({ email: email.toLowerCase() });
