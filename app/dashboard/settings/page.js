@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Plus, X } from 'lucide-react';
+import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Plus, X, Activity } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
 
 const TIMEFRAMES = ['1m','5m','15m','1h','4h'];
@@ -214,11 +214,54 @@ export default function SettingsPage() {
           </div>
         </Row>
 
-        <Row label="Stop Loss" hint="Auto-sell if price drops this much">
-          <div className="flex items-center gap-2">
+        <Row label="Stop Loss" hint={form.trailingStopPercent > 0 ? "Disabled — Trailing Stop is active" : "Auto-sell if price drops this much"}>
+          <div className="flex items-center gap-2" style={{ opacity: form.trailingStopPercent > 0 ? 0.4 : 1 }}>
             <TrendingDown size={14} className="text-red-500" />
             <NumberInput value={form.stopLossPercent} onChange={v => set('stopLossPercent', v)}
               min={0.1} max={50} step={0.1} suffix="% below entry" />
+          </div>
+        </Row>
+
+        <Row label="Trailing Stop" hint="Follows price up, exits when it drops back by the callback %">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => set('trailingStopPercent', form.trailingStopPercent > 0 ? 0 : 2)}
+                className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0"
+                style={{ background: form.trailingStopPercent > 0 ? '#2563eb' : '#e2e8f0' }}>
+                <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                  style={{ transform: form.trailingStopPercent > 0 ? 'translateX(1.375rem)' : 'translateX(0.25rem)' }} />
+              </button>
+              <span className="text-sm font-semibold" style={{ color: form.trailingStopPercent > 0 ? '#2563eb' : '#94a3b8' }}>
+                {form.trailingStopPercent > 0 ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+
+            {form.trailingStopPercent > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Activity size={14} className="text-blue-500" />
+                  <NumberInput value={form.trailingStopPercent} onChange={v => set('trailingStopPercent', v)}
+                    min={0.1} max={20} step={0.1} suffix="% callback" />
+                </div>
+                <div className="flex gap-2">
+                  {[1, 2, 5, 10].map(pct => (
+                    <button key={pct} onClick={() => set('trailingStopPercent', pct)}
+                      className="px-3 py-1 rounded-lg text-xs font-bold border transition-all"
+                      style={{
+                        background:  form.trailingStopPercent === pct ? '#2563eb' : '#f8fafc',
+                        color:       form.trailingStopPercent === pct ? '#fff'    : '#64748b',
+                        borderColor: form.trailingStopPercent === pct ? '#2563eb' : '#e2e8f0',
+                      }}>
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400">
+                  Replaces fixed Stop Loss. Exits when price falls {form.trailingStopPercent}% from peak.
+                </p>
+              </div>
+            )}
           </div>
         </Row>
 

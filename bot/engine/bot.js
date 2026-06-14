@@ -76,10 +76,41 @@ export async function runBotForUser(user) {
       }
 
       const tradePrice = await getCurrentPrice(openTrade.symbol);
-      const exitReason = checkExitConditions(openTrade, tradePrice);
-      if (exitReason) {
-        await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet);
-        continue;
+
+      // Trailing stop takes priority over fixed SL when enabled
+      const trailPct = settings.trailingStopPercent ?? 0;
+      if (trailPct > 0) {
+        const prevHigh    = openTrade.trailingHighPrice || openTrade.price;
+        const newHigh     = Math.max(prevHigh, tradePrice);
+        const trailPrice  = parseFloat((newHigh * (1 - trailPct / 100)).toFixed(6));
+
+        if (newHigh !== prevHigh) {
+          await Trade.findByIdAndUpdate(openTrade._id, { trailingHighPrice: newHigh });
+          openTrade.trailingHighPrice = newHigh;
+        }
+
+        await log(userId, 'info',
+          `[Trailing] ${openTrade.symbol} | High: $${newHigh} | Stop: $${trailPrice} | Now: $${tradePrice}`
+        );
+
+        if (tradePrice <= trailPrice) {
+          await closePosition(userId, apiKey, apiSecret, openTrade,
+            `Trailing stop hit — peak $${newHigh} → dropped ${trailPct}% → stop $${trailPrice}`, isTestnet);
+          continue;
+        }
+
+        // Still check TP even in trailing mode
+        if (openTrade.takeProfit && tradePrice >= openTrade.takeProfit) {
+          await closePosition(userId, apiKey, apiSecret, openTrade,
+            `Take-profit hit @ $${tradePrice}`, isTestnet);
+          continue;
+        }
+      } else {
+        const exitReason = checkExitConditions(openTrade, tradePrice);
+        if (exitReason) {
+          await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet);
+          continue;
+        }
       }
 
       const holdMins = (Date.now() - new Date(openTrade.createdAt).getTime()) / 60000;
