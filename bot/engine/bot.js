@@ -83,7 +83,7 @@ export async function runBotForUser(user) {
       }
 
       const holdMins = (Date.now() - new Date(openTrade.createdAt).getTime()) / 60000;
-      if (holdMins >= 60) {
+      if (holdMins >= 240) {
         const pnl = ((tradePrice - openTrade.price) / openTrade.price * 100).toFixed(2);
         await closePosition(
           userId, apiKey, apiSecret, openTrade,
@@ -126,6 +126,11 @@ export async function runBotForUser(user) {
         const signal     = detectSignal(indicators);
         if (signal === 'SELL') {
           for (const t of openOnSym) {
+            const heldMins = (Date.now() - new Date(t.createdAt).getTime()) / 60000;
+            if (heldMins < 15) {
+              await log(userId, 'info', `[${sym}] SELL signal ignored — held only ${heldMins.toFixed(0)}m (min 15m required)`);
+              continue;
+            }
             await closePosition(userId, apiKey, apiSecret, t, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
           }
         }

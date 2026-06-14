@@ -98,7 +98,11 @@ async function getStepSize(symbol) {
   return (await getSymbolInfo(symbol)).stepSize;
 }
 function roundStep(qty, step) {
-  return parseFloat(qty.toFixed(Math.round(-Math.log10(step))));
+  // Always floor — never sell more than you own. toFixed() would round 0.02277 → 0.023
+  // which exceeds actual balance and triggers Binance -2010 (false phantom detection).
+  const precision = Math.round(-Math.log10(step));
+  const factor    = 10 ** precision;
+  return parseFloat((Math.floor(qty * factor) / factor).toFixed(precision));
 }
 // Trim a quote (USDT) amount to the symbol's allowed precision, rounding DOWN
 // so we never try to spend more than the user has. Strips JS float noise that
