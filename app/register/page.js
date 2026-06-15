@@ -69,7 +69,7 @@ function RegisterForm() {
 
   async function sendOtp(e) {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password) return setError('Please fill all required fields');
+    if (!form.name || !form.email || !form.password || !form.referralCode) return setError('Please fill all required fields including referral code');
     const { valid, failures } = validatePassword(form.password);
     if (!valid) return setError(`Password must include: ${failures.map(f => f.label).join(', ')}`);
     setError('');
@@ -204,13 +204,15 @@ function RegisterForm() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Referral Code <span className="text-slate-400 font-normal">(optional)</span>
+                      Referral Code <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <Hash size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input className="input" style={{ paddingLeft: '2.5rem' }} type="text" placeholder="ABCD1234"
-                        value={form.referralCode} onChange={e => setForm({ ...form, referralCode: e.target.value.toUpperCase() })} />
+                        value={form.referralCode} onChange={e => setForm({ ...form, referralCode: e.target.value.toUpperCase() })}
+                        required />
                     </div>
+                    <p className="text-xs text-slate-400 mt-1">A referral code is required to create an account</p>
                   </div>
 
                   <button type="submit" disabled={loading || !pwdValid}
