@@ -13,19 +13,35 @@ async function adminGuard() {
   return user;
 }
 
-export async function GET() {
+export async function GET(req) {
   const admin = await adminGuard();
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const users = await User.find({})
-    .select('-password')
-    .sort({ createdAt: -1 });
+
+  const { searchParams } = new URL(req.url);
+  const search = searchParams.get('search')?.trim() || '';
+
+  const filter = search
+    ? { $or: [{ name: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }] }
+    : {};
+
+  const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
   const now = new Date();
+
+  // Referral counts: for each user count how many others have referredBy = their referralCode
+  const refCodes = users.map(u => u.referralCode).filter(Boolean);
+  const refCounts = await User.aggregate([
+    { $match: { referredBy: { $in: refCodes } } },
+    { $group: { _id: '$referredBy', count: { $sum: 1 } } },
+  ]);
+  const refMap = Object.fromEntries(refCounts.map(r => [r._id, r.count]));
+
   const result = users.map(u => ({
     ...u.toObject(),
     subscriptionActive: u.subscriptionExpiry && new Date(u.subscriptionExpiry) > now,
     subscriptionDaysLeft: u.subscriptionExpiry
       ? Math.max(0, Math.ceil((new Date(u.subscriptionExpiry) - now) / 86400000))
       : 0,
+    referralCount: refMap[u.referralCode] || 0,
   }));
   return NextResponse.json(result);
 }
@@ -33,10 +49,11 @@ export async function GET() {
 export async function PATCH(req) {
   const admin = await adminGuard();
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { userId, status, role, grantDays } = await req.json();
+  const { userId, status, role, grantDays, canViewOverview } = await req.json();
   const update = {};
   if (status) update.status = status;
   if (role)   update.role   = role;
+  if (canViewOverview !== undefined) update.canViewOverview = canViewOverview;
   if (grantDays) {
     const now  = new Date();
     const user = await User.findById(userId).select('subscriptionExpiry');

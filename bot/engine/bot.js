@@ -20,6 +20,16 @@ import BotSettings from '../../lib/models/BotSettings.js';
 import Trade from '../../lib/models/Trade.js';
 import BotLog from '../../lib/models/BotLog.js';
 
+function symCfg(settings, sym) {
+  const over = settings.symbolConfigs?.find(c => c.symbol === sym);
+  return {
+    tradeUSDT:           over?.tradeUSDT           ?? settings.tradeUSDT           ?? 50,
+    stopLossPercent:     over?.stopLossPercent     ?? settings.stopLossPercent     ?? 2,
+    takeProfitPercent:   over?.takeProfitPercent   ?? settings.takeProfitPercent   ?? 4,
+    trailingStopPercent: over?.trailingStopPercent ?? settings.trailingStopPercent ?? 0,
+  };
+}
+
 async function log(userId, level, message, data = null) {
   console.log(`[Bot:${String(userId).slice(-4)}] [${level.toUpperCase()}] ${message}`);
   await BotLog.create({ userId, level, message, data }).catch(() => {});
@@ -67,7 +77,7 @@ export async function runBotForUser(user) {
     for (const openTrade of openTrades) {
       // Repair missing SL/TP on old trades
       if (!openTrade.stopLoss || !openTrade.takeProfit) {
-        const { stopLossPercent = 2, takeProfitPercent = 4 } = settings;
+        const { stopLossPercent, takeProfitPercent } = symCfg(settings, openTrade.symbol);
         const sl = parseFloat((openTrade.price * (1 - stopLossPercent / 100)).toFixed(6));
         const tp = parseFloat((openTrade.price * (1 + takeProfitPercent / 100)).toFixed(6));
         await Trade.findByIdAndUpdate(openTrade._id, { stopLoss: sl, takeProfit: tp });
@@ -78,7 +88,7 @@ export async function runBotForUser(user) {
       const tradePrice = await getCurrentPrice(openTrade.symbol);
 
       // Trailing stop takes priority over fixed SL when enabled
-      const trailPct = settings.trailingStopPercent ?? 0;
+      const trailPct = symCfg(settings, openTrade.symbol).trailingStopPercent;
       if (trailPct > 0) {
         const prevHigh    = openTrade.trailingHighPrice || openTrade.price;
         const newHigh     = Math.max(prevHigh, tradePrice);
@@ -215,9 +225,10 @@ export async function runBotForUser(user) {
         }
       }
 
-      // Execute BUY
-      const tradeSettings = { ...settings.toObject(), symbol: sym };
-      const amount = Math.min(settings.tradeUSDT || 50, usdtBalance * 0.99);
+      // Execute BUY — merge per-symbol overrides on top of global settings
+      const sc = symCfg(settings, sym);
+      const tradeSettings = { ...settings.toObject(), symbol: sym, ...sc };
+      const amount = Math.min(sc.tradeUSDT, usdtBalance * 0.99);
       await openPosition(userId, apiKey, apiSecret, tradeSettings, amount, indicators, sentiment, isTestnet);
     }
 

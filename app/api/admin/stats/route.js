@@ -12,7 +12,8 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await connectDB();
   const caller = await User.findOne({ email: session.user.email });
-  if (caller?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (caller?.role !== 'admin' && !caller?.canViewOverview)
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const now = new Date();
 
@@ -54,5 +55,6 @@ export async function GET() {
     totalProfit:          parseFloat((totalProfit[0]?.total || 0).toFixed(4)),
     commissionCount:      commissions.length,
     totalFunds:           parseFloat((fundAgg[0]?.total || 0).toFixed(2)),
+    isAdmin:              caller.role === 'admin',
   });
 }

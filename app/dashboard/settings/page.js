@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Plus, X, Activity } from 'lucide-react';
+import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Plus, X, Activity, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
 
 const TIMEFRAMES = ['1m','5m','15m','1h','4h'];
@@ -37,6 +37,7 @@ export default function SettingsPage() {
   const [balance,    setBalance]    = useState(null);
   const [balLoading, setBalLoading] = useState(false);
   const [addSymbol,  setAddSymbol]  = useState('ETHUSDT');
+  const [expandedSym, setExpandedSym] = useState(null);
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => { setForm(d); setLoading(false); });
@@ -66,6 +67,27 @@ export default function SettingsPage() {
   }
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); }
+
+  function getSymCfg(sym) {
+    return form.symbolConfigs?.find(c => c.symbol === sym) || {};
+  }
+
+  function setSymCfg(sym, key, val) {
+    setForm(f => {
+      const configs = f.symbolConfigs ? [...f.symbolConfigs] : [];
+      const idx = configs.findIndex(c => c.symbol === sym);
+      if (idx >= 0) {
+        configs[idx] = { ...configs[idx], [key]: val === '' ? null : val };
+      } else {
+        configs.push({ symbol: sym, [key]: val === '' ? null : val });
+      }
+      return { ...f, symbolConfigs: configs };
+    });
+  }
+
+  function clearSymCfg(sym) {
+    setForm(f => ({ ...f, symbolConfigs: (f.symbolConfigs || []).filter(c => c.symbol !== sym) }));
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -183,6 +205,75 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-400">
               {(form.symbols?.length || 1)} pair{(form.symbols?.length || 1) !== 1 ? 's' : ''} active · remove a pair by clicking ×
             </p>
+
+            {/* Per-symbol overrides */}
+            {(() => {
+              const activeSymbols = form.symbols?.length ? form.symbols : [form.symbol];
+              return activeSymbols.length > 1 && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    <SlidersHorizontal size={11} /> Per-symbol overrides
+                  </div>
+                  {activeSymbols.map(sym => {
+                    const cfg = getSymCfg(sym);
+                    const isOpen = expandedSym === sym;
+                    const hasCustom = form.symbolConfigs?.some(c => c.symbol === sym && (
+                      c.tradeUSDT != null || c.stopLossPercent != null ||
+                      c.takeProfitPercent != null || c.trailingStopPercent != null
+                    ));
+                    return (
+                      <div key={sym} className="rounded-xl border overflow-hidden"
+                        style={{ borderColor: hasCustom ? '#bfdbfe' : '#e2e8f0' }}>
+                        <button
+                          onClick={() => setExpandedSym(isOpen ? null : sym)}
+                          className="w-full flex items-center justify-between px-3 py-2"
+                          style={{ background: hasCustom ? '#eff6ff' : '#f8fafc' }}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-sm" style={{ color: '#1d4ed8' }}>{sym}</span>
+                            {hasCustom
+                              ? <span className="text-xs font-semibold text-blue-500">Custom</span>
+                              : <span className="text-xs text-slate-400">Global settings</span>
+                            }
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {hasCustom && (
+                              <span
+                                onClick={e => { e.stopPropagation(); clearSymCfg(sym); }}
+                                className="text-xs text-slate-400 hover:text-red-500 px-1.5 py-0.5 rounded cursor-pointer">
+                                Reset
+                              </span>
+                            )}
+                            <ChevronDown size={13} style={{ transform: isOpen ? 'rotate(180deg)' : '', transition: 'transform 0.2s', color: '#94a3b8' }} />
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <div className="px-3 py-3 border-t border-slate-100 space-y-2.5 bg-white">
+                            {[
+                              { key: 'tradeUSDT',           label: 'Trade Size',    suffix: 'USDT',            placeholder: `${form.tradeUSDT ?? 50}`, step: 1,   min: 1,   max: 100000 },
+                              { key: 'stopLossPercent',     label: 'Stop Loss',     suffix: '% below entry',   placeholder: `${form.stopLossPercent}`,  step: 0.1, min: 0.1, max: 50 },
+                              { key: 'takeProfitPercent',   label: 'Take Profit',   suffix: '% above entry',   placeholder: `${form.takeProfitPercent}`,step: 0.1, min: 0.1, max: 100 },
+                              { key: 'trailingStopPercent', label: 'Trailing Stop', suffix: '% callback (0=off)', placeholder: `${form.trailingStopPercent ?? 0}`, step: 0.1, min: 0, max: 20 },
+                            ].map(({ key, label, suffix, placeholder, step, min, max }) => (
+                              <div key={key} className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">{label}</span>
+                                <input
+                                  type="number" min={min} max={max} step={step}
+                                  placeholder={`${placeholder} (global)`}
+                                  value={cfg[key] ?? ''}
+                                  onChange={e => setSymCfg(sym, key, e.target.value === '' ? null : parseFloat(e.target.value))}
+                                  className="input w-24 text-center font-mono text-sm py-1" />
+                                <span className="text-xs text-slate-400">{suffix}</span>
+                              </div>
+                            ))}
+                            <p className="text-xs text-slate-400 pt-1">Leave blank to use global setting</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </Row>
 

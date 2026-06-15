@@ -22,7 +22,7 @@ export async function PUT(req) {
   const body = await req.json();
   const allowed = ['symbol','symbols','timeframe','tradeUSDT','stopLossPercent','takeProfitPercent',
                    'cooldownMinutes','maxDailyTrades','maxConcurrentTrades','useGroqFilter','aggressiveMode',
-                   'trailingStopPercent'];
+                   'trailingStopPercent','symbolConfigs'];
   const update = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
@@ -43,6 +43,20 @@ export async function PUT(req) {
     return NextResponse.json({ error: 'stopLossPercent must be 0.1–50' }, { status: 400 });
   if (update.takeProfitPercent && (update.takeProfitPercent < 0.1 || update.takeProfitPercent > 100))
     return NextResponse.json({ error: 'takeProfitPercent must be 0.1–100' }, { status: 400 });
+
+  if (update.symbolConfigs !== undefined) {
+    if (!Array.isArray(update.symbolConfigs))
+      return NextResponse.json({ error: 'symbolConfigs must be an array' }, { status: 400 });
+    update.symbolConfigs = update.symbolConfigs
+      .filter(c => c?.symbol)
+      .map(c => ({
+        symbol: String(c.symbol).trim().toUpperCase(),
+        tradeUSDT:           c.tradeUSDT           != null ? Number(c.tradeUSDT)           : null,
+        stopLossPercent:     c.stopLossPercent     != null ? Number(c.stopLossPercent)     : null,
+        takeProfitPercent:   c.takeProfitPercent   != null ? Number(c.takeProfitPercent)   : null,
+        trailingStopPercent: c.trailingStopPercent != null ? Number(c.trailingStopPercent) : null,
+      }));
+  }
 
   await connectDB();
   const user = await User.findOne({ email: session.user.email });

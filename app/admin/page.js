@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import {
   Users, Bot, ShieldCheck, TrendingUp, RefreshCw, UserX, UserCheck,
   Settings, DollarSign, Percent, Star, CreditCard, Activity, Ticket,
-  Send, BarChart2, Plus, Trash2, Eye, EyeOff,
+  Send, BarChart2, Plus, Trash2, Eye, EyeOff, Search, ChevronLeft,
+  ChevronRight, LayoutDashboard, GitBranch,
 } from 'lucide-react';
 
 const DEFAULT_CONFIGS = [
@@ -46,6 +47,21 @@ export default function AdminPage() {
   const [replyText, setReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
 
+  // Users search
+  const [userSearch, setUserSearch] = useState('');
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  // Trades tab
+  const [trades, setTrades] = useState([]);
+  const [tradesLoading, setTradesLoading] = useState(false);
+  const [tradePage, setTradePage] = useState(1);
+  const [tradePages, setTradePages] = useState(1);
+  const [tradeTotal, setTradeTotal] = useState(0);
+  const [tradeSearch, setTradeSearch] = useState('');
+  const [tradeSymbol, setTradeSymbol] = useState('');
+  const [tradeSide, setTradeSide] = useState('');
+  const [tradeStatus, setTradeStatus] = useState('');
+
   const [symbols, setSymbols] = useState([]);           // DB symbols
   const [symbolsLoading, setSymbolsLoading] = useState(false);
   const [newSymbol, setNewSymbol] = useState('');
@@ -80,6 +96,42 @@ export default function AdminPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  async function searchUsers(q) {
+    setUserSearch(q);
+    setUsersLoading(true);
+    const res = await fetch(`/api/admin/users?search=${encodeURIComponent(q)}`);
+    const u = await res.json();
+    setUsers(Array.isArray(u) ? u : []);
+    setUsersLoading(false);
+  }
+
+  async function loadTrades(page = 1) {
+    setTradesLoading(true);
+    setTradePage(page);
+    const params = new URLSearchParams({ page, limit: 20 });
+    if (tradeSearch) params.set('search', tradeSearch);
+    if (tradeSymbol) params.set('symbol', tradeSymbol);
+    if (tradeSide)   params.set('side',   tradeSide);
+    if (tradeStatus) params.set('status', tradeStatus);
+    const res = await fetch(`/api/admin/trades?${params}`);
+    const d   = await res.json();
+    setTrades(d.trades || []);
+    setTradePages(d.pages || 1);
+    setTradeTotal(d.total || 0);
+    setTradesLoading(false);
+  }
+
+  useEffect(() => { if (tab === 'trades') loadTrades(1); }, [tab]);
+
+  async function toggleOverviewAccess(userId, current) {
+    await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, canViewOverview: !current }),
+    });
+    setUsers(prev => prev.map(u => u._id === userId ? { ...u, canViewOverview: !current } : u));
+  }
 
   async function loadTickets() {
     setTicketsLoading(true);
@@ -253,13 +305,17 @@ export default function AdminPage() {
     </div>
   );
 
-  const TABS = [
+  const isAdmin = stats?.isAdmin;
+  const TABS = isAdmin ? [
+    { id: 'overview',     label: 'Overview' },
+    { id: 'users',        label: 'Users' },
+    { id: 'trades',       label: 'Trades' },
+    { id: 'commissions',  label: 'Commissions' },
+    { id: 'tickets',      label: 'Tickets' },
+    { id: 'symbols',      label: 'Symbols' },
+    { id: 'config',       label: 'Config' },
+  ] : [
     { id: 'overview', label: 'Overview' },
-    { id: 'users', label: 'Users' },
-    { id: 'commissions', label: 'Commissions' },
-    { id: 'tickets', label: 'Tickets' },
-    { id: 'symbols', label: 'Symbols' },
-    { id: 'config', label: 'Config' },
   ];
 
   return (
@@ -356,15 +412,27 @@ export default function AdminPage() {
       {/* Users */}
       {tab === 'users' && (
         <div className="card glow-border overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
             <h2 className="text-base font-bold text-slate-900">All Users</h2>
-            <span className="text-sm text-slate-500">{users.length} total</span>
+            <div className="flex items-center gap-2 flex-1 max-w-xs">
+              <div className="relative flex-1">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  className="input pl-8 py-1.5 text-sm w-full"
+                  placeholder="Search name or email…"
+                  value={userSearch}
+                  onChange={e => searchUsers(e.target.value)}
+                />
+              </div>
+              {usersLoading && <RefreshCw size={13} className="text-blue-500 animate-spin shrink-0" />}
+            </div>
+            <span className="text-sm text-slate-500">{users.length} shown</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  {['Name', 'Email', 'Referral', 'Balance', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
+                  {['Name', 'Email', 'Referrals', 'Balance', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -384,7 +452,13 @@ export default function AdminPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-500 text-xs">{u.email}</td>
-                    <td className="px-4 py-3 font-mono text-blue-600 font-medium text-xs">{u.referralCode}</td>
+                    <td className="px-4 py-3 text-xs">
+                      <div className="font-mono text-blue-600 font-medium">{u.referralCode}</div>
+                      <div className="flex items-center gap-1 mt-0.5 text-slate-400">
+                        <GitBranch size={10} />
+                        <span>{u.referralCount || 0} referred</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-slate-700 font-mono text-xs font-semibold">${(u.assetBalance || 0).toFixed(2)}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
@@ -448,6 +522,18 @@ export default function AdminPage() {
                             <Star size={11} /> Grant Sub
                           </button>
                         )}
+                        {u.role !== 'admin' && (
+                          <button
+                            onClick={() => toggleOverviewAccess(u._id, u.canViewOverview)}
+                            title={u.canViewOverview ? 'Revoke overview access' : 'Grant overview access'}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap ${
+                              u.canViewOverview
+                                ? 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
+                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                            }`}>
+                            <LayoutDashboard size={11} /> {u.canViewOverview ? 'Overview ✓' : 'Overview'}
+                          </button>
+                        )}
                         {deleteConfirm === u._id ? (
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-red-600 font-semibold whitespace-nowrap">Delete?</span>
@@ -481,6 +567,134 @@ export default function AdminPage() {
       )}
 
       {/* Commissions */}
+      {/* Trades */}
+      {tab === 'trades' && (
+        <div>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input className="input pl-8 py-1.5 text-sm w-44" placeholder="Search user…"
+                value={tradeSearch} onChange={e => setTradeSearch(e.target.value)} />
+            </div>
+            <input className="input py-1.5 text-sm w-32 uppercase" placeholder="Symbol e.g. ETH"
+              value={tradeSymbol} onChange={e => setTradeSymbol(e.target.value.toUpperCase())} />
+            <select className="input py-1.5 text-sm w-28" value={tradeSide} onChange={e => setTradeSide(e.target.value)}>
+              <option value="">All sides</option>
+              <option value="BUY">BUY</option>
+              <option value="SELL">SELL</option>
+            </select>
+            <select className="input py-1.5 text-sm w-28" value={tradeStatus} onChange={e => setTradeStatus(e.target.value)}>
+              <option value="">All status</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+            <button onClick={() => loadTrades(1)} className="btn-primary py-1.5 px-4 text-sm flex items-center gap-1.5">
+              <Search size={13} /> Search
+            </button>
+            <span className="text-xs text-slate-400 self-center ml-auto">{tradeTotal} trades found</span>
+          </div>
+
+          <div className="card glow-border overflow-hidden">
+            {tradesLoading ? (
+              <div className="flex items-center justify-center h-40">
+                <RefreshCw size={22} className="text-blue-500 animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {['User', 'Symbol', 'Side', 'Price', 'Qty', 'Total', 'P&L', 'Source', 'Opened', 'Status'].map(h => (
+                          <th key={h} className="text-left px-4 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {trades.length === 0 ? (
+                        <tr><td colSpan={10} className="text-center py-10 text-slate-400 text-sm">No trades found</td></tr>
+                      ) : trades.map(t => (
+                        <tr key={t._id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-2.5">
+                            <div className="text-xs font-semibold text-slate-800 whitespace-nowrap">{t.userId?.name || '—'}</div>
+                            <div className="text-[10px] text-slate-400">{t.userId?.email}</div>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono font-semibold text-xs text-slate-800 whitespace-nowrap">{t.symbol}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${t.side === 'BUY' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                              {t.side}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-xs text-slate-700">${t.price?.toFixed(4)}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{t.qty}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs text-slate-600">${t.total?.toFixed(2)}</td>
+                          <td className="px-4 py-2.5">
+                            {t.profit != null ? (
+                              <span className={`text-xs font-semibold ${t.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(4)}
+                              </span>
+                            ) : <span className="text-slate-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${t.source === 'bot' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {t.source}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-slate-500 whitespace-nowrap">
+                            {new Date(t.createdAt).toLocaleDateString()}<br/>
+                            <span className="text-[10px]">{new Date(t.createdAt).toLocaleTimeString()}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${t.status === 'open' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {t.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {tradePages > 1 && (
+                  <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">Page {tradePage} of {tradePages}</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => loadTrades(tradePage - 1)} disabled={tradePage <= 1}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30">
+                        <ChevronLeft size={14} />
+                      </button>
+                      {Array.from({ length: Math.min(7, tradePages) }, (_, i) => {
+                        const p = tradePages <= 7 ? i + 1
+                          : tradePage <= 4 ? i + 1
+                          : tradePage >= tradePages - 3 ? tradePages - 6 + i
+                          : tradePage - 3 + i;
+                        return (
+                          <button key={p} onClick={() => loadTrades(p)}
+                            className="w-8 h-8 rounded-lg text-xs font-semibold border transition-all"
+                            style={{
+                              background: p === tradePage ? '#2563eb' : 'white',
+                              color: p === tradePage ? 'white' : '#64748b',
+                              borderColor: p === tradePage ? '#2563eb' : '#e2e8f0',
+                            }}>
+                            {p}
+                          </button>
+                        );
+                      })}
+                      <button onClick={() => loadTrades(tradePage + 1)} disabled={tradePage >= tradePages}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30">
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {tab === 'commissions' && (
         <div>
           {/* Summary cards */}
