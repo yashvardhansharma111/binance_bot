@@ -11,7 +11,7 @@
  */
 import { getCandles, getCurrentPrice, getUSDTBalance } from '../services/binance.js';
 import { calculateIndicators, detectSignal } from '../services/indicators.js';
-import { getSentiment, shouldBlock } from '../services/sentiment.js';
+import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/sentiment.js';
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
 import { openPosition, closePosition } from './executor.js';
 import { decrypt } from '../../lib/encryption.js';
@@ -124,6 +124,24 @@ export async function runBotForUser(user) {
       }
 
       const holdMins = (Date.now() - new Date(openTrade.createdAt).getTime()) / 60000;
+
+      // Sentiment-driven exit: if Groq says strongly bearish on an open position, close it
+      if (settings.useGroqFilter && holdMins >= 15) {
+        try {
+          const sCan  = await getCandles(openTrade.symbol, timeframe, 100);
+          const sInd  = calculateIndicators(sCan);
+          const sSent = await getSentiment(openTrade.symbol, sInd);
+          await log(userId, 'info',
+            `[${openTrade.symbol}] Exit-sentiment: ${sSent.sentiment} (${sSent.confidence}%) — ${sSent.reason}`
+          );
+          if (shouldSellOnSentiment(sSent)) {
+            await closePosition(userId, apiKey, apiSecret, openTrade,
+              `Bearish sentiment: ${sSent.reason} (${sSent.confidence}%)`, isTestnet);
+            continue;
+          }
+        } catch { /* sentiment failure is non-fatal */ }
+      }
+
       if (holdMins >= 240) {
         const pnl = ((tradePrice - openTrade.price) / openTrade.price * 100).toFixed(2);
         await closePosition(

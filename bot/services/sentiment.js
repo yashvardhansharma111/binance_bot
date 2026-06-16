@@ -53,7 +53,12 @@ export async function getSentiment(symbol, indicators) {
   }
 }
 
-// Block BUY only when sentiment is strongly bearish
+// Block BUY when sentiment is strongly bearish
 export function shouldBlock(signal, sentiment) {
   return signal === 'BUY' && sentiment.sentiment === 'bearish' && sentiment.confidence >= 65;
+}
+
+// Exit open position when sentiment turns strongly bearish
+export function shouldSellOnSentiment(sentiment) {
+  return sentiment.sentiment === 'bearish' && sentiment.confidence >= 75;
 }
