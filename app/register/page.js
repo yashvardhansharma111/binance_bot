@@ -41,11 +41,29 @@ function RegisterForm() {
   const [success,    setSuccess]    = useState('');
   const [countdown,  setCountdown]  = useState(0);
   const [copied,     setCopied]     = useState(false);
+  const [refStatus,  setRefStatus]  = useState('idle'); // idle | checking | valid | invalid
 
   useEffect(() => {
     const ref = searchParams.get('ref');
-    if (ref) setForm(f => ({ ...f, referralCode: ref }));
+    if (ref) { setForm(f => ({ ...f, referralCode: ref })); checkRef(ref); }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!form.referralCode) { setRefStatus('idle'); return; }
+    setRefStatus('checking');
+    const t = setTimeout(() => checkRef(form.referralCode), 600);
+    return () => clearTimeout(t);
+  }, [form.referralCode]);
+
+  async function checkRef(code) {
+    if (!code) { setRefStatus('idle'); return; }
+    setRefStatus('checking');
+    try {
+      const res = await fetch(`/api/auth/check-referral?code=${encodeURIComponent(code)}`);
+      const { valid } = await res.json();
+      setRefStatus(valid ? 'valid' : 'invalid');
+    } catch { setRefStatus('idle'); }
+  }
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -69,7 +87,8 @@ function RegisterForm() {
 
   async function sendOtp(e) {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password || !form.referralCode) return setError('Please fill all required fields including referral code');
+    if (!form.name || !form.email || !form.password) return setError('Please fill all required fields');
+    if (!form.referralCode || refStatus !== 'valid') return setError('A valid referral code is required');
     const { valid, failures } = validatePassword(form.password);
     if (!valid) return setError(`Password must include: ${failures.map(f => f.label).join(', ')}`);
     setError('');
@@ -208,14 +227,33 @@ function RegisterForm() {
                     </label>
                     <div className="relative">
                       <Hash size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input className="input" style={{ paddingLeft: '2.5rem' }} type="text" placeholder="ABCD1234"
-                        value={form.referralCode} onChange={e => setForm({ ...form, referralCode: e.target.value.toUpperCase() })}
-                        required />
+                      <input
+                        className="input pr-9"
+                        style={{
+                          paddingLeft: '2.5rem',
+                          borderColor: refStatus === 'valid' ? '#10b981' : refStatus === 'invalid' ? '#ef4444' : undefined,
+                        }}
+                        type="text" placeholder="ABCD1234"
+                        value={form.referralCode}
+                        onChange={e => setForm({ ...form, referralCode: e.target.value.toUpperCase() })} />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                        {refStatus === 'checking' && <RefreshCw size={14} className="animate-spin text-slate-400" />}
+                        {refStatus === 'valid'    && <CheckCircle size={15} className="text-emerald-500" />}
+                        {refStatus === 'invalid'  && <AlertCircle size={15} className="text-red-500" />}
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">A referral code is required to create an account</p>
+                    {refStatus === 'invalid' && (
+                      <p className="text-xs text-red-500 mt-1">This referral code doesn't exist. Ask your referrer for the correct code.</p>
+                    )}
+                    {refStatus === 'valid' && (
+                      <p className="text-xs text-emerald-600 mt-1">Valid referral code ✓</p>
+                    )}
+                    {refStatus === 'idle' && (
+                      <p className="text-xs text-slate-400 mt-1">A valid referral code is required to register</p>
+                    )}
                   </div>
 
-                  <button type="submit" disabled={loading || !pwdValid}
+                  <button type="submit" disabled={loading || !pwdValid || refStatus !== 'valid'}
                     className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-60 flex items-center justify-center gap-2">
                     {loading ? <><RefreshCw size={14} className="animate-spin" /> Creating account...</> : 'Create Account'}
                   </button>
