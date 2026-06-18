@@ -42,10 +42,15 @@ function RegisterForm() {
   const [countdown,  setCountdown]  = useState(0);
   const [copied,     setCopied]     = useState(false);
   const [refStatus,  setRefStatus]  = useState('idle'); // idle | checking | valid | invalid
+  const [refLocked,  setRefLocked]  = useState(false);  // true when code came from ?ref= URL param
 
   useEffect(() => {
     const ref = searchParams.get('ref');
-    if (ref) { setForm(f => ({ ...f, referralCode: ref })); checkRef(ref); }
+    if (ref) {
+      setForm(f => ({ ...f, referralCode: ref }));
+      setRefLocked(true);
+      checkRef(ref);
+    }
   }, [searchParams]);
 
   useEffect(() => {
@@ -88,7 +93,8 @@ function RegisterForm() {
   async function sendOtp(e) {
     e.preventDefault();
     if (!form.name || !form.email || !form.password) return setError('Please fill all required fields');
-    if (!form.referralCode || refStatus !== 'valid') return setError('A valid referral code is required');
+    if (form.referralCode && refStatus === 'invalid') return setError('Invalid referral code — please check and try again');
+    if (refLocked && refStatus !== 'valid') return setError('Referral code could not be verified');
     const { valid, failures } = validatePassword(form.password);
     if (!valid) return setError(`Password must include: ${failures.map(f => f.label).join(', ')}`);
     setError('');
@@ -223,7 +229,11 @@ function RegisterForm() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Referral Code <span className="text-red-500">*</span>
+                      Referral Code
+                      {refLocked
+                        ? <span className="ml-2 text-xs font-normal text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Applied</span>
+                        : <span className="ml-1 text-xs font-normal text-slate-400">(optional)</span>
+                      }
                     </label>
                     <div className="relative">
                       <Hash size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -232,28 +242,32 @@ function RegisterForm() {
                         style={{
                           paddingLeft: '2.5rem',
                           borderColor: refStatus === 'valid' ? '#10b981' : refStatus === 'invalid' ? '#ef4444' : undefined,
+                          background:  refLocked ? '#f0fdf4' : undefined,
+                          cursor:      refLocked ? 'not-allowed' : undefined,
                         }}
-                        type="text" placeholder="ABCD1234"
+                        type="text"
+                        placeholder="ABCD1234"
                         value={form.referralCode}
-                        onChange={e => setForm({ ...form, referralCode: e.target.value.toUpperCase() })} />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm">
+                        readOnly={refLocked}
+                        onChange={e => !refLocked && setForm({ ...form, referralCode: e.target.value.toUpperCase() })} />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2">
                         {refStatus === 'checking' && <RefreshCw size={14} className="animate-spin text-slate-400" />}
                         {refStatus === 'valid'    && <CheckCircle size={15} className="text-emerald-500" />}
                         {refStatus === 'invalid'  && <AlertCircle size={15} className="text-red-500" />}
                       </span>
                     </div>
                     {refStatus === 'invalid' && (
-                      <p className="text-xs text-red-500 mt-1">This referral code doesn't exist. Ask your referrer for the correct code.</p>
+                      <p className="text-xs text-red-500 mt-1">This referral code doesn't exist.</p>
                     )}
                     {refStatus === 'valid' && (
-                      <p className="text-xs text-emerald-600 mt-1">Valid referral code ✓</p>
+                      <p className="text-xs text-emerald-600 mt-1">Referral code verified ✓</p>
                     )}
-                    {refStatus === 'idle' && (
-                      <p className="text-xs text-slate-400 mt-1">A valid referral code is required to register</p>
+                    {refLocked && refStatus !== 'valid' && refStatus !== 'invalid' && (
+                      <p className="text-xs text-slate-400 mt-1">Verifying referral code...</p>
                     )}
                   </div>
 
-                  <button type="submit" disabled={loading || !pwdValid || refStatus !== 'valid'}
+                  <button type="submit" disabled={loading || !pwdValid || refStatus === 'invalid' || refStatus === 'checking' || (refLocked && refStatus !== 'valid')}
                     className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-60 flex items-center justify-center gap-2">
                     {loading ? <><RefreshCw size={14} className="animate-spin" /> Creating account...</> : 'Create Account'}
                   </button>

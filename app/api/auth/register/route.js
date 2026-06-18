@@ -15,8 +15,8 @@ function generateReferralCode(name) {
 export async function POST(req) {
   try {
     const { name, email, password, referralCode, otp } = await req.json();
-    if (!name || !email || !password || !referralCode) {
-      return NextResponse.json({ error: 'All fields required including referral code' }, { status: 400 });
+    if (!name || !email || !password) {
+      return NextResponse.json({ error: 'Name, email and password are required' }, { status: 400 });
     }
     const { valid, failures } = validatePassword(password);
     if (!valid)
@@ -28,9 +28,12 @@ export async function POST(req) {
     const exists = await User.findOne({ email: email.toLowerCase() });
     if (exists) return NextResponse.json({ error: 'Email already registered' }, { status: 400 });
 
-    const referrer = await User.findOne({ referralCode });
-    if (!referrer) return NextResponse.json({ error: 'Invalid referral code' }, { status: 400 });
-    const referredBy = referralCode;
+    let referredBy = null;
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode });
+      if (!referrer) return NextResponse.json({ error: 'Invalid referral code' }, { status: 400 });
+      referredBy = referralCode;
+    }
 
     const hashed = await bcrypt.hash(password, 12);
     const code = generateReferralCode(name);
