@@ -128,7 +128,7 @@ export async function runBotForUser(user) {
       // Sentiment-driven exit: if Groq says strongly bearish on an open position, close it
       if (settings.useGroqFilter && holdMins >= 15) {
         try {
-          const sCan  = await getCandles(openTrade.symbol, timeframe, 100);
+          const sCan  = await getCandles(openTrade.symbol, timeframe, 120);
           const sInd  = calculateIndicators(sCan);
           const sSent = await getSentiment(openTrade.symbol, sInd);
           await log(userId, 'info',
@@ -180,7 +180,7 @@ export async function runBotForUser(user) {
 
       // At concurrent limit for this symbol — check SELL signal to close
       if (openOnSym.length >= maxConcurrent) {
-        const candles    = await getCandles(sym, timeframe, 100);
+        const candles    = await getCandles(sym, timeframe, 120);
         const indicators = calculateIndicators(candles);
         const signal     = detectSignal(indicators);
         if (signal === 'SELL') {
@@ -198,11 +198,11 @@ export async function runBotForUser(user) {
 
       // Fetch candles + indicators for this symbol
       const currentPrice = await getCurrentPrice(sym);
-      const candles      = await getCandles(sym, timeframe, 100);
+      const candles      = await getCandles(sym, timeframe, 120);
       const indicators   = calculateIndicators(candles);
 
       await log(userId, 'info',
-        `[${sym}] RSI:${indicators.rsi} | Trend:${indicators.uptrend ? '↑' : '↓'} | MACD:${indicators.bullishCrossover ? '↑cross' : indicators.bearishCrossover ? '↓cross' : 'flat'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
+        `[${sym}] RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | Trend:${indicators.uptrend ? '↑' : '↓'} | MACD:${indicators.bullishCrossover ? '↑cross' : indicators.bearishCrossover ? '↓cross' : 'flat'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
       );
 
       const signal = detectSignal(indicators, aggressiveMode);
