@@ -432,7 +432,7 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  {['Name', 'Email', 'Referrals', 'Balance', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
+                  {['Name', 'Email', 'Phone', 'Referrals', 'Balance', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -452,6 +452,9 @@ export default function AdminPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-500 text-xs">{u.email}</td>
+                    <td className="px-4 py-3 text-xs font-mono text-slate-600 whitespace-nowrap">
+                      {u.phone || <span className="text-slate-300">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-xs">
                       <div className="font-mono text-blue-600 font-medium">{u.referralCode}</div>
                       <div className="flex items-center gap-1 mt-0.5 text-slate-400">
