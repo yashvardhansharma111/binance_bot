@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Zap, Mail, Lock, User, Eye, EyeOff, AlertCircle,
-  CheckCircle, Hash, ShieldCheck, RefreshCw, Wand2, Check, X, Copy,
+  CheckCircle, Hash, ShieldCheck, RefreshCw, Wand2, Check, X, Copy, Phone,
 } from 'lucide-react';
 import { PASSWORD_RULES, validatePassword, generatePassword } from '@/lib/passwordUtils';
 
@@ -32,7 +32,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
 
   const [step,       setStep]       = useState(1);
-  const [form,       setForm]       = useState({ name: '', email: '', password: '', referralCode: '' });
+  const [form,       setForm]       = useState({ name: '', email: '', password: '', phone: '', referralCode: '' });
   const [otp,        setOtp]        = useState('');
   const [showPass,   setShowPass]   = useState(false);
   const [loading,    setLoading]    = useState(false);
@@ -181,6 +181,17 @@ function RegisterForm() {
                       <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input className="input" style={{ paddingLeft: '2.5rem' }} type="email" placeholder="you@example.com"
                         value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      Phone Number <span className="text-xs font-normal text-slate-400">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input className="input" style={{ paddingLeft: '2.5rem' }} type="tel" placeholder="+91 9876543210"
+                        value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                     </div>
                   </div>
 

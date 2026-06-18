@@ -14,7 +14,7 @@ function generateReferralCode(name) {
 
 export async function POST(req) {
   try {
-    const { name, email, password, referralCode, otp } = await req.json();
+    const { name, email, password, phone, referralCode, otp } = await req.json();
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Name, email and password are required' }, { status: 400 });
     }
@@ -42,6 +42,7 @@ export async function POST(req) {
       name,
       email: email.toLowerCase(),
       password: hashed,
+      phone: phone?.trim() || null,
       referralCode: code,
       referredBy,
     });

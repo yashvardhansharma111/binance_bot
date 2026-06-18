@@ -591,6 +591,21 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Phone number prompt for users who haven't added one */}
+      {user && !user.phone && (
+        <a href="/dashboard/profile"
+          className="mb-5 flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer">
+          <div className="w-8 h-8 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+            <span className="text-amber-500 text-sm">📱</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">Add your phone number</p>
+            <p className="text-xs text-amber-600">Secure your account — takes 5 seconds</p>
+          </div>
+          <span className="text-xs text-amber-600 font-semibold shrink-0">Add now →</span>
+        </a>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
         <StatCard

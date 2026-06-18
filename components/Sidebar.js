@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Key, Users, BarChart2, LogOut, Zap,
   ShieldCheck, Activity, ChevronRight, LineChart,
   ArrowDownToLine, Menu, X, Crown, Settings2, Zap as Trade,
-  Sun, Moon, ArrowUpRight,
+  Sun, Moon, ArrowUpRight, UserCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/app/ThemeContext';
@@ -22,6 +22,7 @@ const navItems = [
   { href: '/dashboard/subscribe',   label: 'Subscribe',  icon: Crown },
   { href: '/dashboard/apikeys',     label: 'API Keys',   icon: Key },
   { href: '/dashboard/referral',    label: 'Referral',   icon: Users },
+  { href: '/dashboard/profile',     label: 'Profile',    icon: UserCircle },
 ];
 
 function isActive(href, pathname) {
