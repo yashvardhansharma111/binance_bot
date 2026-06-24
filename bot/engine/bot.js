@@ -9,7 +9,7 @@
  * 6. Groq sentiment filter (BUY only)
  * 7. Execute
  */
-import { getCandles, getCurrentPrice, getUSDTBalance } from '../services/binance.js';
+import { getExchange } from '../services/exchange.js';
 import { calculateIndicators, detectSignal } from '../services/indicators.js';
 import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/sentiment.js';
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
@@ -61,6 +61,11 @@ export async function runBotForUser(user) {
       return await log(userId, 'error', 'Failed to decrypt API keys');
     }
 
+    // Exchange service — Binance or BingX based on saved key
+    const exchangeName = keyDoc.exchange || 'binance';
+    const svc = getExchange(exchangeName);
+    const { getCandles, getCurrentPrice, getUSDTBalance } = svc;
+
     // 2. Settings (auto-create defaults)
     let settings = await BotSettings.findOne({ userId });
     if (!settings) settings = await BotSettings.create({ userId });
@@ -105,20 +110,20 @@ export async function runBotForUser(user) {
 
         if (tradePrice <= trailPrice) {
           await closePosition(userId, apiKey, apiSecret, openTrade,
-            `Trailing stop hit — peak $${newHigh} → dropped ${trailPct}% → stop $${trailPrice}`, isTestnet);
+            `Trailing stop hit — peak $${newHigh} → dropped ${trailPct}% → stop $${trailPrice}`, isTestnet, exchangeName);
           continue;
         }
 
         // Still check TP even in trailing mode
         if (openTrade.takeProfit && tradePrice >= openTrade.takeProfit) {
           await closePosition(userId, apiKey, apiSecret, openTrade,
-            `Take-profit hit @ $${tradePrice}`, isTestnet);
+            `Take-profit hit @ $${tradePrice}`, isTestnet, exchangeName);
           continue;
         }
       } else {
         const exitReason = checkExitConditions(openTrade, tradePrice);
         if (exitReason) {
-          await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet);
+          await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet, exchangeName);
           continue;
         }
       }
@@ -136,7 +141,7 @@ export async function runBotForUser(user) {
           );
           if (shouldSellOnSentiment(sSent)) {
             await closePosition(userId, apiKey, apiSecret, openTrade,
-              `Bearish sentiment: ${sSent.reason} (${sSent.confidence}%)`, isTestnet);
+              `Bearish sentiment: ${sSent.reason} (${sSent.confidence}%)`, isTestnet, exchangeName);
             continue;
           }
         } catch { /* sentiment failure is non-fatal */ }
@@ -170,7 +175,7 @@ export async function runBotForUser(user) {
     }
 
     // 5. Fetch USDT balance once — shared across all symbol iterations
-    const usdtBalance = await getUSDTBalance(apiKey, apiSecret, isTestnet);
+    const usdtBalance = await getUSDTBalance(apiKey, apiSecret, isTestnet, exchangeName);
 
     // 6. Run new-entry logic for each configured symbol independently
     const maxConcurrent = settings.maxConcurrentTrades ?? 1;
@@ -190,7 +195,7 @@ export async function runBotForUser(user) {
               await log(userId, 'info', `[${sym}] SELL signal ignored — held only ${heldMins.toFixed(0)}m (min 15m required)`);
               continue;
             }
-            await closePosition(userId, apiKey, apiSecret, t, `SELL signal — RSI:${indicators.rsi}`, isTestnet);
+            await closePosition(userId, apiKey, apiSecret, t, `SELL signal — RSI:${indicators.rsi}`, isTestnet, exchangeName);
           }
         }
         continue;
@@ -247,7 +252,7 @@ export async function runBotForUser(user) {
       const sc = symCfg(settings, sym);
       const tradeSettings = { ...settings.toObject(), symbol: sym, ...sc };
       const amount = Math.min(sc.tradeUSDT, usdtBalance * 0.99);
-      await openPosition(userId, apiKey, apiSecret, tradeSettings, amount, indicators, sentiment, isTestnet);
+      await openPosition(userId, apiKey, apiSecret, tradeSettings, amount, indicators, sentiment, isTestnet, exchangeName);
     }
 
   } catch (err) {

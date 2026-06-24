@@ -1,4 +1,4 @@
-import { placeMarketBuy, placeMarketSell } from '../services/binance.js';
+import { getExchange } from '../services/exchange.js';
 import { calcRiskLevels, recordTrade } from './risk.js';
 import Trade from '../../lib/models/Trade.js';
 import User from '../../lib/models/User.js';
@@ -66,12 +66,13 @@ async function applyCommission(userId, tradeId, profit) {
   console.log(`[Commission] ${TOTAL_COMMISSION_RATE}% of $${profit.toFixed(4)} = $${totalCut.toFixed(4)} | platform:$${platformAmount.toFixed(4)} referrer:$${referrerAmount.toFixed(4)}`);
 }
 
-export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmount, indicators, sentiment, isTestnet = false) {
+export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmount, indicators, sentiment, isTestnet = false, exchange = 'binance') {
   const { symbol, stopLossPercent, takeProfitPercent } = settings;
+  const svc = getExchange(exchange);
 
-  await log(userId, 'info', `BUY $${usdtAmount.toFixed(2)} of ${symbol} | RSI:${indicators.rsi} | sentiment:${sentiment?.sentiment}`);
+  await log(userId, 'info', `BUY $${usdtAmount.toFixed(2)} of ${symbol} | RSI:${indicators.rsi} | sentiment:${sentiment?.sentiment} | exchange:${exchange}`);
 
-  const order = await placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount, isTestnet);
+  const order = await svc.placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount, isTestnet);
   const { stopLoss, takeProfit } = calcRiskLevels(order.price, stopLossPercent, takeProfitPercent);
 
   await Trade.create({
@@ -93,21 +94,22 @@ export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmou
   }).catch(() => {});
 }
 
-export async function closePosition(userId, apiKey, apiSecret, openTrade, reason, isTestnet = false) {
+export async function closePosition(userId, apiKey, apiSecret, openTrade, reason, isTestnet = false, exchange = 'binance') {
   const { symbol, qty, price: entry } = openTrade;
+  const svc = getExchange(exchange);
 
   await log(userId, 'info', `SELL ${symbol} qty:${qty} | Reason: ${reason}`);
 
   let order;
   try {
-    order = await placeMarketSell(apiKey, apiSecret, symbol, qty, isTestnet);
+    order = await svc.placeMarketSell(apiKey, apiSecret, symbol, qty, isTestnet);
   } catch (e) {
     // -2010: position already closed on exchange (SL/TP triggered before bot could sell).
     // Estimate P&L from current market price so history shows a real number, not $0.
     const isPhantom   = e.message.includes('-2010') || e.message.includes('insufficient balance');
     const isTooSmall  = e.message.includes('-1013') || e.message.includes('notional too small');
     if (isPhantom || isTooSmall) {
-      const { getCurrentPrice } = await import('../services/binance.js');
+      const { getCurrentPrice } = svc;
       const exitPrice     = await getCurrentPrice(symbol).catch(() => entry);
       const phantomProfit = parseFloat(((exitPrice - entry) * qty).toFixed(6));
       const closeReason   = isTooSmall

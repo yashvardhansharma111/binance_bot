@@ -89,6 +89,7 @@ export default function ApiKeysPage() {
   const [connected, setConnected] = useState(null);
   const [keyInfo, setKeyInfo] = useState(null);
   const [accountType, setAccountType] = useState('real');
+  const [exchange,    setExchange]    = useState('binance');
   const [form, setForm] = useState({ apiKey: '', apiSecret: '', label: '' });
   const [showSecret, setShowSecret] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -110,7 +111,7 @@ export default function ApiKeysPage() {
     const res = await fetch('/api/apikeys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, accountType }),
+      body: JSON.stringify({ ...form, accountType, exchange }),
     });
     const data = await res.json();
     setLoading(false);
@@ -171,7 +172,7 @@ export default function ApiKeysPage() {
               </div>
               <div>
                 <div className="font-semibold text-slate-900">
-                  {isTestnet ? 'Binance Testnet' : 'Binance Live'} Connected
+                  {keyInfo?.exchange === 'bingx' ? 'BingX' : isTestnet ? 'Binance Testnet' : 'Binance Live'} Connected
                 </div>
                 <div className="text-sm text-slate-500">{keyInfo?.label || 'No label'}</div>
               </div>
@@ -215,7 +216,28 @@ export default function ApiKeysPage() {
         </div>
       ) : (
         <>
-          {/* Account type toggle */}
+          {/* Exchange selector */}
+          <div className="flex gap-3 mb-4">
+            <button onClick={() => { setExchange('binance'); setAccountType('real'); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                exchange === 'binance'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+              }`}>
+              <Key size={16} /> Binance
+            </button>
+            <button onClick={() => { setExchange('bingx'); setAccountType('real'); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                exchange === 'bingx'
+                  ? 'border-orange-500 bg-orange-50 text-orange-700'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+              }`}>
+              <Key size={16} /> BingX
+            </button>
+          </div>
+
+          {/* Account type toggle — Binance only (BingX has no testnet) */}
+          {exchange === 'binance' && (
           <div className="flex gap-3 mb-6">
             <button onClick={() => setAccountType('real')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${
@@ -234,9 +256,30 @@ export default function ApiKeysPage() {
               <FlaskConical size={16} /> Testnet (Paper)
             </button>
           </div>
+          )}
 
           {/* Inline guide */}
-          <GuideSection accountType={accountType} />
+          {exchange === 'bingx' ? (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 overflow-hidden mb-6">
+              <button onClick={() => {}} className="w-full flex items-center gap-2.5 px-5 py-4 text-left">
+                <BadgeCheck size={16} className="text-orange-600" />
+                <span className="font-semibold text-orange-800 text-sm">How to get a BingX API key</span>
+              </button>
+              <div className="px-5 pb-5 space-y-3 text-sm text-orange-800 border-t border-orange-200 pt-4">
+                <p className="font-medium text-red-600">⚠️ Enable Spot trading only — never Withdrawals.</p>
+                <ol className="space-y-2.5 list-decimal list-inside">
+                  <li>Log in at <strong>bingx.com</strong></li>
+                  <li>Go to <strong>Account → API Management</strong></li>
+                  <li>Click <strong>Create API</strong>, give it a name</li>
+                  <li>Enable <strong>Spot Trading</strong> permission only</li>
+                  <li>Optionally whitelist your server IP</li>
+                  <li>Copy the <strong>API Key</strong> and <strong>Secret Key</strong></li>
+                </ol>
+              </div>
+            </div>
+          ) : (
+            <GuideSection accountType={accountType} />
+          )}
 
           <div className="card p-6 glow-border">
             <div className="flex items-center gap-3 mb-6">
@@ -245,10 +288,10 @@ export default function ApiKeysPage() {
               </div>
               <div>
                 <div className="font-semibold text-slate-900">
-                  {accountType === 'testnet' ? 'Connect Testnet API' : 'Connect Binance API'}
+                  {exchange === 'bingx' ? 'Connect BingX API' : accountType === 'testnet' ? 'Connect Testnet API' : 'Connect Binance API'}
                 </div>
                 <div className="text-sm text-slate-500">
-                  {accountType === 'testnet' ? 'Paper trading — no real funds' : 'Live trading with real funds'}
+                  {exchange === 'bingx' ? 'BingX Spot trading' : accountType === 'testnet' ? 'Paper trading — no real funds' : 'Live trading with real funds'}
                 </div>
               </div>
             </div>
@@ -286,7 +329,7 @@ export default function ApiKeysPage() {
                     ? 'bg-violet-600 hover:bg-violet-700'
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}>
-                {loading ? 'Connecting...' : accountType === 'testnet' ? '🧪 Connect Testnet' : '✅ Connect Live Account'}
+                {loading ? 'Connecting...' : exchange === 'bingx' ? '🟠 Connect BingX' : accountType === 'testnet' ? '🧪 Connect Testnet' : '✅ Connect Binance'}
               </button>
             </form>
           </div>
