@@ -10,6 +10,8 @@
  * 7. Execute
  */
 import { getExchange } from '../services/exchange.js';
+import { get24hChange } from '../services/binance.js';
+import { checkMacroTrend } from '../services/indicators.js';
 import { calculateIndicators, detectSignal } from '../services/indicators.js';
 import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/sentiment.js';
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
@@ -201,31 +203,51 @@ export async function runBotForUser(user) {
         continue;
       }
 
+      // ── Guard 1: 24h market change ────────────────────────────────────────
+      // Block new entries if the coin dropped more than 2% in the last 24h
+      const change24h = await get24hChange(sym);
+      if (change24h < -2) {
+        await log(userId, 'warn', `[${sym}] BLOCKED — down ${change24h.toFixed(2)}% in 24h (threshold: -2%)`);
+        continue;
+      }
+
+      // ── Guard 2: 1h macro trend ───────────────────────────────────────────
+      // Only enter if the hourly chart is in an uptrend (EMA20 > EMA50 on 1h)
+      const h1candles = await getCandles(sym, '1h', 60);
+      const h1uptrend = checkMacroTrend(h1candles);
+      if (!h1uptrend) {
+        await log(userId, 'warn', `[${sym}] BLOCKED — 1h trend bearish (EMA20 < EMA50 on 1h)`);
+        continue;
+      }
+
+      // ── Guard 3: Consecutive loss circuit breaker ─────────────────────────
+      // After 2 consecutive losses on same symbol, cool down for 6 hours
+      const lastSells = await Trade.find({ userId, symbol: sym, status: 'closed', side: 'SELL' })
+        .sort({ createdAt: -1 }).limit(2);
+      if (lastSells.length >= 2 && lastSells.every(t => (t.profit || 0) < 0)) {
+        const lastLossAt     = new Date(lastSells[0].closedAt || lastSells[0].createdAt);
+        const hoursSinceLoss = (Date.now() - lastLossAt.getTime()) / 3_600_000;
+        if (hoursSinceLoss < 6) {
+          await log(userId, 'warn',
+            `[${sym}] BLOCKED — 2 consecutive losses, cooling down for ${(6 - hoursSinceLoss).toFixed(1)}h more`);
+          continue;
+        }
+      }
+
       // Fetch candles + indicators for this symbol
       const currentPrice = await getCurrentPrice(sym);
       const candles      = await getCandles(sym, timeframe, 120);
       const indicators   = calculateIndicators(candles);
 
       await log(userId, 'info',
-        `[${sym}] RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | Trend:${indicators.uptrend ? '↑' : '↓'} | MACD:${indicators.bullishCrossover ? '↑cross' : indicators.bearishCrossover ? '↓cross' : 'flat'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
+        `[${sym}] 24h:${change24h.toFixed(2)}% | RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | 1h:${h1uptrend ? '↑' : '↓'} | Trend:${indicators.uptrend ? '↑' : '↓'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
       );
 
       const signal = detectSignal(indicators, aggressiveMode);
       await log(userId, 'info', `[${sym}] Signal: ${signal}${aggressiveMode ? ' [AGGRESSIVE]' : ''}`);
 
-      // Force-trade: if no trade on this symbol in last 1h and signal not SELL
-      const lastSymTrade = await Trade.findOne({ userId, symbol: sym }).sort({ createdAt: -1 });
-      const hoursSinceLast = lastSymTrade
-        ? (Date.now() - new Date(lastSymTrade.createdAt).getTime()) / 3_600_000
-        : Infinity;
-      const forceTrade = hoursSinceLast >= 1 && signal !== 'SELL';
-
-      if (forceTrade) {
-        await log(userId, 'warn', `[${sym}] Force trade — no trade in ${Math.floor(hoursSinceLast * 60)}m | Signal was: ${signal}`);
-      }
-
-      if (!forceTrade && signal === 'HOLD') continue;
-      if (!forceTrade && signal === 'SELL') {
+      if (signal === 'HOLD') continue;
+      if (signal === 'SELL') {
         await log(userId, 'info', `[${sym}] SELL signal but no open position — nothing to close`);
         continue;
       }
@@ -239,7 +261,7 @@ export async function runBotForUser(user) {
 
       // Groq sentiment filter
       let sentiment = { sentiment: 'neutral', confidence: 50, reason: 'Filter off' };
-      if (settings.useGroqFilter && !forceTrade && !aggressiveMode) {
+      if (settings.useGroqFilter && !aggressiveMode) {
         sentiment = await getSentiment(sym, indicators);
         await log(userId, 'info', `[${sym}] Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
         if (shouldBlock(signal, sentiment)) {

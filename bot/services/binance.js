@@ -73,6 +73,15 @@ export async function getUSDTBalance(apiKey, apiSecret, isTestnet = TESTNET) {
   }
 }
 
+export async function get24hChange(symbol) {
+  try {
+    const { data } = await axios.get(`${BASE}/api/v3/ticker/24hr`, {
+      params: { symbol }, timeout: 5000,
+    });
+    return parseFloat(data.priceChangePercent);
+  } catch { return 0; }
+}
+
 export async function testConnection(apiKey, apiSecret) {
   const usdt = await getUSDTBalance(apiKey, apiSecret);
   return { connected: true, USDT: usdt, testnet: TESTNET };

@@ -45,6 +45,16 @@ export function calculateIndicators(candles) {
   };
 }
 
+// Check macro trend on a different timeframe (e.g. 1h candles)
+// Returns true only if EMA20 > EMA50 on that timeframe
+export function checkMacroTrend(candles) {
+  if (candles.length < 50) return true; // not enough data → don't block
+  const closes = candles.map(c => c.close);
+  const ema20  = EMA.calculate({ values: closes, period: 20 });
+  const ema50  = EMA.calculate({ values: closes, period: 50 });
+  return (ema20.at(-1) ?? 0) > (ema50.at(-1) ?? 0);
+}
+
 export function detectSignal(
   { rsi, bullishCrossover, bearishCrossover, uptrend, macroUptrend, volumeIncreasing },
   aggressive = false
