@@ -121,7 +121,7 @@ export default function SettingsPage() {
       <div className="card glow-border p-4 mb-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <Wallet size={15} className="text-blue-500" /> Binance Balance
+            <Wallet size={15} className="text-blue-500" /> Exchange Balance
           </div>
           <button onClick={fetchBalance} disabled={balLoading}
             className="btn-outline py-1 px-3 text-xs flex items-center gap-1">

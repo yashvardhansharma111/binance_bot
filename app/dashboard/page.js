@@ -609,7 +609,7 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
         <StatCard
-          title="Binance USDT"
+          title={`${balances?.exchange === 'bingx' ? 'BingX' : 'Binance'} USDT`}
           value={balLoading && !balances
             ? '...'
             : balances?.error
@@ -658,12 +658,14 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* Binance Balance */}
+      {/* Exchange Balance */}
       <div className="card p-5 glow-border mb-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Wallet size={15} className="text-blue-500" />
-            <h2 className="text-sm font-bold text-slate-900">Binance Balance</h2>
+            <h2 className="text-sm font-bold text-slate-900">
+              {balances?.exchange === 'bingx' ? 'BingX' : 'Binance'} Balance
+            </h2>
             {balances?.dryRun && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold border border-amber-200">
                 DRY RUN
