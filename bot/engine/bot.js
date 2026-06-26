@@ -79,7 +79,9 @@ export async function runBotForUser(user) {
     // 3. Check bot-opened trades only — manual trades are managed by the user,
     //    never auto-closed by the bot. SL/TP/force-exit runs unconditionally
     //    regardless of subscription or balance status.
-    const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY', source: 'bot' });
+    // Use $ne:'manual' (not source:'bot') so legacy trades without the source field
+    // are still managed — $ne matches missing fields, strict equality does not.
+    const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY', source: { $ne: 'manual' } });
 
     for (const openTrade of openTrades) {
       // Repair missing SL/TP on old trades
