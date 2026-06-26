@@ -55,31 +55,43 @@ async function fetchBinanceBalance(apiKey, apiSecret, isTestnet) {
 }
 
 // ── BingX ─────────────────────────────────────────────────────────────────────
+const BINGX_BASES = ['https://open-api.bingx.com', 'https://open-api.bingx.pro'];
+
 async function fetchBingXBalance(apiKey, apiSecret) {
-  const timestamp = Date.now();
-  const qs        = `timestamp=${timestamp}`;
-  const signature = hmac(apiSecret, qs);
+  let lastErr = null;
 
-  try {
-    const { data } = await axios.get('https://open-api.bingx.com/openApi/spot/v1/account/balance', {
-      params:  { timestamp, signature },
-      headers: { 'X-BX-APIKEY': apiKey },
-      timeout: 15000,
-    });
+  for (const base of BINGX_BASES) {
+    // BingX requires params sorted alphabetically before signing
+    const p   = { recvWindow: 5000, timestamp: Date.now() };
+    const qs  = Object.keys(p).sort().map(k => `${k}=${p[k]}`).join('&');
+    const sig = hmac(apiSecret, qs);
 
-    if (data.code !== 0) throw new Error(data.msg || `BingX error ${data.code}`);
+    try {
+      const { data } = await axios.get(`${base}/openApi/spot/v1/account/balance`, {
+        params:  { ...p, signature: sig },
+        headers: { 'X-BX-APIKEY': apiKey },
+        timeout: 15000,
+      });
 
-    return (data.data?.balances || [])
-      .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
-      .filter(b => b.free > 0 || b.locked > 0)
-      .sort((a, b) => b.free - a.free);
-  } catch (e) {
-    if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT' || e.message?.includes('timeout')) {
-      throw new Error('BingX request timed out — make sure your server IP is whitelisted in BingX API key settings');
+      if (data.code !== 0) throw new Error(data.msg || `BingX error ${data.code}`);
+
+      // Response nests under data.balance.balances or data.balances depending on API version
+      const list = data.data?.balance?.balances || data.data?.balances || [];
+      return list
+        .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
+        .filter(b => b.free > 0 || b.locked > 0)
+        .sort((a, b) => b.free - a.free);
+    } catch (e) {
+      lastErr = e;
+      if (e.response) break; // got a real API error response — don't retry other hosts
     }
-    const msg = e.response?.data?.msg || e.message;
-    throw new Error(msg);
   }
+
+  if (lastErr?.code === 'ECONNABORTED' || lastErr?.code === 'ETIMEDOUT' || lastErr?.message?.includes('timeout')) {
+    throw new Error('BingX request timed out — ensure your server IP is whitelisted in BingX API key settings');
+  }
+  const msg = lastErr?.response?.data?.msg || lastErr?.message || 'BingX unreachable';
+  throw new Error(msg);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────

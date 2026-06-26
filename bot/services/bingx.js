@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { createHmac } from 'crypto';
 
-const BASE = 'https://open-api.bingx.com';
+const BASES = ['https://open-api.bingx.com', 'https://open-api.bingx.pro'];
 
 // BingX uses "BTC-USDT" format; Binance uses "BTCUSDT"
 function toSymbol(s) {
@@ -11,9 +11,10 @@ function toSymbol(s) {
   return s;
 }
 
+// BingX requires keys sorted alphabetically before signing
 function buildSigned(apiSecret, params = {}) {
   const p  = { ...params, timestamp: Date.now() };
-  const qs = Object.entries(p).map(([k, v]) => `${k}=${v}`).join('&');
+  const qs = Object.keys(p).sort().map(k => `${k}=${p[k]}`).join('&');
   const sig = createHmac('sha256', apiSecret).update(qs).digest('hex');
   return { ...p, signature: sig };
 }
@@ -31,39 +32,59 @@ function orderError(e) {
 // ── Market data ───────────────────────────────────────────────────────────────
 
 export async function getCandles(symbol, interval = '5m', limit = 100) {
-  const { data } = await axios.get(`${BASE}/openApi/spot/v2/market/kline`, {
-    params: { symbol: toSymbol(symbol), interval, limit },
-    timeout: 10000,
-  });
-  const klines = data?.data?.klines || [];
-  return klines.map(c => ({
-    open:   parseFloat(c[1]),
-    high:   parseFloat(c[2]),
-    low:    parseFloat(c[3]),
-    close:  parseFloat(c[4]),
-    volume: parseFloat(c[5]),
-  }));
+  for (const base of BASES) {
+    try {
+      const { data } = await axios.get(`${base}/openApi/spot/v2/market/kline`, {
+        params: { symbol: toSymbol(symbol), interval, limit },
+        timeout: 10000,
+      });
+      const klines = data?.data?.klines || [];
+      return klines.map(c => ({
+        open:   parseFloat(c[1]),
+        high:   parseFloat(c[2]),
+        low:    parseFloat(c[3]),
+        close:  parseFloat(c[4]),
+        volume: parseFloat(c[5]),
+      }));
+    } catch (e) {
+      if (base === BASES[BASES.length - 1]) throw e;
+    }
+  }
 }
 
 export async function getCurrentPrice(symbol) {
-  const { data } = await axios.get(`${BASE}/openApi/spot/v1/ticker/price`, {
-    params: { symbol: toSymbol(symbol) },
-    timeout: 5000,
-  });
-  return parseFloat(data?.data?.price || 0);
+  for (const base of BASES) {
+    try {
+      const { data } = await axios.get(`${base}/openApi/spot/v1/ticker/price`, {
+        params: { symbol: toSymbol(symbol) },
+        timeout: 5000,
+      });
+      return parseFloat(data?.data?.price || 0);
+    } catch (e) {
+      if (base === BASES[BASES.length - 1]) throw e;
+    }
+  }
 }
 
 // ── Authenticated ─────────────────────────────────────────────────────────────
 
 export async function getUSDTBalance(apiKey, apiSecret) {
   if (process.env.DRY_RUN === 'true') return 10000;
-  const { data } = await axios.get(`${BASE}/openApi/spot/v1/account/balance`, {
-    params:  buildSigned(apiSecret),
-    headers: headers(apiKey),
-    timeout: 10000,
-  });
-  const usdt = (data?.data?.balances || []).find(b => b.asset === 'USDT');
-  return parseFloat(usdt?.free || 0);
+  for (const base of BASES) {
+    try {
+      const { data } = await axios.get(`${base}/openApi/spot/v1/account/balance`, {
+        params:  buildSigned(apiSecret),
+        headers: headers(apiKey),
+        timeout: 12000,
+      });
+      const list = data?.data?.balance?.balances || data?.data?.balances || [];
+      const usdt = list.find(b => b.asset === 'USDT');
+      return parseFloat(usdt?.free || 0);
+    } catch (e) {
+      if (base === BASES[BASES.length - 1]) throw e;
+    }
+  }
+  return 0;
 }
 
 export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
