@@ -76,10 +76,10 @@ export async function runBotForUser(user) {
     // Resolve which symbols to trade — multi-symbol list takes priority over legacy single field
     const tradingSymbols = settings.symbols?.length ? settings.symbols : [settings.symbol || 'BTCUSDT'];
 
-    // 3. Check ALL open trades — SL/TP/force-exit runs unconditionally,
-    //    regardless of subscription or balance status, so positions are
-    //    always honoured even after subscription expires.
-    const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY' });
+    // 3. Check bot-opened trades only — manual trades are managed by the user,
+    //    never auto-closed by the bot. SL/TP/force-exit runs unconditionally
+    //    regardless of subscription or balance status.
+    const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY', source: 'bot' });
 
     for (const openTrade of openTrades) {
       // Repair missing SL/TP on old trades
@@ -154,7 +154,7 @@ export async function runBotForUser(user) {
         await closePosition(
           userId, apiKey, apiSecret, openTrade,
           `Force exit after ${Math.floor(holdMins)}m | P&L: ${pnl}%`,
-          isTestnet
+          isTestnet, exchangeName
         );
         continue;
       }

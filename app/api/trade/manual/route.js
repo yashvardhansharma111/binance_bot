@@ -6,7 +6,7 @@ import ApiKey from '@/lib/models/ApiKey';
 import Trade from '@/lib/models/Trade';
 import User from '@/lib/models/User';
 import { decrypt } from '@/lib/encryption';
-import { placeMarketBuy, placeMarketSell, getCurrentPrice } from '@/bot/services/binance';
+import { getExchange } from '@/bot/services/exchange';
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -33,7 +33,9 @@ export async function POST(req) {
   const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
   if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
 
-  const isTestnet = keyDoc.accountType === 'testnet';
+  const exchange   = keyDoc.exchange || 'binance';
+  const isTestnet  = keyDoc.accountType === 'testnet';
+  const { placeMarketBuy, placeMarketSell } = getExchange(exchange);
 
   let apiKey, apiSecret;
   try {

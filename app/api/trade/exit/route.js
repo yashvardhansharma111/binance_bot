@@ -7,7 +7,7 @@ import Trade from '@/lib/models/Trade';
 import User from '@/lib/models/User';
 import Commission from '@/lib/models/Commission';
 import { decrypt } from '@/lib/encryption';
-import { placeMarketSell } from '@/bot/services/binance';
+import { getExchange } from '@/bot/services/exchange';
 
 const TOTAL_COMMISSION_RATE = 15;
 const REFERRER_RATE         = 10;
@@ -63,9 +63,11 @@ export async function POST(req) {
   const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
   if (!keyDoc) return NextResponse.json({ error: 'No active API key' }, { status: 400 });
 
-  const isTestnet = keyDoc.accountType === 'testnet';
-  const apiKey    = decrypt(keyDoc.encryptedKey);
-  const apiSecret = decrypt(keyDoc.encryptedSecret);
+  const exchange   = keyDoc.exchange || 'binance';
+  const isTestnet  = keyDoc.accountType === 'testnet';
+  const apiKey     = decrypt(keyDoc.encryptedKey);
+  const apiSecret  = decrypt(keyDoc.encryptedSecret);
+  const { placeMarketSell } = getExchange(exchange);
 
   let order, profit;
   try {
