@@ -55,43 +55,48 @@ async function fetchBinanceBalance(apiKey, apiSecret, isTestnet) {
 }
 
 // ── BingX ─────────────────────────────────────────────────────────────────────
-const BINGX_BASES = ['https://open-api.bingx.com', 'https://open-api.bingx.pro'];
+const BINGX_BASE = 'https://open-api.bingx.com';
 
 async function fetchBingXBalance(apiKey, apiSecret) {
-  let lastErr = null;
+  // Step 1: Test public connectivity (no auth) — fast 5s check
+  try {
+    await axios.get(`${BINGX_BASE}/openApi/spot/v1/ticker/price`, {
+      params:  { symbol: 'BTC-USDT' },
+      timeout: 5000,
+    });
+  } catch {
+    throw new Error('Cannot reach BingX servers — check your internet connection or VPN');
+  }
 
-  for (const base of BINGX_BASES) {
-    // BingX requires params sorted alphabetically before signing
-    const p   = { recvWindow: 5000, timestamp: Date.now() };
-    const qs  = Object.keys(p).sort().map(k => `${k}=${p[k]}`).join('&');
-    const sig = hmac(apiSecret, qs);
+  // Step 2: Authenticated balance fetch — connectivity is confirmed
+  // BingX requires params sorted alphabetically before signing
+  const p   = { recvWindow: 5000, timestamp: Date.now() };
+  const qs  = Object.keys(p).sort().map(k => `${k}=${p[k]}`).join('&');
+  const sig = hmac(apiSecret, qs);
 
-    try {
-      const { data } = await axios.get(`${base}/openApi/spot/v1/account/balance`, {
-        params:  { ...p, signature: sig },
-        headers: { 'X-BX-APIKEY': apiKey },
-        timeout: 15000,
-      });
+  try {
+    const { data } = await axios.get(`${BINGX_BASE}/openApi/spot/v1/account/balance`, {
+      params:  { ...p, signature: sig },
+      headers: { 'X-BX-APIKEY': apiKey },
+      timeout: 10000,
+    });
 
-      if (data.code !== 0) throw new Error(data.msg || `BingX error ${data.code}`);
+    if (data.code !== 0) throw new Error(data.msg || `BingX error ${data.code}`);
 
-      // Response nests under data.balance.balances or data.balances depending on API version
-      const list = data.data?.balance?.balances || data.data?.balances || [];
-      return list
-        .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
-        .filter(b => b.free > 0 || b.locked > 0)
-        .sort((a, b) => b.free - a.free);
-    } catch (e) {
-      lastErr = e;
-      if (e.response) break; // got a real API error response — don't retry other hosts
+    // Response nests under data.balance.balances or data.balances depending on API version
+    const list = data.data?.balance?.balances || data.data?.balances || [];
+    return list
+      .map(b => ({ asset: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked) }))
+      .filter(b => b.free > 0 || b.locked > 0)
+      .sort((a, b) => b.free - a.free);
+  } catch (e) {
+    if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT' || e.message?.includes('timeout')) {
+      // Public endpoint worked but auth timed out → almost certainly IP restriction on the API key
+      throw new Error('BingX auth timed out — your API key likely has IP restriction enabled. Go to BingX → API Management → edit the key → disable IP restriction (or add your IP to the whitelist)');
     }
+    const msg = e.response?.data?.msg || e.message;
+    throw new Error(`BingX: ${msg}`);
   }
-
-  if (lastErr?.code === 'ECONNABORTED' || lastErr?.code === 'ETIMEDOUT' || lastErr?.message?.includes('timeout')) {
-    throw new Error('BingX request timed out — ensure your server IP is whitelisted in BingX API key settings');
-  }
-  const msg = lastErr?.response?.data?.msg || lastErr?.message || 'BingX unreachable';
-  throw new Error(msg);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
