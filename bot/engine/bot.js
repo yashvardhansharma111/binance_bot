@@ -205,34 +205,37 @@ export async function runBotForUser(user) {
         continue;
       }
 
-      // ── Guard 1: 24h market change ────────────────────────────────────────
-      // Block new entries if the coin dropped more than 2% in the last 24h
-      const change24h = await get24hChange(sym);
-      if (change24h < -2) {
-        await log(userId, 'warn', `[${sym}] BLOCKED — down ${change24h.toFixed(2)}% in 24h (threshold: -2%)`);
-        continue;
-      }
+      // ── Bear market guards (skipped in aggressive mode) ──────────────────
+      let change24h = 0;
+      let h1uptrend = true;
 
-      // ── Guard 2: 1h macro trend ───────────────────────────────────────────
-      // Only enter if the hourly chart is in an uptrend (EMA20 > EMA50 on 1h)
-      const h1candles = await getCandles(sym, '1h', 60);
-      const h1uptrend = checkMacroTrend(h1candles);
-      if (!h1uptrend) {
-        await log(userId, 'warn', `[${sym}] BLOCKED — 1h trend bearish (EMA20 < EMA50 on 1h)`);
-        continue;
-      }
-
-      // ── Guard 3: Consecutive loss circuit breaker ─────────────────────────
-      // After 2 consecutive losses on same symbol, cool down for 6 hours
-      const lastSells = await Trade.find({ userId, symbol: sym, status: 'closed', side: 'SELL' })
-        .sort({ createdAt: -1 }).limit(2);
-      if (lastSells.length >= 2 && lastSells.every(t => (t.profit || 0) < 0)) {
-        const lastLossAt     = new Date(lastSells[0].closedAt || lastSells[0].createdAt);
-        const hoursSinceLoss = (Date.now() - lastLossAt.getTime()) / 3_600_000;
-        if (hoursSinceLoss < 6) {
-          await log(userId, 'warn',
-            `[${sym}] BLOCKED — 2 consecutive losses, cooling down for ${(6 - hoursSinceLoss).toFixed(1)}h more`);
+      if (!aggressiveMode) {
+        // Guard 1: 24h market change — block if coin dropped > 2% in last 24h
+        change24h = await get24hChange(sym);
+        if (change24h < -2) {
+          await log(userId, 'warn', `[${sym}] BLOCKED — down ${change24h.toFixed(2)}% in 24h (threshold: -2%)`);
           continue;
+        }
+
+        // Guard 2: 1h macro trend — only enter if EMA20 > EMA50 on 1h
+        const h1candles = await getCandles(sym, '1h', 60);
+        h1uptrend = checkMacroTrend(h1candles);
+        if (!h1uptrend) {
+          await log(userId, 'warn', `[${sym}] BLOCKED — 1h trend bearish (EMA20 < EMA50 on 1h)`);
+          continue;
+        }
+
+        // Guard 3: Consecutive loss circuit breaker — 2 losses → 6h cooldown
+        const lastSells = await Trade.find({ userId, symbol: sym, status: 'closed', side: 'SELL' })
+          .sort({ createdAt: -1 }).limit(2);
+        if (lastSells.length >= 2 && lastSells.every(t => (t.profit || 0) < 0)) {
+          const lastLossAt     = new Date(lastSells[0].closedAt || lastSells[0].createdAt);
+          const hoursSinceLoss = (Date.now() - lastLossAt.getTime()) / 3_600_000;
+          if (hoursSinceLoss < 6) {
+            await log(userId, 'warn',
+              `[${sym}] BLOCKED — 2 consecutive losses, cooling down for ${(6 - hoursSinceLoss).toFixed(1)}h more`);
+            continue;
+          }
         }
       }
 
@@ -242,7 +245,9 @@ export async function runBotForUser(user) {
       const indicators   = calculateIndicators(candles);
 
       await log(userId, 'info',
-        `[${sym}] 24h:${change24h.toFixed(2)}% | RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | 1h:${h1uptrend ? '↑' : '↓'} | Trend:${indicators.uptrend ? '↑' : '↓'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
+        aggressiveMode
+          ? `[${sym}] [AGGRESSIVE] RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | Trend:${indicators.uptrend ? '↑' : '↓'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
+          : `[${sym}] 24h:${change24h.toFixed(2)}% | RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | 1h:${h1uptrend ? '↑' : '↓'} | Trend:${indicators.uptrend ? '↑' : '→'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
       );
 
       const signal = detectSignal(indicators, aggressiveMode);

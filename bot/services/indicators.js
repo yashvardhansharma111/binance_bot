@@ -59,26 +59,27 @@ export function detectSignal(
   { rsi, bullishCrossover, bearishCrossover, uptrend, macroUptrend, volumeIncreasing },
   aggressive = false
 ) {
-  // SELL is always evaluated regardless of trend
+  // SELL always evaluated regardless of mode
   const sell = rsi > 70 || bearishCrossover;
 
-  // ── Macro bear gate ───────────────────────────────────────────────────────
+  // ── Aggressive mode — all macro/trend/sentiment gates bypassed ────────────
+  // No EMA100 check, no uptrend requirement, no volume requirement.
+  // Enters on any RSI < 60 dip. Exits at RSI 72 to let profits run.
+  if (aggressive) {
+    const buy    = rsi < 60;
+    const agSell = rsi > 72 || bearishCrossover;
+    return buy ? 'BUY' : agSell ? 'SELL' : 'HOLD';
+  }
+
+  // ── Macro bear gate (normal mode only) ───────────────────────────────────
   // Price is below EMA100 → macro downtrend → block ALL new buys
   if (!macroUptrend) {
     return sell ? 'SELL' : 'HOLD';
   }
 
-  // ── Aggressive mode ───────────────────────────────────────────────────────
-  if (aggressive) {
-    // Requires local uptrend + volume confirmation (was: RSI < 65 blindly)
-    const buy     = rsi < 55 && uptrend && volumeIncreasing;
-    const agSell  = rsi > 72 || bearishCrossover;
-    return buy ? 'BUY' : agSell ? 'SELL' : 'HOLD';
-  }
-
   // ── Normal mode ───────────────────────────────────────────────────────────
-  // In a confirmed local uptrend, buy dips up to RSI 48 (more frequent)
-  // In a local pullback within the macro bull, require deeper oversold (RSI 40)
+  // Confirmed local uptrend: buy dips up to RSI 48
+  // Local pullback in macro bull: require deeper oversold RSI 40
   const rsiThreshold = uptrend ? 48 : 40;
   const buy = rsi < rsiThreshold && uptrend && !bearishCrossover;
 
