@@ -38,7 +38,8 @@ export async function getCandles(symbol, interval = '5m', limit = 100) {
         params: { symbol: toSymbol(symbol), interval, limit },
         timeout: 10000,
       });
-      const klines = data?.data?.klines || [];
+      // BingX v2 returns data.data as the array directly (not data.data.klines)
+      const klines = Array.isArray(data?.data) ? data.data : (data?.data?.klines || []);
       return klines.map(c => ({
         open:   parseFloat(c[1]),
         high:   parseFloat(c[2]),
@@ -102,7 +103,7 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
   });
 
   try {
-    const { data } = await axios.post(`${BASE}/openApi/spot/v1/trade/order`, null, {
+    const { data } = await axios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
       params, headers: headers(apiKey), timeout: 15000,
     });
     const r     = data?.data || {};
@@ -127,7 +128,7 @@ export async function placeMarketSell(apiKey, apiSecret, symbol, qty) {
   });
 
   try {
-    const { data } = await axios.post(`${BASE}/openApi/spot/v1/trade/order`, null, {
+    const { data } = await axios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
       params, headers: headers(apiKey), timeout: 15000,
     });
     const r           = data?.data || {};
