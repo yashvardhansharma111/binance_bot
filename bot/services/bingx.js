@@ -1,7 +1,14 @@
 import axios from 'axios';
+import https from 'https';
 import { createHmac } from 'crypto';
 
 const BASES = ['https://open-api.bingx.com', 'https://open-api.bingx.pro'];
+
+// BingX uses intermediate CAs not always in outdated server CA bundles.
+// Disable strict SSL only for BingX calls — all other outbound traffic unaffected.
+const bingxAxios = axios.create({
+  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+});
 
 // BingX uses "BTC-USDT" format; Binance uses "BTCUSDT"
 function toSymbol(s) {
@@ -34,7 +41,7 @@ function orderError(e) {
 export async function getCandles(symbol, interval = '5m', limit = 100) {
   for (const base of BASES) {
     try {
-      const { data } = await axios.get(`${base}/openApi/spot/v2/market/kline`, {
+      const { data } = await bingxAxios.get(`${base}/openApi/spot/v2/market/kline`, {
         params: { symbol: toSymbol(symbol), interval, limit },
         timeout: 10000,
       });
@@ -56,7 +63,7 @@ export async function getCandles(symbol, interval = '5m', limit = 100) {
 export async function getCurrentPrice(symbol) {
   for (const base of BASES) {
     try {
-      const { data } = await axios.get(`${base}/openApi/spot/v1/ticker/price`, {
+      const { data } = await bingxAxios.get(`${base}/openApi/spot/v1/ticker/price`, {
         params: { symbol: toSymbol(symbol) },
         timeout: 5000,
       });
@@ -73,7 +80,7 @@ export async function getUSDTBalance(apiKey, apiSecret) {
   if (process.env.DRY_RUN === 'true') return 10000;
   for (const base of BASES) {
     try {
-      const { data } = await axios.get(`${base}/openApi/spot/v1/account/balance`, {
+      const { data } = await bingxAxios.get(`${base}/openApi/spot/v1/account/balance`, {
         params:  buildSigned(apiSecret),
         headers: headers(apiKey),
         timeout: 12000,
@@ -103,7 +110,7 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
   });
 
   try {
-    const { data } = await axios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
+    const { data } = await bingxAxios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
       params, headers: headers(apiKey), timeout: 15000,
     });
     if (data.code !== 0) throw new Error(data.msg || `BingX order error ${data.code}`);
@@ -130,7 +137,7 @@ export async function placeMarketSell(apiKey, apiSecret, symbol, qty) {
   });
 
   try {
-    const { data } = await axios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
+    const { data } = await bingxAxios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
       params, headers: headers(apiKey), timeout: 15000,
     });
     if (data.code !== 0) throw new Error(data.msg || `BingX order error ${data.code}`);

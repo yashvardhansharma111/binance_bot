@@ -3,6 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { createHmac } from 'crypto';
 import axios from 'axios';
+import https from 'https';
+
+const bingxAxios = axios.create({
+  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+});
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import ApiKey from '@/lib/models/ApiKey';
@@ -60,7 +65,7 @@ const BINGX_BASE = 'https://open-api.bingx.com';
 async function fetchBingXBalance(apiKey, apiSecret) {
   // Step 1: Test public connectivity (no auth) — fast 5s check
   try {
-    await axios.get(`${BINGX_BASE}/openApi/spot/v1/ticker/price`, {
+    await bingxAxios.get(`${BINGX_BASE}/openApi/spot/v1/ticker/price`, {
       params:  { symbol: 'BTC-USDT' },
       timeout: 5000,
     });
@@ -75,7 +80,7 @@ async function fetchBingXBalance(apiKey, apiSecret) {
   const sig = hmac(apiSecret, qs);
 
   try {
-    const { data } = await axios.get(`${BINGX_BASE}/openApi/spot/v1/account/balance`, {
+    const { data } = await bingxAxios.get(`${BINGX_BASE}/openApi/spot/v1/account/balance`, {
       params:  { ...p, signature: sig },
       headers: { 'X-BX-APIKEY': apiKey },
       timeout: 10000,
