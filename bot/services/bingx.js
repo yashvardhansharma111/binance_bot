@@ -95,6 +95,15 @@ export async function getUSDTBalance(apiKey, apiSecret) {
   return 0;
 }
 
+// BingX POST orders: params must go in the request BODY as form-encoded,
+// NOT in the URL query string. Signature covers the sorted body string.
+function buildOrderBody(apiSecret, params) {
+  const p  = { ...params, timestamp: Date.now() };
+  const qs = Object.keys(p).sort().map(k => `${k}=${p[k]}`).join('&');
+  const sig = createHmac('sha256', apiSecret).update(qs).digest('hex');
+  return `${qs}&signature=${sig}`;
+}
+
 export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
   if (process.env.DRY_RUN === 'true') {
     const price = await getCurrentPrice(symbol);
@@ -102,7 +111,7 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
     return { orderId: `DRY_${Date.now()}`, price, qty, total: usdtAmount };
   }
 
-  const params = buildSigned(apiSecret, {
+  const body = buildOrderBody(apiSecret, {
     symbol:        toSymbol(symbol),
     side:          'BUY',
     type:          'MARKET',
@@ -110,8 +119,9 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
   });
 
   try {
-    const { data } = await bingxAxios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
-      params, headers: headers(apiKey), timeout: 15000,
+    const { data } = await bingxAxios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, body, {
+      headers: { ...headers(apiKey), 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 15000,
     });
     if (data.code !== 0) throw new Error(data.msg || `BingX order error ${data.code}`);
     const r     = data?.data || {};
@@ -129,7 +139,7 @@ export async function placeMarketSell(apiKey, apiSecret, symbol, qty) {
     return { orderId: `DRY_${Date.now()}`, price, qty, total: qty * price };
   }
 
-  const params = buildSigned(apiSecret, {
+  const body = buildOrderBody(apiSecret, {
     symbol:   toSymbol(symbol),
     side:     'SELL',
     type:     'MARKET',
@@ -137,8 +147,9 @@ export async function placeMarketSell(apiKey, apiSecret, symbol, qty) {
   });
 
   try {
-    const { data } = await bingxAxios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
-      params, headers: headers(apiKey), timeout: 15000,
+    const { data } = await bingxAxios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, body, {
+      headers: { ...headers(apiKey), 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 15000,
     });
     if (data.code !== 0) throw new Error(data.msg || `BingX order error ${data.code}`);
     const r           = data?.data || {};
