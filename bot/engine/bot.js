@@ -84,6 +84,17 @@ export async function runBotForUser(user) {
     const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY', source: { $ne: 'manual' } });
 
     for (const openTrade of openTrades) {
+      // Ghost trade guard — order was never filled (qty=0 or price=0)
+      // Auto-close in DB so it stops appearing in Active Trades
+      if (!openTrade.qty || !openTrade.price) {
+        await Trade.findByIdAndUpdate(openTrade._id, {
+          status: 'closed', closedAt: new Date(), profit: 0,
+          reason: 'Ghost trade — order was not filled on exchange (qty/price=0)',
+        });
+        await log(userId, 'warn', `[${openTrade.symbol}] Ghost trade auto-closed (qty=${openTrade.qty} price=${openTrade.price})`);
+        continue;
+      }
+
       // Repair missing SL/TP on old trades
       if (!openTrade.stopLoss || !openTrade.takeProfit) {
         const { stopLossPercent, takeProfitPercent } = symCfg(settings, openTrade.symbol);

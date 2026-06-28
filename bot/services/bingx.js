@@ -106,10 +106,12 @@ export async function placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount) {
     const { data } = await axios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
       params, headers: headers(apiKey), timeout: 15000,
     });
+    if (data.code !== 0) throw new Error(data.msg || `BingX order error ${data.code}`);
     const r     = data?.data || {};
     const qty   = parseFloat(r.executedQty   || 0);
     const total = parseFloat(r.cummulativeQuoteQty || usdtAmount);
     const price = qty > 0 ? total / qty : await getCurrentPrice(symbol);
+    if (!price || !qty) throw new Error(`BingX order returned empty fill — qty:${qty} price:${price}`);
     return { orderId: String(r.orderId || Date.now()), price, qty, total };
   } catch (e) { throw orderError(e); }
 }
@@ -131,6 +133,7 @@ export async function placeMarketSell(apiKey, apiSecret, symbol, qty) {
     const { data } = await axios.post(`${BASES[0]}/openApi/spot/v1/trade/order`, null, {
       params, headers: headers(apiKey), timeout: 15000,
     });
+    if (data.code !== 0) throw new Error(data.msg || `BingX order error ${data.code}`);
     const r           = data?.data || {};
     const executedQty = parseFloat(r.executedQty || qty);
     const total       = parseFloat(r.cummulativeQuoteQty || 0);
