@@ -5,7 +5,7 @@ import ChatBot from '@/components/ChatBot';
 
 export default function DashboardLayout({ children }) {
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg)' }}>
       <SessionGuard />
 
       {/* Desktop: left sidebar */}

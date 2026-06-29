@@ -66,7 +66,7 @@ export function DesktopSidebar() {
 
   return (
     <aside
-      className="hidden lg:flex w-64 min-h-screen flex-col shrink-0"
+      className="hidden lg:flex w-64 h-full flex-col shrink-0 overflow-y-auto"
       style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
     >
       {/* Logo */}
