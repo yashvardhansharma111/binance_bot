@@ -197,6 +197,8 @@ export async function runBotForUser(user) {
     const maxConcurrent = settings.maxConcurrentTrades ?? 1;
 
     for (const sym of tradingSymbols) {
+      // Per-symbol try/catch — one bad symbol never kills other symbols
+      try {
       const openOnSym = openTrades.filter(t => t.symbol === sym);
 
       // At concurrent limit for this symbol — check SELL signal to close
@@ -294,6 +296,10 @@ export async function runBotForUser(user) {
       const tradeSettings = { ...settings.toObject(), symbol: sym, ...sc };
       const amount = Math.min(sc.tradeUSDT, usdtBalance * 0.99);
       await openPosition(userId, apiKey, apiSecret, tradeSettings, amount, indicators, sentiment, isTestnet, exchangeName);
+
+      } catch (symErr) {
+        await log(userId, 'error', `[${sym}] Symbol error — skipping: ${symErr.message}`);
+      }
     }
 
   } catch (err) {
