@@ -203,7 +203,11 @@ export async function runBotForUser(user) {
 
       // At concurrent limit for this symbol — check SELL signal to close
       if (openOnSym.length >= maxConcurrent) {
-        const candles    = await getCandles(sym, timeframe, 120);
+        const candles = await getCandles(sym, timeframe, 120);
+        if (candles.length < 100) {
+          await log(userId, 'warn', `[${sym}] Only ${candles.length} candles returned — symbol may not be listed on ${exchangeName.toUpperCase()} or is restricted in this region. Remove it from Settings to stop this warning.`);
+          continue;
+        }
         const indicators = calculateIndicators(candles);
         const signal     = detectSignal(indicators);
         if (signal === 'SELL') {
@@ -256,6 +260,10 @@ export async function runBotForUser(user) {
       // Fetch candles + indicators for this symbol
       const currentPrice = await getCurrentPrice(sym);
       const candles      = await getCandles(sym, timeframe, 120);
+      if (candles.length < 100) {
+        await log(userId, 'warn', `[${sym}] Only ${candles.length} candles returned — symbol may not be listed on ${exchangeName.toUpperCase()} or is restricted in this region. Remove it from Settings to stop this warning.`);
+        continue;
+      }
       const indicators   = calculateIndicators(candles);
 
       await log(userId, 'info',
@@ -298,7 +306,8 @@ export async function runBotForUser(user) {
       await openPosition(userId, apiKey, apiSecret, tradeSettings, amount, indicators, sentiment, isTestnet, exchangeName);
 
       } catch (symErr) {
-        await log(userId, 'error', `[${sym}] Symbol error — skipping: ${symErr.message}`);
+        const level = symErr.message.includes('candles') ? 'warn' : 'error';
+        await log(userId, level, `[${sym}] Symbol error — skipping: ${symErr.message}`);
       }
     }
 

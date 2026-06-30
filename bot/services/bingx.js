@@ -45,6 +45,11 @@ export async function getCandles(symbol, interval = '5m', limit = 100) {
         params: { symbol: toSymbol(symbol), interval, limit },
         timeout: 10000,
       });
+      if (data?.code !== 0) {
+        // Symbol not available on BingX — return empty so bot's candle guard handles it
+        console.warn(`[BingX] getCandles ${symbol}: code=${data?.code} msg=${data?.msg}`);
+        return [];
+      }
       // BingX v2 returns data.data as the array directly (not data.data.klines)
       const klines = Array.isArray(data?.data) ? data.data : (data?.data?.klines || []);
       return klines.map(c => ({
