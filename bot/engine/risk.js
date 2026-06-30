@@ -35,8 +35,8 @@ export function calcRiskLevels(entryPrice, slPct, tpPct) {
   };
 }
 
-export function checkExitConditions(trade, currentPrice) {
-  if (trade.stopLoss && currentPrice <= trade.stopLoss)
+export function checkExitConditions(trade, currentPrice, useStopLoss = true) {
+  if (useStopLoss && trade.stopLoss && currentPrice <= trade.stopLoss)
     return `Stop-loss hit @ $${currentPrice}`;
   if (trade.takeProfit && currentPrice >= trade.takeProfit)
     return `Take-profit hit @ $${currentPrice}`;

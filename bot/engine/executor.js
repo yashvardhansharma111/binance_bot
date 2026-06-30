@@ -67,13 +67,15 @@ async function applyCommission(userId, tradeId, profit) {
 }
 
 export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmount, indicators, sentiment, isTestnet = false, exchange = 'binance') {
-  const { symbol, stopLossPercent, takeProfitPercent } = settings;
+  const { symbol, stopLossPercent, takeProfitPercent, useStopLoss } = settings;
   const svc = getExchange(exchange);
 
   await log(userId, 'info', `BUY $${usdtAmount.toFixed(2)} of ${symbol} | RSI:${indicators.rsi} | sentiment:${sentiment?.sentiment} | exchange:${exchange}`);
 
   const order = await svc.placeMarketBuy(apiKey, apiSecret, symbol, usdtAmount, isTestnet);
-  const { stopLoss, takeProfit } = calcRiskLevels(order.price, stopLossPercent, takeProfitPercent);
+  const { stopLoss: sl, takeProfit } = calcRiskLevels(order.price, stopLossPercent, takeProfitPercent);
+  // Respect useStopLoss setting — null means bot will only exit on TP or signal
+  const stopLoss = useStopLoss === false ? null : sl;
 
   await Trade.create({
     userId, symbol, side: 'BUY',
@@ -84,7 +86,7 @@ export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmou
   });
 
   await recordTrade(userId);
-  await log(userId, 'info', `✅ BUY @ $${order.price} | SL:$${stopLoss} TP:$${takeProfit}`);
+  await log(userId, 'info', `✅ BUY @ $${order.price} | SL:${stopLoss ? '$' + stopLoss : 'OFF'} TP:$${takeProfit}`);
 
   const user = await User.findById(userId);
   sendTradeEmail(user.email, user.name, 'BUY', {

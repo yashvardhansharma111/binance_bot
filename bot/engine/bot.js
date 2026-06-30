@@ -136,7 +136,8 @@ export async function runBotForUser(user) {
           continue;
         }
       } else {
-        const exitReason = checkExitConditions(openTrade, tradePrice);
+        // Pass useStopLoss so existing trades with SL set aren't auto-exited when user disabled SL
+        const exitReason = checkExitConditions(openTrade, tradePrice, settings.useStopLoss !== false);
         if (exitReason) {
           await closePosition(userId, apiKey, apiSecret, openTrade, exitReason, isTestnet, exchangeName);
           continue;

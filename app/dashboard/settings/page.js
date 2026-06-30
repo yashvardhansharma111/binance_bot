@@ -305,11 +305,27 @@ export default function SettingsPage() {
           </div>
         </Row>
 
-        <Row label="Stop Loss" hint={form.trailingStopPercent > 0 ? "Disabled — Trailing Stop is active" : "Auto-sell if price drops this much"}>
-          <div className="flex items-center gap-2" style={{ opacity: form.trailingStopPercent > 0 ? 0.4 : 1 }}>
-            <TrendingDown size={14} className="text-red-500" />
-            <NumberInput value={form.stopLossPercent} onChange={v => set('stopLossPercent', v)}
-              min={0.1} max={50} step={0.1} suffix="% below entry" />
+        <Row label="Stop Loss" hint={form.trailingStopPercent > 0 ? "Disabled — Trailing Stop is active" : form.useStopLoss === false ? "OFF — bot only exits on Take Profit or signal" : "Auto-sell if price drops this much"}>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => set('useStopLoss', form.useStopLoss === false ? true : false)}
+                className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0"
+                style={{ background: form.useStopLoss !== false ? '#2563eb' : '#e2e8f0' }}>
+                <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                  style={{ transform: form.useStopLoss !== false ? 'translateX(1.375rem)' : 'translateX(0.25rem)' }} />
+              </button>
+              <span className="text-sm font-semibold" style={{ color: form.useStopLoss !== false ? '#2563eb' : '#94a3b8' }}>
+                {form.useStopLoss !== false ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+            {form.useStopLoss !== false && (
+              <div className="flex items-center gap-2" style={{ opacity: form.trailingStopPercent > 0 ? 0.4 : 1 }}>
+                <TrendingDown size={14} className="text-red-500" />
+                <NumberInput value={form.stopLossPercent} onChange={v => set('stopLossPercent', v)}
+                  min={0.1} max={50} step={0.1} suffix="% below entry" />
+              </div>
+            )}
           </div>
         </Row>
 
