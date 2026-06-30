@@ -106,27 +106,50 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   try {
     order = await svc.placeMarketSell(apiKey, apiSecret, symbol, qty, isTestnet);
   } catch (e) {
-    // -2010: position already closed on exchange (SL/TP triggered before bot could sell).
-    // Estimate P&L from current market price so history shows a real number, not $0.
-    const isPhantom   = e.message.includes('-2010') || e.message.includes('insufficient balance');
-    const isTooSmall  = e.message.includes('-1013') || e.message.includes('notional too small');
-    if (isPhantom || isTooSmall) {
+    const isPhantom  = e.message.includes('-2010') || e.message.includes('insufficient balance');
+    const isTooSmall = e.message.includes('-1013') || e.message.includes('notional too small');
+
+    // -2010 "insufficient balance" is ambiguous: it may mean the position was already
+    // closed on exchange, OR that Binance deducted trading fees from the purchased coins
+    // so actual balance < stored qty. Try once more with qty trimmed by 0.2% before
+    // giving up and treating as phantom.
+    if (isPhantom) {
+      const trimmedQty = parseFloat((qty * 0.998).toFixed(8));
+      await log(userId, 'warn',
+        `[${symbol}] Sell qty=${qty} got -2010; retrying with trimmed qty=${trimmedQty} (fee adjustment)`);
+      try {
+        order = await svc.placeMarketSell(apiKey, apiSecret, symbol, trimmedQty, isTestnet);
+        // retry succeeded — fall through to normal settlement below
+      } catch (e2) {
+        // Both attempts failed — position was genuinely already closed on exchange
+        const { getCurrentPrice } = svc;
+        const exitPrice     = await getCurrentPrice(symbol).catch(() => entry);
+        const phantomProfit = parseFloat(((exitPrice - entry) * qty).toFixed(6));
+        await Trade.findByIdAndUpdate(openTrade._id, {
+          status: 'closed', closedAt: new Date(), profit: phantomProfit,
+          reason: `${openTrade.reason || ''} | EXIT:${reason} (SL/TP closed on exchange)`,
+        });
+        await log(userId, 'warn',
+          `Position ${symbol} confirmed closed on exchange — estimated P&L: $${phantomProfit}`);
+        return;
+      }
+    } else if (isTooSmall) {
       const { getCurrentPrice } = svc;
       const exitPrice     = await getCurrentPrice(symbol).catch(() => entry);
       const phantomProfit = parseFloat(((exitPrice - entry) * qty).toFixed(6));
-      const closeReason   = isTooSmall
-        ? `${openTrade.reason || ''} | EXIT:${reason} (notional too small to sell — position written off)`
-        : `${openTrade.reason || ''} | EXIT:${reason} (SL/TP closed on exchange)`;
       await Trade.findByIdAndUpdate(openTrade._id, {
-        status: 'closed', closedAt: new Date(), profit: phantomProfit, reason: closeReason,
+        status: 'closed', closedAt: new Date(), profit: phantomProfit,
+        reason: `${openTrade.reason || ''} | EXIT:${reason} (notional too small to sell — position written off)`,
       });
-      await log(userId, 'warn', `Position ${symbol} closed (${isTooSmall ? 'notional too small' : 'already on exchange'}) — estimated P&L: $${phantomProfit}`);
+      await log(userId, 'warn',
+        `Position ${symbol} written off — notional too small to sell — estimated P&L: $${phantomProfit}`);
       return;
+    } else {
+      throw e;
     }
-    throw e;
   }
 
-  const profit = parseFloat(((order.price - entry) * qty).toFixed(6));
+  const profit = parseFloat(((order.price - entry) * order.qty).toFixed(6));
 
   const closedTrade = await Trade.findByIdAndUpdate(openTrade._id, {
     status: 'closed', closedAt: new Date(), profit,
