@@ -177,15 +177,6 @@ export async function runBotForUser(user) {
         } catch { /* sentiment failure is non-fatal */ }
       }
 
-      if (holdMins >= 240) {
-        const pnl = ((tradePrice - openTrade.price) / openTrade.price * 100).toFixed(2);
-        await closePosition(
-          userId, apiKey, apiSecret, openTrade,
-          `Force exit after ${Math.floor(holdMins)}m | P&L: ${pnl}%`,
-          isTestnet, exchangeName
-        );
-        continue;
-      }
 
       await log(userId, 'info',
         `Holding ${openTrade.symbol} @ $${openTrade.price} for ${holdMins.toFixed(0)}m | Now: $${tradePrice} | SL:$${openTrade.stopLoss} TP:$${openTrade.takeProfit}`
