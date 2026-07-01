@@ -106,7 +106,7 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   try {
     order = await svc.placeMarketSell(apiKey, apiSecret, symbol, qty, isTestnet);
   } catch (e) {
-    const isPhantom  = e.message.includes('-2010') || e.message.includes('insufficient balance');
+    const isPhantom  = e.message.includes('-2010') || e.message.includes('insufficient balance') || e.message.includes('balance not enough');
     const isTooSmall = e.message.includes('-1013') || e.message.includes('notional too small');
 
     // -2010 "insufficient balance" is ambiguous: it may mean the position was already

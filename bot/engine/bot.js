@@ -95,10 +95,12 @@ export async function runBotForUser(user) {
         continue;
       }
 
-      // Repair missing SL/TP on old trades
-      if (!openTrade.stopLoss || !openTrade.takeProfit) {
+      // Repair missing SL/TP on old trades — only set SL if useStopLoss is on
+      if (!openTrade.takeProfit || (!openTrade.stopLoss && settings.useStopLoss !== false)) {
         const { stopLossPercent, takeProfitPercent } = symCfg(settings, openTrade.symbol);
-        const sl = parseFloat((openTrade.price * (1 - stopLossPercent / 100)).toFixed(6));
+        const sl = settings.useStopLoss !== false
+          ? parseFloat((openTrade.price * (1 - stopLossPercent / 100)).toFixed(6))
+          : null;
         const tp = parseFloat((openTrade.price * (1 + takeProfitPercent / 100)).toFixed(6));
         await Trade.findByIdAndUpdate(openTrade._id, { stopLoss: sl, takeProfit: tp });
         openTrade.stopLoss   = sl;
@@ -106,6 +108,13 @@ export async function runBotForUser(user) {
       }
 
       const tradePrice = await getCurrentPrice(openTrade.symbol);
+
+      // Guard: price fetch returned 0 — network/parse failure on exchange.
+      // Never use $0 for exit decisions; it would false-trigger every stop loss.
+      if (!tradePrice || tradePrice <= 0) {
+        await log(userId, 'warn', `[${openTrade.symbol}] Price fetch returned $0 — skipping exit checks this tick`);
+        continue;
+      }
 
       // Trailing stop takes priority over fixed SL when enabled
       const trailPct = symCfg(settings, openTrade.symbol).trailingStopPercent;

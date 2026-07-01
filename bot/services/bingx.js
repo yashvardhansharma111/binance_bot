@@ -72,7 +72,9 @@ export async function getCurrentPrice(symbol) {
         params: { symbol: toSymbol(symbol) },
         timeout: 5000,
       });
-      return parseFloat(data?.data?.price || 0);
+      const price = parseFloat(data?.data?.price);
+      if (!price || price <= 0) throw new Error(`BingX returned invalid price for ${symbol}: ${data?.data?.price}`);
+      return price;
     } catch (e) {
       if (base === BASES[BASES.length - 1]) throw e;
     }
