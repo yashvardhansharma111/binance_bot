@@ -3,6 +3,9 @@
     "allow": [
       "Bash(Get-Content \"d:\\\\binance_bot\\\\app\\\\dashboard\\\\page.js\")",
       "Bash(xargs grep *)"
+    ],
+    "additionalDirectories": [
+      "d:\\binance_bot\\.next"
     ]
   }
 }

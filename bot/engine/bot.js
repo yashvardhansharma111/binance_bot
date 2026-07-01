@@ -165,9 +165,14 @@ export async function runBotForUser(user) {
             `[${openTrade.symbol}] Exit-sentiment: ${sSent.sentiment} (${sSent.confidence}%) — ${sSent.reason}`
           );
           if (shouldSellOnSentiment(sSent)) {
-            await closePosition(userId, apiKey, apiSecret, openTrade,
-              `Bearish sentiment: ${sSent.reason} (${sSent.confidence}%)`, isTestnet, exchangeName);
-            continue;
+            // When SL is off, don't exit on sentiment if trade is at a loss
+            if (settings.useStopLoss === false && tradePrice < openTrade.price) {
+              await log(userId, 'info', `[${openTrade.symbol}] Bearish sentiment exit skipped — SL is OFF and trade is at a loss`);
+            } else {
+              await closePosition(userId, apiKey, apiSecret, openTrade,
+                `Bearish sentiment: ${sSent.reason} (${sSent.confidence}%)`, isTestnet, exchangeName);
+              continue;
+            }
           }
         } catch { /* sentiment failure is non-fatal */ }
       }
@@ -218,12 +223,19 @@ export async function runBotForUser(user) {
           continue;
         }
         const indicators = calculateIndicators(candles);
-        const signal     = detectSignal(indicators);
+        const signal     = detectSignal(indicators, aggressiveMode);
         if (signal === 'SELL') {
           for (const t of openOnSym) {
             const heldMins = (Date.now() - new Date(t.createdAt).getTime()) / 60000;
             if (heldMins < 15) {
               await log(userId, 'info', `[${sym}] SELL signal ignored — held only ${heldMins.toFixed(0)}m (min 15m required)`);
+              continue;
+            }
+            // When SL is off, only exit on SELL signal if trade is in profit.
+            // Closing at a loss defeats the purpose of disabling SL.
+            const nowPrice = await getCurrentPrice(sym).catch(() => 0);
+            if (settings.useStopLoss === false && nowPrice > 0 && nowPrice < t.price) {
+              await log(userId, 'info', `[${sym}] SELL signal ignored — SL is OFF and trade is at a loss (now:$${nowPrice} < entry:$${t.price})`);
               continue;
             }
             await closePosition(userId, apiKey, apiSecret, t, `SELL signal — RSI:${indicators.rsi}`, isTestnet, exchangeName);
