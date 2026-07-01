@@ -133,9 +133,13 @@ export async function runBotForUser(user) {
         );
 
         if (tradePrice <= trailPrice) {
-          await closePosition(userId, apiKey, apiSecret, openTrade,
-            `Trailing stop hit — peak $${newHigh} → dropped ${trailPct}% → stop $${trailPrice}`, isTestnet, exchangeName);
-          continue;
+          if (settings.useStopLoss === false && tradePrice < openTrade.price) {
+            await log(userId, 'info', `[Trailing] ${openTrade.symbol} trail hit but SL is OFF and trade is at a loss — holding`);
+          } else {
+            await closePosition(userId, apiKey, apiSecret, openTrade,
+              `Trailing stop hit — peak $${newHigh} → dropped ${trailPct}% → stop $${trailPrice}`, isTestnet, exchangeName);
+            continue;
+          }
         }
 
         // Still check TP even in trailing mode
