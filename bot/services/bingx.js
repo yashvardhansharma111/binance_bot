@@ -72,13 +72,26 @@ export async function getCurrentPrice(symbol) {
         params: { symbol: toSymbol(symbol) },
         timeout: 5000,
       });
-      const price = parseFloat(data?.data?.price);
-      if (!price || price <= 0) throw new Error(`BingX returned invalid price for ${symbol}: ${data?.data?.price}`);
-      return price;
-    } catch (e) {
-      if (base === BASES[BASES.length - 1]) throw e;
-    }
+      // BingX returns data.data as object OR array depending on version/symbol
+      const priceData = Array.isArray(data?.data) ? data.data[0] : data?.data;
+      const price = parseFloat(priceData?.price);
+      if (price > 0) return price;
+      // fallthrough to kline fallback
+    } catch { /* try next */ }
+
+    // Fallback: last 1m kline close price
+    try {
+      const { data } = await bingxAxios.get(`${base}/openApi/spot/v2/market/kline`, {
+        params: { symbol: toSymbol(symbol), interval: '1m', limit: 1 },
+        timeout: 5000,
+      });
+      if (data?.code === 0 && Array.isArray(data?.data) && data.data.length > 0) {
+        const price = parseFloat(data.data[0][4]); // index 4 = close
+        if (price > 0) return price;
+      }
+    } catch { /* try next base */ }
   }
+  throw new Error(`Cannot fetch price for ${symbol} on BingX — ticker and kline both failed`);
 }
 
 // ── Authenticated ─────────────────────────────────────────────────────────────
