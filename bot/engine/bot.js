@@ -266,9 +266,20 @@ export async function runBotForUser(user) {
           const lastLossAt     = new Date(lastSells[0].closedAt || lastSells[0].createdAt);
           const hoursSinceLoss = (Date.now() - lastLossAt.getTime()) / 3_600_000;
           if (hoursSinceLoss < 6) {
-            await log(userId, 'warn',
-              `[${sym}] BLOCKED — 2 consecutive losses, cooling down for ${(6 - hoursSinceLoss).toFixed(1)}h more`);
-            continue;
+            // If user manually exited a trade in profit AFTER the last bot loss,
+            // treat it as a streak reset and allow re-entry
+            const manualProfit = await Trade.findOne({
+              userId, symbol: sym, status: 'closed',
+              reason: 'Manual exit', profit: { $gt: 0 },
+              closedAt: { $gte: lastLossAt },
+            });
+            if (manualProfit) {
+              await log(userId, 'info', `[${sym}] Loss streak reset by profitable manual exit — allowing re-entry`);
+            } else {
+              await log(userId, 'warn',
+                `[${sym}] BLOCKED — 2 consecutive losses, cooling down for ${(6 - hoursSinceLoss).toFixed(1)}h more`);
+              continue;
+            }
           }
         }
       }

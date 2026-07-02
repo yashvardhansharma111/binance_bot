@@ -96,8 +96,7 @@ export async function getCurrentPrice(symbol) {
 
 // ── Authenticated ─────────────────────────────────────────────────────────────
 
-export async function getUSDTBalance(apiKey, apiSecret) {
-  if (process.env.DRY_RUN === 'true') return 10000;
+async function fetchBingXBalances(apiKey, apiSecret) {
   for (const base of BASES) {
     try {
       const { data } = await bingxAxios.get(`${base}/openApi/spot/v1/account/balance`, {
@@ -105,14 +104,31 @@ export async function getUSDTBalance(apiKey, apiSecret) {
         headers: headers(apiKey),
         timeout: 12000,
       });
-      const list = data?.data?.balance?.balances || data?.data?.balances || [];
-      const usdt = list.find(b => b.asset === 'USDT');
-      return parseFloat(usdt?.free || 0);
+      return data?.data?.balance?.balances || data?.data?.balances || [];
     } catch (e) {
       if (base === BASES[BASES.length - 1]) throw e;
     }
   }
-  return 0;
+  return [];
+}
+
+export async function getUSDTBalance(apiKey, apiSecret) {
+  if (process.env.DRY_RUN === 'true') return 10000;
+  const list = await fetchBingXBalances(apiKey, apiSecret);
+  const usdt = list.find(b => b.asset === 'USDT');
+  return parseFloat(usdt?.free || 0);
+}
+
+export async function getAssetBalance(apiKey, apiSecret, symbol) {
+  if (process.env.DRY_RUN === 'true') return 0;
+  const asset = symbol.replace(/USDT$|BTC$|ETH$/, '');
+  try {
+    const list = await fetchBingXBalances(apiKey, apiSecret);
+    const b = list.find(b => b.asset === asset);
+    return parseFloat(b?.free || 0);
+  } catch {
+    return 0;
+  }
 }
 
 // BingX POST orders: params must go in the request BODY as form-encoded,

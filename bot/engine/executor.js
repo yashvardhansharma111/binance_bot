@@ -114,23 +114,37 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
     // so actual balance < stored qty. Try once more with qty trimmed by 0.2% before
     // giving up and treating as phantom.
     if (isPhantom) {
-      const trimmedQty = parseFloat((qty * 0.998).toFixed(8));
+      // Check actual coin balance on exchange — if > 0 coins are still there (fee deduction issue),
+      // sell the real balance. If 0, the position was already closed by SL/TP on exchange.
+      const actualBalance = await svc.getAssetBalance(apiKey, apiSecret, symbol, isTestnet).catch(() => 0);
       await log(userId, 'warn',
-        `[${symbol}] Sell qty=${qty} got -2010; retrying with trimmed qty=${trimmedQty} (fee adjustment)`);
-      try {
-        order = await svc.placeMarketSell(apiKey, apiSecret, symbol, trimmedQty, isTestnet);
-        // retry succeeded — fall through to normal settlement below
-      } catch (e2) {
-        // Both attempts failed — position was genuinely already closed on exchange
-        const { getCurrentPrice } = svc;
-        const exitPrice     = await getCurrentPrice(symbol).catch(() => entry);
+        `[${symbol}] Sell qty=${qty} got insufficient balance. Actual exchange balance: ${actualBalance}`);
+
+      if (actualBalance > 0) {
+        // Coins still on exchange — sell the real amount
+        try {
+          order = await svc.placeMarketSell(apiKey, apiSecret, symbol, actualBalance, isTestnet);
+          // fall through to normal settlement below
+        } catch (e2) {
+          await log(userId, 'error',
+            `[${symbol}] Sell failed even with actual balance ${actualBalance}: ${e2.message} — manual intervention required`);
+          await Trade.findByIdAndUpdate(openTrade._id, {
+            status: 'closed', closedAt: new Date(),
+            profit: 0,
+            reason: `${openTrade.reason || ''} | EXIT:${reason} (sell failed — coins may remain on exchange, sell manually)`,
+          });
+          return;
+        }
+      } else {
+        // Balance = 0 — position was genuinely already closed on exchange (SL/TP hit)
+        const exitPrice     = await svc.getCurrentPrice(symbol).catch(() => entry);
         const phantomProfit = parseFloat(((exitPrice - entry) * qty).toFixed(6));
         await Trade.findByIdAndUpdate(openTrade._id, {
           status: 'closed', closedAt: new Date(), profit: phantomProfit,
           reason: `${openTrade.reason || ''} | EXIT:${reason} (SL/TP closed on exchange)`,
         });
         await log(userId, 'warn',
-          `Position ${symbol} confirmed closed on exchange — estimated P&L: $${phantomProfit}`);
+          `Position ${symbol} confirmed closed on exchange (balance=0) — estimated P&L: $${phantomProfit}`);
         return;
       }
     } else if (isTooSmall) {

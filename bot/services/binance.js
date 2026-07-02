@@ -53,23 +53,39 @@ function client(apiKey, apiSecret, isTestnet = TESTNET) {
 
 // ── Balance ───────────────────────────────────────────────────────────────────
 
+async function fetchAccountBalances(apiKey, apiSecret, isTestnet) {
+  const base   = isTestnet ? TESTNET_API : BASE;
+  const params = { timestamp: Date.now(), recvWindow: 60000 };
+  const qs     = new URLSearchParams(params).toString();
+  const sig    = createHmac('sha256', apiSecret).update(qs).digest('hex');
+  const { data } = await axios.get(`${base}/api/v3/account?${qs}&signature=${sig}`, {
+    headers: { 'X-MBX-APIKEY': apiKey },
+    timeout: 10000,
+  });
+  return data.balances || [];
+}
+
 export async function getUSDTBalance(apiKey, apiSecret, isTestnet = TESTNET) {
   if (process.env.DRY_RUN === 'true') return 10000;
-  const base = isTestnet ? TESTNET_API : BASE;
-  const url  = signedOrderUrl(base, apiSecret, { timestamp: undefined }); // reuse signer
-  // Build manually to avoid node-binance-api (hangs with no timeout)
-  const params = { timestamp: Date.now(), recvWindow: 60000 };
-  const qs  = new URLSearchParams(params).toString();
-  const sig = createHmac('sha256', apiSecret).update(qs).digest('hex');
   try {
-    const { data } = await axios.get(`${base}/api/v3/account?${qs}&signature=${sig}`, {
-      headers: { 'X-MBX-APIKEY': apiKey },
-      timeout: 10000,
-    });
-    const usdt = data.balances?.find(b => b.asset === 'USDT');
+    const balances = await fetchAccountBalances(apiKey, apiSecret, isTestnet);
+    const usdt = balances.find(b => b.asset === 'USDT');
     return parseFloat(usdt?.free || 0);
   } catch (e) {
     throw orderError(e);
+  }
+}
+
+// Returns the free balance of the base asset for a trading symbol (e.g. SOL for SOLUSDT)
+export async function getAssetBalance(apiKey, apiSecret, symbol, isTestnet = TESTNET) {
+  if (process.env.DRY_RUN === 'true') return 0;
+  const asset = symbol.replace(/USDT$|BTC$|ETH$|BNB$/, '');
+  try {
+    const balances = await fetchAccountBalances(apiKey, apiSecret, isTestnet);
+    const b = balances.find(b => b.asset === asset);
+    return parseFloat(b?.free || 0);
+  } catch {
+    return 0;
   }
 }
 

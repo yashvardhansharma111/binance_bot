@@ -72,13 +72,36 @@ export async function POST(req) {
   let order, profit;
   try {
     order  = await placeMarketSell(apiKey, apiSecret, trade.symbol, trade.qty, isTestnet);
-    profit = parseFloat(((order.price - trade.price) * trade.qty).toFixed(6));
+    profit = parseFloat(((order.price - trade.price) * order.qty).toFixed(6));
   } catch (e) {
-    // -2010: position already closed on exchange (SL/TP triggered) — estimate P&L from SL/TP price
-    if (e.message.includes('-2010') || e.message.includes('insufficient balance') || e.message.includes('Insufficient') || e.message.includes('-1013') || e.message.includes('notional too small')) {
-      const exitPrice = trade.takeProfit && trade.stopLoss
-        ? (trade.price > trade.stopLoss ? trade.takeProfit : trade.stopLoss)
-        : (trade.stopLoss || trade.takeProfit || trade.price);
+    const isInsufficient = e.message.includes('-2010') || e.message.includes('insufficient balance')
+      || e.message.includes('Insufficient') || e.message.includes('balance not enough');
+    const isTooSmall     = e.message.includes('-1013') || e.message.includes('notional too small');
+
+    if (isInsufficient) {
+      // Check actual coin balance on exchange before treating as phantom
+      const { getAssetBalance } = getExchange(exchange);
+      const actualBalance = await getAssetBalance(apiKey, apiSecret, trade.symbol, isTestnet).catch(() => 0);
+
+      if (actualBalance > 0) {
+        // Coins still on exchange — sell the real amount
+        const { placeMarketSell: sellFn } = getExchange(exchange);
+        try {
+          order  = await sellFn(apiKey, apiSecret, trade.symbol, actualBalance, isTestnet);
+          profit = parseFloat(((order.price - trade.price) * order.qty).toFixed(6));
+        } catch (e2) {
+          return NextResponse.json({ error: `Sell failed (balance=${actualBalance}): ${e2.message} — please sell manually on exchange` }, { status: 500 });
+        }
+      } else {
+        // Balance = 0 — position already closed on exchange by SL/TP
+        const exitPrice = trade.takeProfit && trade.stopLoss
+          ? (trade.price > trade.stopLoss ? trade.takeProfit : trade.stopLoss)
+          : (trade.stopLoss || trade.takeProfit || trade.price);
+        profit = parseFloat(((exitPrice - trade.price) * trade.qty).toFixed(6));
+        order  = { price: exitPrice };
+      }
+    } else if (isTooSmall) {
+      const exitPrice = trade.stopLoss || trade.takeProfit || trade.price;
       profit = parseFloat(((exitPrice - trade.price) * trade.qty).toFixed(6));
       order  = { price: exitPrice };
     } else {
