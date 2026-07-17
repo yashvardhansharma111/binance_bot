@@ -49,11 +49,19 @@ export async function GET(req) {
 export async function PATCH(req) {
   const admin = await adminGuard();
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { userId, status, role, grantDays, canViewOverview } = await req.json();
+  const { userId, status, role, grantDays, canViewOverview, assetBalance } = await req.json();
+  if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+
   const update = {};
   if (status) update.status = status;
   if (role)   update.role   = role;
   if (canViewOverview !== undefined) update.canViewOverview = canViewOverview;
+  if (assetBalance !== undefined && assetBalance !== null && assetBalance !== '') {
+    const bal = Number(assetBalance);
+    if (!Number.isFinite(bal) || bal < 0)
+      return NextResponse.json({ error: 'assetBalance must be a non-negative number' }, { status: 400 });
+    update.assetBalance = Math.round(bal * 100) / 100;
+  }
   if (grantDays) {
     const now  = new Date();
     const user = await User.findById(userId).select('subscriptionExpiry');
@@ -62,7 +70,11 @@ export async function PATCH(req) {
       : now;
     update.subscriptionExpiry = new Date(base.getTime() + Number(grantDays) * 86_400_000);
   }
+  if (Object.keys(update).length === 0)
+    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+
   const user = await User.findByIdAndUpdate(userId, { $set: update }, { new: true }).select('-password');
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   return NextResponse.json(user);
 }
 

@@ -38,6 +38,9 @@ export default function AdminPage() {
   const [grantingId, setGrantingId] = useState(null);
   const [grantDays, setGrantDays] = useState('30');
   const [grantLoading, setGrantLoading] = useState(false);
+  const [balanceEditId, setBalanceEditId] = useState(null);
+  const [balanceValue, setBalanceValue] = useState('');
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -289,6 +292,25 @@ export default function AdminPage() {
     load();
   }
 
+  async function updateBalance(userId) {
+    const bal = Number(balanceValue);
+    if (!Number.isFinite(bal) || bal < 0) return;
+    setBalanceLoading(true);
+    const res = await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, assetBalance: bal }),
+    });
+    const updated = await res.json();
+    setBalanceLoading(false);
+    if (!res.ok) return;
+    setBalanceEditId(null);
+    setBalanceValue('');
+    setUsers(prev => prev.map(u => u._id === userId
+      ? { ...u, assetBalance: updated.assetBalance }
+      : u));
+  }
+
   async function saveConfig(key, label) {
     setSaving(key);
     await fetch('/api/admin/config', {
@@ -462,7 +484,44 @@ export default function AdminPage() {
                         <span>{u.referralCount || 0} referred</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-700 font-mono text-xs font-semibold">${(u.assetBalance || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3">
+                      {balanceEditId === u._id ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-400">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={balanceValue}
+                            onChange={e => setBalanceValue(e.target.value)}
+                            className="w-20 px-1.5 py-1 text-xs border border-slate-300 rounded-lg font-mono"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => updateBalance(u._id)}
+                            disabled={balanceLoading}
+                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 whitespace-nowrap">
+                            {balanceLoading ? '…' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => { setBalanceEditId(null); setBalanceValue(''); }}
+                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200">
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setBalanceEditId(u._id);
+                            setBalanceValue(String(u.assetBalance ?? 0));
+                            setGrantingId(null);
+                          }}
+                          title="Edit asset balance"
+                          className="text-slate-700 font-mono text-xs font-semibold hover:text-emerald-600 hover:underline decoration-dotted underline-offset-2 transition-colors">
+                          ${(u.assetBalance || 0).toFixed(2)}
+                        </button>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         u.botActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -520,7 +579,7 @@ export default function AdminPage() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => { setGrantingId(u._id); setGrantDays('30'); }}
+                            onClick={() => { setGrantingId(u._id); setGrantDays('30'); setBalanceEditId(null); }}
                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 whitespace-nowrap">
                             <Star size={11} /> Grant Sub
                           </button>
