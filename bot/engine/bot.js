@@ -286,7 +286,21 @@ export async function runBotForUser(user) {
 
       // Fetch candles + indicators for this symbol
       const currentPrice = await getCurrentPrice(sym);
-      const candles      = await getCandles(sym, timeframe, 120);
+
+      // Guard: if positions already open on this symbol, only add another if price
+      // has dropped at least minEntryGapPct% below the lowest existing entry (DCA on dips only)
+      if (openOnSym.length > 0) {
+        const minGapPct   = settings.minEntryGapPct ?? 1.5;
+        const lowestEntry = Math.min(...openOnSym.map(t => t.price));
+        const dropPct     = ((lowestEntry - currentPrice) / lowestEntry) * 100;
+        if (dropPct < minGapPct) {
+          await log(userId, 'info',
+            `[${sym}] SKIPPED — price $${currentPrice} only ${dropPct.toFixed(2)}% below lowest open entry $${lowestEntry} (need ${minGapPct}% drop to add)`);
+          continue;
+        }
+      }
+
+      const candles = await getCandles(sym, timeframe, 120);
       if (candles.length < 100) {
         await log(userId, 'warn', `[${sym}] Only ${candles.length} candles returned — symbol may not be listed on ${exchangeName.toUpperCase()} or is restricted in this region. Remove it from Settings to stop this warning.`);
         continue;
