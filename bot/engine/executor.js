@@ -5,11 +5,9 @@ import User from '../../lib/models/User.js';
 import Commission from '../../lib/models/Commission.js';
 import BotLog from '../../lib/models/BotLog.js';
 import { sendTradeEmail } from '../../lib/mail.js';
+import { getReferralChain, TRADE_PLATFORM_RATE, TRADE_MLM_RATES } from '../../lib/mlm.js';
 
-const TOTAL_COMMISSION_RATE = 15;  // 15% of profit
-const REFERRER_RATE         = 10;  // referrer gets 10%
-const PLATFORM_RATE_WITH    = 5;   // platform gets 5% when referrer exists
-const PLATFORM_RATE_WITHOUT = 15;  // platform gets 15% when no referrer
+const TOTAL_COMMISSION_RATE = 15; // 15% of profit — never changes
 
 async function log(userId, level, message, data = null) {
   console.log(`[Bot:${String(userId).slice(-4)}] [${level.toUpperCase()}] ${message}`);
@@ -17,53 +15,45 @@ async function log(userId, level, message, data = null) {
 }
 
 async function applyCommission(userId, tradeId, profit) {
-  if (profit <= 0) return; // only on profitable trades
+  if (profit <= 0) return;
 
-  const user = await User.findById(userId);
-  if (!user) return;
+  const totalCut     = parseFloat((profit * TOTAL_COMMISSION_RATE / 100).toFixed(8));
+  const platformCut  = parseFloat((profit * TRADE_PLATFORM_RATE  / 100).toFixed(8));
 
-  const totalCut = parseFloat((profit * TOTAL_COMMISSION_RATE / 100).toFixed(8));
+  // Deduct total commission from trader's balance first
+  await User.findByIdAndUpdate(userId, { $inc: { assetBalance: -totalCut } });
 
-  let referrerId     = null;
-  let referrerAmount = 0;
-  let platformAmount = totalCut;
-  let platformRate   = PLATFORM_RATE_WITHOUT;
-  let referrerRate   = 0;
+  // Walk up referral chain (up to 3 levels) and credit each referrer their MLM share
+  const chain = await getReferralChain(userId, TRADE_MLM_RATES.length);
+  let totalReferrerPaid = 0;
 
-  if (user.referredBy) {
-    const referrer = await User.findOne({ referralCode: user.referredBy });
-    if (referrer) {
-      referrerId     = referrer._id;
-      referrerAmount = parseFloat((profit * REFERRER_RATE / 100).toFixed(8));
-      platformAmount = parseFloat((profit * PLATFORM_RATE_WITH / 100).toFixed(8));
-      platformRate   = PLATFORM_RATE_WITH;
-      referrerRate   = REFERRER_RATE;
+  for (let i = 0; i < chain.length; i++) {
+    const referrer     = chain[i];
+    const rate         = TRADE_MLM_RATES[i];           // 6, 3, or 1
+    const amount       = parseFloat((profit * rate / 100).toFixed(8));
+    const level        = i + 1;
 
-      // Credit referrer's asset balance
-      await User.findByIdAndUpdate(referrer._id, {
-        $inc: { assetBalance: referrerAmount },
-      });
-    }
+    await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: amount } });
+
+    await Commission.create({
+      tradeId,
+      userId,
+      referrerId:     referrer._id,
+      level,
+      profit,
+      platformRate:   TRADE_PLATFORM_RATE,
+      referrerRate:   rate,
+      platformAmount: platformCut,
+      referrerAmount: amount,
+      totalAmount:    totalCut,
+    });
+
+    totalReferrerPaid += amount;
+    console.log(`[Commission] L${level} referrer ${referrer._id} credited $${amount.toFixed(4)} (${rate}%)`);
   }
 
-  // Deduct total commission from user's asset balance
-  await User.findByIdAndUpdate(userId, {
-    $inc: { assetBalance: -totalCut },
-  });
-
-  await Commission.create({
-    tradeId,
-    userId,
-    referrerId,
-    profit,
-    platformRate,
-    referrerRate,
-    platformAmount,
-    referrerAmount,
-    totalAmount: totalCut,
-  });
-
-  console.log(`[Commission] ${TOTAL_COMMISSION_RATE}% of $${profit.toFixed(4)} = $${totalCut.toFixed(4)} | platform:$${platformAmount.toFixed(4)} referrer:$${referrerAmount.toFixed(4)}`);
+  // If no referrers at all, full 15% goes to platform (no Commission record needed)
+  console.log(`[Commission] 15% of $${profit.toFixed(4)} = $${totalCut.toFixed(4)} | platform:$${platformCut.toFixed(4)} referrers(MLM):$${totalReferrerPaid.toFixed(4)}`);
 }
 
 export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmount, indicators, sentiment, isTestnet = false, exchange = 'binance') {

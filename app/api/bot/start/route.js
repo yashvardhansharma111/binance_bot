@@ -14,5 +14,12 @@ export async function POST() {
   const key  = await ApiKey.findOne({ userId: user._id, isActive: true });
   if (!key) return NextResponse.json({ error: 'Connect your Binance API key first' }, { status: 400 });
   await User.findByIdAndUpdate(user._id, { botActive: true });
+
+  // Push notification — fire and forget
+  try {
+    const { sendPush } = await import('@/lib/fcm.js');
+    await sendPush(user._id, '🤖 Bot Started', 'Your trading bot is now active and scanning markets');
+  } catch {}
+
   return NextResponse.json({ message: 'Bot started', botActive: true });
 }

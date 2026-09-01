@@ -115,5 +115,11 @@ export async function POST(req) {
 
   await applyCommission(user, closedTrade._id, profit);
 
+  try {
+    const { sendPush } = await import('@/lib/fcm.js');
+    const pnlStr = profit >= 0 ? `+$${profit.toFixed(2)}` : `-$${Math.abs(profit).toFixed(2)}`;
+    await sendPush(user._id, profit >= 0 ? '✅ Trade Closed — Profit' : '🔴 Trade Closed — Loss', `${trade.symbol}: ${pnlStr}`);
+  } catch {}
+
   return NextResponse.json({ order, profit });
 }

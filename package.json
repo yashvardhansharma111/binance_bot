@@ -4,18 +4,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev":   "concurrently -n next,bot -c cyan,yellow --kill-others-on-fail \"next dev\" \"node --env-file=.env.local bot/server.js\"",
+    "dev": "concurrently -n next,bot -c cyan,yellow --kill-others-on-fail \"next dev\" \"node --env-file=.env.local bot/server.js\"",
     "build": "next build",
     "start": "concurrently -n next,bot -c cyan,yellow --kill-others-on-fail \"next start\" \"node --env-file=.env.local bot/server.js\"",
-    "lint":  "eslint",
-    "seed":  "node --env-file=.env.local scripts/seed.js",
-    "bot":   "node --env-file=.env.local bot/server.js"
+    "lint": "eslint",
+    "seed": "node --env-file=.env.local scripts/seed.js",
+    "bot": "node --env-file=.env.local bot/server.js"
   },
   "dependencies": {
     "axios": "^1.7.7",
     "bcryptjs": "^3.0.3",
     "concurrently": "^9.2.1",
     "dotenv": "^16.4.5",
+    "firebase-admin": "^14.3.0",
     "lightweight-charts": "^5.2.0",
     "lucide-react": "^1.14.0",
     "mongoose": "^9.6.1",

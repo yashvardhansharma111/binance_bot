@@ -15,12 +15,27 @@ export async function GET() {
     'referralCode assetBalance'
   );
 
-  const referrals = await User.find({ referredBy: user.referralCode })
-    .select('name email createdAt botActive status subscriptionExpiry');
+  // L1 referrals (direct)
+  const l1Referrals = await User.find({ referredBy: user.referralCode })
+    .select('name email createdAt botActive status subscriptionExpiry referralCode');
+
+  // L2 referrals (referred by any L1)
+  const l1Codes = l1Referrals.map(u => u.referralCode).filter(Boolean);
+  const l2Referrals = l1Codes.length
+    ? await User.find({ referredBy: { $in: l1Codes } })
+        .select('name email createdAt botActive status subscriptionExpiry referralCode')
+    : [];
+
+  // L3 referrals (referred by any L2)
+  const l2Codes = l2Referrals.map(u => u.referralCode).filter(Boolean);
+  const l3Referrals = l2Codes.length
+    ? await User.find({ referredBy: { $in: l2Codes } })
+        .select('name email createdAt botActive status subscriptionExpiry')
+    : [];
 
   const tradeComms = await Commission.find({ referrerId: user._id })
     .sort({ createdAt: -1 })
-    .limit(30);
+    .limit(40);
 
   const subComms = await SubscriptionCommission.find({ referrerId: user._id })
     .sort({ createdAt: -1 })
@@ -30,16 +45,18 @@ export async function GET() {
     ...tradeComms.map(c => ({
       _id:       c._id,
       type:      'trade',
+      level:     c.level ?? 1,
       amount:    c.referrerAmount,
       createdAt: c.createdAt,
     })),
     ...subComms.map(c => ({
       _id:       c._id,
       type:      'subscription',
+      level:     c.level ?? 1,
       amount:    c.referrerAmount,
       createdAt: c.createdAt,
     })),
-  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 40);
+  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 60);
 
   const sumField = async (Model) => {
     const [agg] = await Model.aggregate([
@@ -55,7 +72,11 @@ export async function GET() {
 
   return NextResponse.json({
     referralCode: user.referralCode,
-    referrals,
+    referrals: {
+      l1: l1Referrals,
+      l2: l2Referrals,
+      l3: l3Referrals,
+    },
     commissions,
     totalEarned,
   });

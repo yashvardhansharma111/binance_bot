@@ -5,6 +5,7 @@ import Payment from '@/lib/models/Payment';
 import Subscription from '@/lib/models/Subscription';
 import User from '@/lib/models/User';
 import SubscriptionCommission from '@/lib/models/SubscriptionCommission';
+import { getReferralChain, SUB_MLM_RATES } from '@/lib/mlm';
 
 export async function POST(req) {
   const rawBody = await req.text();
@@ -69,32 +70,32 @@ export async function POST(req) {
         }
       }
 
-      // Credit 20% of subscription price to referrer's assetBalance
-      const SUB_REFERRER_RATE = 0.20;
-      const buyer = await User.findById(sub.userId).select('referredBy');
-      if (buyer?.referredBy) {
-        const referrer = await User.findOne({ referralCode: buyer.referredBy }).select('_id');
-        if (referrer) {
-          const planAmount  = sub.amount || 1;
-          const referrerCut = parseFloat((planAmount * SUB_REFERRER_RATE).toFixed(4));
-          await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: referrerCut } });
+      // Credit MLM subscription commissions up to 3 levels
+      const planAmount = sub.amount || 1;
+      const chain = await getReferralChain(sub.userId, SUB_MLM_RATES.length);
+      for (let i = 0; i < chain.length; i++) {
+        const referrer = chain[i];
+        const rate     = SUB_MLM_RATES[i];                              // 0.12, 0.05, 0.03
+        const amount   = parseFloat((planAmount * rate).toFixed(4));
+        const level    = i + 1;
 
-          // Record the commission so it appears in referral totals / history.
-          // unique index on subscriptionId makes this idempotent across webhook retries.
-          await SubscriptionCommission.updateOne(
-            { subscriptionId: sub._id },
-            { $setOnInsert: {
-                subscriptionId: sub._id,
-                userId:         sub.userId,
-                referrerId:     referrer._id,
-                planAmount,
-                referrerRate:   SUB_REFERRER_RATE,
-                referrerAmount: referrerCut,
-            } },
-            { upsert: true },
-          );
-          console.log(`[webhook] Sub referral: referrer ${referrer._id} credited $${referrerCut} to assetBalance`);
-        }
+        await User.findByIdAndUpdate(referrer._id, { $inc: { assetBalance: amount } });
+
+        // Idempotent: unique index on { subscriptionId, level } prevents double-credit on webhook retries
+        await SubscriptionCommission.updateOne(
+          { subscriptionId: sub._id, level },
+          { $setOnInsert: {
+              subscriptionId: sub._id,
+              userId:         sub.userId,
+              referrerId:     referrer._id,
+              level,
+              planAmount,
+              referrerRate:   rate,
+              referrerAmount: amount,
+          } },
+          { upsert: true },
+        );
+        console.log(`[webhook] Sub MLM L${level}: referrer ${referrer._id} credited $${amount} (${(rate * 100).toFixed(0)}% of $${planAmount})`);
       }
     } else {
       await sub.save();
