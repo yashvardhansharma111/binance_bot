@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   Users, Copy, CheckCircle, DollarSign, UserCheck,
   RefreshCw, Link2, ArrowUpRight, Wallet, Clock,
-  CheckCircle2, XCircle, AlertCircle, Send,
+  CheckCircle2, XCircle, AlertCircle, Send, ChevronRight,
 } from 'lucide-react';
 
 const CURRENCIES = ['USDT TRC20', 'USDT BEP20'];
@@ -14,6 +14,114 @@ const STATUS_STYLE = {
   paid:     { label: 'Paid',     color: '#16a34a', bg: '#f0fdf4', icon: CheckCircle2 },
   rejected: { label: 'Rejected', color: '#dc2626', bg: '#fef2f2', icon: XCircle },
 };
+
+const LEVEL_COLOR = { 1: '#2DD4BF', 2: '#818cf8', 3: '#f59e0b' };
+
+function UserNode({ user, level }) {
+  const color = LEVEL_COLOR[level];
+  const hasSub = user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date();
+  return (
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg"
+      style={{ background: 'var(--surface-2)' }}>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
+          style={{ background: `${color}22`, color }}>
+          L{level}
+        </span>
+        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+          style={{ background: color }}>
+          {user.name?.[0]?.toUpperCase() || '?'}
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-1)' }}>{user.name}</div>
+          <div className="text-xs" style={{ color: 'var(--text-3)' }}>
+            {new Date(user.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        {hasSub && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+            style={{ background: 'rgba(37,99,235,0.12)', color: '#2563eb' }}>
+            Sub
+          </span>
+        )}
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+          style={{
+            background: user.botActive ? 'rgba(34,197,94,0.12)' : 'var(--surface)',
+            color:      user.botActive ? '#16a34a'              : 'var(--text-3)',
+          }}>
+          {user.botActive ? 'Trading' : 'Idle'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ReferralTree({ l1, l2, l3 }) {
+  const l2ByParent = {};
+  for (const u of l2) {
+    if (!l2ByParent[u.referredBy]) l2ByParent[u.referredBy] = [];
+    l2ByParent[u.referredBy].push(u);
+  }
+  const l3ByParent = {};
+  for (const u of l3) {
+    if (!l3ByParent[u.referredBy]) l3ByParent[u.referredBy] = [];
+    l3ByParent[u.referredBy].push(u);
+  }
+
+  if (!l1.length) return (
+    <div className="text-center py-10" style={{ color: 'var(--text-3)' }}>
+      <Users size={28} className="mx-auto mb-2 opacity-30" />
+      <p className="text-sm">No referrals yet. Share your link!</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-1">
+      {l1.map(u1 => {
+        const children2 = l2ByParent[u1.referralCode] || [];
+        return (
+          <div key={u1._id}>
+            <UserNode user={u1} level={1} />
+            {children2.map((u2, i2) => {
+              const children3 = l3ByParent[u2.referralCode] || [];
+              const isLastL2  = i2 === children2.length - 1;
+              return (
+                <div key={u2._id} className="flex">
+                  {/* vertical + horizontal connector */}
+                  <div className="flex flex-col items-center" style={{ width: 24, minWidth: 24 }}>
+                    <div style={{ width: 1, height: 10, background: 'var(--border)' }} />
+                    <div style={{ width: 12, height: 1, background: 'var(--border)', alignSelf: 'flex-end' }} />
+                    {!isLastL2 && <div style={{ flex: 1, width: 1, background: 'var(--border)' }} />}
+                  </div>
+                  <div className="flex-1 min-w-0 mb-0.5">
+                    <UserNode user={u2} level={2} />
+                    {children3.map((u3, i3) => {
+                      const isLastL3 = i3 === children3.length - 1;
+                      return (
+                        <div key={u3._id} className="flex">
+                          <div className="flex flex-col items-center" style={{ width: 24, minWidth: 24 }}>
+                            <div style={{ width: 1, height: 10, background: 'var(--border)' }} />
+                            <div style={{ width: 12, height: 1, background: 'var(--border)', alignSelf: 'flex-end' }} />
+                            {!isLastL3 && <div style={{ flex: 1, width: 1, background: 'var(--border)' }} />}
+                          </div>
+                          <div className="flex-1 min-w-0 mb-0.5">
+                            <UserNode user={u3} level={3} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function ReferralPage() {
   const [data,          setData]          = useState(null);
@@ -80,6 +188,12 @@ export default function ReferralPage() {
     }
   }
 
+  const l1 = data?.referrals?.l1 || [];
+  const l2 = data?.referrals?.l2 || [];
+  const l3 = data?.referrals?.l3 || [];
+  const totalNetwork  = l1.length + l2.length + l3.length;
+  const activeBots    = [...l1, ...l2, ...l3].filter(r => r.botActive).length;
+
   const referralLink = typeof window !== 'undefined'
     ? `${window.location.origin}/register?ref=${data?.referralCode}`
     : '';
@@ -99,7 +213,7 @@ export default function ReferralPage() {
         </p>
       </div>
 
-      {/* Single asset balance card */}
+      {/* Asset balance card */}
       <div className="card glow-border p-5 flex items-center justify-between gap-3 mb-6"
         style={{ background: assetBalance > 0 ? 'var(--accent-dim)' : 'var(--surface)' }}>
         <div className="flex items-center gap-3">
@@ -142,9 +256,9 @@ export default function ReferralPage() {
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { label: 'Total Earned', value: `$${(data?.totalEarned || 0).toFixed(2)}`, sub: 'All time', icon: DollarSign, accent: true },
-              { label: 'Total Referrals', value: data?.referrals?.length || 0, sub: 'Users you referred', icon: Users },
-              { label: 'Active Bots', value: data?.referrals?.filter(r => r.botActive).length || 0, sub: 'Trading right now', icon: UserCheck },
+              { label: 'Total Earned',  value: `$${(data?.totalEarned || 0).toFixed(2)}`, sub: 'All time',            icon: DollarSign, accent: true },
+              { label: 'Direct (L1)',   value: l1.length,                                  sub: `+${l2.length} L2, +${l3.length} L3 network`, icon: Users },
+              { label: 'Active Bots',   value: activeBots,                                  sub: `Across ${totalNetwork} referrals`, icon: UserCheck },
             ].map(({ label, value, sub, icon: Icon, accent }) => (
               <div key={label} className="card p-5 glow-border">
                 <div className="flex items-center gap-3 mb-2">
@@ -197,7 +311,7 @@ export default function ReferralPage() {
             <div className="grid sm:grid-cols-2 gap-3">
               {[
                 { pct: '20%', label: 'of subscription price', desc: 'When your referral buys the bot ($49 plan → you get $9.80)' },
-                { pct: '10%', label: 'of trade profit', desc: 'Every profitable trade your referral makes — you earn 10% of the 15% platform commission' },
+                { pct: '10%', label: 'of trade profit',       desc: 'Every profitable trade your referral makes — you earn 10% of the 15% platform commission' },
               ].map(({ pct, label, desc }) => (
                 <div key={label} className="rounded-xl p-4" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
                   <div className="text-2xl font-bold mb-1" style={{ color: 'var(--accent)' }}>{pct}</div>
@@ -208,52 +322,33 @@ export default function ReferralPage() {
             </div>
           </div>
 
+          {/* Level legend */}
+          <div className="flex items-center gap-4 px-1">
+            {[1,2,3].map(lv => (
+              <div key={lv} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-2)' }}>
+                <span className="font-bold px-1.5 py-0.5 rounded"
+                  style={{ background: `${LEVEL_COLOR[lv]}22`, color: LEVEL_COLOR[lv] }}>
+                  L{lv}
+                </span>
+                {lv === 1 ? 'Direct' : lv === 2 ? 'Their referrals' : 'Network depth 3'}
+              </div>
+            ))}
+            <span className="ml-auto text-xs" style={{ color: 'var(--text-3)' }}>
+              {totalNetwork} total in network
+            </span>
+          </div>
+
+          {/* Referral tree + commissions */}
           <div className="grid md:grid-cols-2 gap-5">
-            {/* Referrals list */}
             <div className="card p-5 glow-border">
-              <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-1)' }}>
-                Your Referrals ({data?.referrals?.length || 0})
+              <h2 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--text-1)' }}>
+                <Users size={14} style={{ color: 'var(--accent)' }} />
+                Referral Tree
+                <span className="ml-auto text-xs font-normal" style={{ color: 'var(--text-3)' }}>
+                  {l1.length} direct · {l2.length} L2 · {l3.length} L3
+                </span>
               </h2>
-              {!data?.referrals?.length ? (
-                <div className="text-center py-8" style={{ color: 'var(--text-3)' }}>
-                  <Users size={28} className="mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">No referrals yet. Share your link!</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {data.referrals.map(r => (
-                    <div key={r._id} className="flex items-center justify-between py-2 px-3 rounded-lg transition-colors"
-                      style={{ background: 'var(--surface-2)' }}>
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                          style={{ background: 'var(--accent)' }}>
-                          {r.name?.[0]?.toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{r.name}</div>
-                          <div className="text-xs" style={{ color: 'var(--text-3)' }}>{new Date(r.createdAt).toLocaleDateString()}</div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold"
-                          style={{
-                            background: r.subscriptionExpiry && new Date(r.subscriptionExpiry) > new Date() ? 'rgba(37,99,235,0.1)' : 'var(--surface)',
-                            color:      r.subscriptionExpiry && new Date(r.subscriptionExpiry) > new Date() ? '#2563eb' : 'var(--text-3)',
-                          }}>
-                          {r.subscriptionExpiry && new Date(r.subscriptionExpiry) > new Date() ? 'Subscribed' : 'No Sub'}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold"
-                          style={{
-                            background: r.botActive ? 'rgba(34,197,94,0.1)' : 'var(--surface)',
-                            color:      r.botActive ? '#16a34a' : 'var(--text-3)',
-                          }}>
-                          {r.botActive ? 'Trading' : 'Inactive'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ReferralTree l1={l1} l2={l2} l3={l3} />
             </div>
 
             {/* Commission history */}
@@ -269,8 +364,12 @@ export default function ReferralPage() {
                   {data.commissions.map(c => (
                     <div key={c._id} className="flex items-center justify-between py-2.5">
                       <div>
-                        <div className="text-xs font-semibold capitalize" style={{ color: 'var(--text-1)' }}>
+                        <div className="text-xs font-semibold capitalize flex items-center gap-1.5" style={{ color: 'var(--text-1)' }}>
                           {c.type} commission
+                          <span className="text-[10px] px-1 py-0.5 rounded font-bold"
+                            style={{ background: `${LEVEL_COLOR[c.level] || LEVEL_COLOR[1]}22`, color: LEVEL_COLOR[c.level] || LEVEL_COLOR[1] }}>
+                            L{c.level}
+                          </span>
                         </div>
                         <div className="text-xs" style={{ color: 'var(--text-3)' }}>
                           {new Date(c.createdAt).toLocaleDateString()}&nbsp;
@@ -298,23 +397,24 @@ export default function ReferralPage() {
               Admin processes within 24 hours. Minimum $5.
             </p>
 
-            {/* Balance info */}
             <div className="flex items-center justify-between px-3 py-2.5 rounded-xl mb-4"
               style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
               <span className="text-xs font-semibold" style={{ color: 'var(--text-2)' }}>Available Asset Balance</span>
               <span className="text-base font-bold" style={{ color: 'var(--accent)' }}>${assetBalance.toFixed(2)}</span>
             </div>
 
-            {(() => {
-              const activeBal = assetBalance;
-              return (
-            <>
             {wSuccess ? (
-              <div className="flex items-start gap-3 p-4 rounded-xl mb-4"
-                style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)' }}>
-                <CheckCircle2 size={18} style={{ color: '#16a34a' }} className="shrink-0 mt-0.5" />
-                <p className="text-sm" style={{ color: '#16a34a' }}>{wSuccess}</p>
-              </div>
+              <>
+                <div className="flex items-start gap-3 p-4 rounded-xl mb-4"
+                  style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)' }}>
+                  <CheckCircle2 size={18} style={{ color: '#16a34a' }} className="shrink-0 mt-0.5" />
+                  <p className="text-sm" style={{ color: '#16a34a' }}>{wSuccess}</p>
+                </div>
+                <button onClick={() => { setWSuccess(''); setTab('history'); }}
+                  className="btn-outline w-full mt-3 py-2.5 text-sm">
+                  View Withdrawal History
+                </button>
+              </>
             ) : (
               <form onSubmit={submitWithdrawal} className="space-y-4">
                 <div>
@@ -322,8 +422,8 @@ export default function ReferralPage() {
                   <input type="number" min="5" step="0.01" placeholder="e.g. 10.00"
                     value={wAmount} onChange={e => setWAmount(e.target.value)}
                     className="input" required />
-                  {wAmount && parseFloat(wAmount) > activeBal && (
-                    <p className="text-xs mt-1" style={{ color: '#dc2626' }}>Exceeds available balance (${activeBal.toFixed(2)})</p>
+                  {wAmount && parseFloat(wAmount) > assetBalance && (
+                    <p className="text-xs mt-1" style={{ color: '#dc2626' }}>Exceeds available balance (${assetBalance.toFixed(2)})</p>
                   )}
                 </div>
 
@@ -358,7 +458,7 @@ export default function ReferralPage() {
                   </div>
                 )}
 
-                <button type="submit" disabled={wLoading || !wAmount || parseFloat(wAmount) > activeBal}
+                <button type="submit" disabled={wLoading || !wAmount || parseFloat(wAmount) > assetBalance}
                   className="btn-primary w-full flex items-center justify-center gap-2 py-3 disabled:opacity-50">
                   {wLoading ? <RefreshCw size={15} className="animate-spin" /> : <Send size={15} />}
                   {wLoading ? 'Submitting...' : 'Submit Withdrawal Request'}
@@ -369,16 +469,6 @@ export default function ReferralPage() {
                 </p>
               </form>
             )}
-
-            {wSuccess && (
-              <button onClick={() => { setWSuccess(''); setTab('history'); }}
-                className="btn-outline w-full mt-3 py-2.5 text-sm">
-                View Withdrawal History
-              </button>
-            )}
-            </>
-              );
-            })()}
           </div>
         </div>
       )}
@@ -397,7 +487,7 @@ export default function ReferralPage() {
           ) : (
             <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
               {withdrawals.map(w => {
-                const s = STATUS_STYLE[w.status] || STATUS_STYLE.pending;
+                const s    = STATUS_STYLE[w.status] || STATUS_STYLE.pending;
                 const Icon = s.icon;
                 return (
                   <div key={w._id} className="px-5 py-4">
@@ -410,10 +500,8 @@ export default function ReferralPage() {
                         <div>
                           <div className="text-sm font-bold flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-1)' }}>
                             ${w.amount.toFixed(2)}
-                            <span className="font-normal text-xs" style={{ color: 'var(--text-2)' }}>{w.currency} {w.network && `· ${w.network}`}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
-                              style={{ background: '#eff6ff', color: '#2563eb' }}>
-                              Assets
+                            <span className="font-normal text-xs" style={{ color: 'var(--text-2)' }}>
+                              {w.currency} {w.network && `· ${w.network}`}
                             </span>
                           </div>
                           <div className="text-xs font-mono mt-0.5 truncate max-w-xs" style={{ color: 'var(--text-3)' }}>
