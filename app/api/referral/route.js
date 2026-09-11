@@ -23,14 +23,14 @@ export async function GET() {
   const l1Codes = l1Referrals.map(u => u.referralCode).filter(Boolean);
   const l2Referrals = l1Codes.length
     ? await User.find({ referredBy: { $in: l1Codes } })
-        .select('name email createdAt botActive status subscriptionExpiry referralCode')
+        .select('name email createdAt botActive status subscriptionExpiry referralCode referredBy')
     : [];
 
   // L3 referrals (referred by any L2)
   const l2Codes = l2Referrals.map(u => u.referralCode).filter(Boolean);
   const l3Referrals = l2Codes.length
     ? await User.find({ referredBy: { $in: l2Codes } })
-        .select('name email createdAt botActive status subscriptionExpiry')
+        .select('name email createdAt botActive status subscriptionExpiry referredBy')
     : [];
 
   const tradeComms = await Commission.find({ referrerId: user._id })
