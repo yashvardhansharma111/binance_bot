@@ -11,7 +11,7 @@ function generateOtp() {
 export async function POST(req) {
   try {
     const { email, purpose } = await req.json();
-    if (!email || !['signup', 'reset'].includes(purpose)) {
+    if (!email || !['signup', 'reset', 'delete'].includes(purpose)) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
@@ -22,7 +22,7 @@ export async function POST(req) {
       if (exists) return NextResponse.json({ error: 'Email already registered' }, { status: 400 });
     }
 
-    if (purpose === 'reset') {
+    if (purpose === 'reset' || purpose === 'delete') {
       const exists = await User.findOne({ email: email.toLowerCase() });
       if (!exists) return NextResponse.json({ error: 'No account found with this email' }, { status: 404 });
     }
