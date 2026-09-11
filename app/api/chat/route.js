@@ -75,7 +75,7 @@ export async function POST(req) {
     const { data } = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
-        model: 'llama-3.1-8b-instant',
+        model: 'qwen/qwen3.6-27b',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           ...messages.slice(-10),
