@@ -8,8 +8,41 @@ import {
 } from 'lucide-react';
 
 const CURRENCIES = [
-  { value: 'usdttrc20', label: 'USDT TRC20', symbol: 'USDT', network: 'Tron (TRC20)' },
-  { value: 'usdtbsc',   label: 'USDT BEP20', symbol: 'USDT', network: 'BNB Smart Chain (BEP20)' },
+  {
+    value:       'usdttrc20',
+    label:       'USDT TRC20',
+    network:     'Tron Network',
+    tag:         'TRC20',
+    fee:         'Fee ~$1',
+    accentColor: '#EF0027',
+    bgSelected:  '#fff1f2',
+    borderSel:   '#EF0027',
+    warning:     'Send only USDT on Tron (TRC20). Do NOT send TRX or any other coin — it will be lost.',
+    Logo: () => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="18" fill="#EF0027"/>
+        <polygon points="18,8 28,14 28,24 18,30 8,24 8,14" fill="none" stroke="white" strokeWidth="1.5"/>
+        <text x="18" y="23" textAnchor="middle" fill="white" fontSize="10" fontWeight="800" fontFamily="sans-serif">TRX</text>
+      </svg>
+    ),
+  },
+  {
+    value:       'usdtbsc',
+    label:       'USDT BEP20',
+    network:     'BNB Smart Chain',
+    tag:         'BEP20',
+    fee:         'Fee ~$0.8',
+    accentColor: '#F0B90B',
+    bgSelected:  '#fffbeb',
+    borderSel:   '#F0B90B',
+    warning:     'Send only USDT on BNB Smart Chain (BEP20). Do NOT send BNB or any other coin — it will be lost.',
+    Logo: () => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="18" fill="#F0B90B"/>
+        <text x="18" y="22" textAnchor="middle" fill="white" fontSize="9" fontWeight="800" fontFamily="sans-serif">BNB</text>
+      </svg>
+    ),
+  },
 ];
 
 const AMOUNTS = [10, 25, 50, 100, 250, 500];
@@ -97,7 +130,8 @@ export default function DepositPage() {
   const StatusIcon = meta?.icon;
   const isDone  = status === 'finished';
   const isFail  = ['failed','expired'].includes(status);
-  const currObj = CURRENCIES.find(c => c.value === currency) || CURRENCIES[0];
+  const currObj  = CURRENCIES.find(c => c.value === currency) || CURRENCIES[0];
+  const payObj   = payment ? (CURRENCIES.find(c => c.value === payment.payCurrency) || currObj) : null;
 
   return (
     <div className="max-w-2xl">
@@ -151,23 +185,59 @@ export default function DepositPage() {
 
           {/* Network */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-3">Network</label>
-            <div className="flex gap-3">
-              {CURRENCIES.map(c => (
-                <button key={c.value} onClick={() => setCurrency(c.value)}
-                  className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left transition-all"
-                  style={{
-                    background:  currency === c.value ? '#eff6ff' : '#f8fafc',
-                    borderColor: currency === c.value ? '#2563eb' : '#e2e8f0',
-                  }}>
-                  <div>
-                    <div className="text-sm font-bold text-slate-800">{c.label}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{c.network}</div>
-                  </div>
-                  {currency === c.value && <CheckCircle2 size={16} className="text-blue-500 shrink-0" />}
-                </button>
-              ))}
+            <label className="block text-sm font-semibold text-slate-700 mb-3">Select Network</label>
+            <div className="flex gap-3 mb-3">
+              {CURRENCIES.map(c => {
+                const selected = currency === c.value;
+                return (
+                  <button key={c.value} onClick={() => setCurrency(c.value)}
+                    className="flex-1 text-left rounded-xl border-2 p-3.5 transition-all"
+                    style={{
+                      background:  selected ? c.bgSelected : '#f8fafc',
+                      borderColor: selected ? c.borderSel  : '#e2e8f0',
+                    }}>
+                    <div className="flex items-start gap-3">
+                      <c.Logo />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-bold text-slate-800">{c.label}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={{ background: c.accentColor + '20', color: c.accentColor }}>
+                            {c.tag}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5">{c.network}</div>
+                        <div className="text-xs font-medium mt-1" style={{ color: c.accentColor }}>{c.fee}</div>
+                      </div>
+                      {selected && (
+                        <div className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
+                          style={{ background: c.accentColor }}>
+                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+
+            {/* Warning banner */}
+            {currObj && (
+              <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border"
+                style={{ background: '#fff7ed', borderColor: '#fed7aa' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 mt-0.5">
+                  <path d="M8 1.5L14.5 13H1.5L8 1.5Z" fill="#f97316" stroke="#ea580c" strokeWidth="0.5"/>
+                  <path d="M8 6v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="8" cy="11.5" r="0.75" fill="white"/>
+                </svg>
+                <div>
+                  <p className="text-xs font-bold text-orange-700 mb-0.5">Wrong coin = permanent loss</p>
+                  <p className="text-xs text-orange-600 leading-relaxed">{currObj.warning}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {error && (
@@ -222,10 +292,28 @@ export default function DepositPage() {
 
           {!isDone && (
             <div className="card glow-border p-6 space-y-5">
+
+              {/* Network badge */}
+              {payObj && (
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border"
+                  style={{ background: payObj.bgSelected, borderColor: payObj.borderSel + '80' }}>
+                  <payObj.Logo />
+                  <div>
+                    <div className="text-xs font-bold" style={{ color: payObj.accentColor }}>{payObj.label}</div>
+                    <div className="text-xs text-slate-500">{payObj.network} · {payObj.tag}</div>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Network</div>
+                    <div className="text-xs font-bold px-2 py-0.5 rounded-full mt-0.5"
+                      style={{ background: payObj.accentColor, color: '#fff' }}>{payObj.tag}</div>
+                  </div>
+                </div>
+              )}
+
               <div className="text-center">
                 <div className="text-xs text-slate-400 mb-1">Send exactly</div>
                 <div className="text-3xl font-bold text-slate-900">
-                  {payment.payAmount} <span className="text-blue-500">{payment.payCurrency?.toUpperCase()}</span>
+                  {payment.payAmount} <span style={{ color: payObj?.accentColor || '#2563eb' }}>{payment.payCurrency?.toUpperCase()}</span>
                 </div>
                 <div className="text-sm text-slate-400 mt-0.5">
                   ${finalAmt} deposit
@@ -264,8 +352,24 @@ export default function DepositPage() {
                 </div>
               </div>
 
+              {/* Critical warning on payment screen */}
+              <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border"
+                style={{ background: '#fef2f2', borderColor: '#fecaca' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 mt-0.5">
+                  <circle cx="8" cy="8" r="7" fill="#dc2626" stroke="#b91c1c" strokeWidth="0.5"/>
+                  <path d="M8 5v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="8" cy="11" r="0.75" fill="white"/>
+                </svg>
+                <div>
+                  <p className="text-xs font-bold text-red-700 mb-0.5">Send only USDT on {payObj?.tag || 'this network'}</p>
+                  <p className="text-xs text-red-600 leading-relaxed">
+                    {payObj?.warning || 'Sending any other coin or using the wrong network will result in permanent loss of funds.'}
+                  </p>
+                </div>
+              </div>
+
               <div className="text-xs text-slate-400 text-center">
-                Send the exact amount to the address above. Sending a different amount may delay crediting.
+                Send the exact amount shown above. A different amount may delay crediting.
               </div>
 
               {isFail && (
