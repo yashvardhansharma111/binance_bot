@@ -71,28 +71,39 @@ export async function POST(req) {
   if (!process.env.GROQ_API_KEY)
     return NextResponse.json({ reply: 'AI support is temporarily unavailable. Please raise a ticket for assistance.' });
 
+  const MODEL = 'qwen/qwen3.8-27b';
+  console.log('[Chat] Using model:', MODEL);
+  console.log('[Chat] GROQ_API_KEY present:', !!process.env.GROQ_API_KEY, '| key prefix:', process.env.GROQ_API_KEY?.slice(0, 8));
+  console.log('[Chat] Messages count:', messages.length);
+
   try {
+    const payload = {
+      model: MODEL,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...messages.slice(-10),
+      ],
+      temperature: 0.3,
+      max_tokens: 500,
+    };
+    console.log('[Chat] Sending to Groq — model:', payload.model, '| msgs:', payload.messages.length);
+
     const { data } = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'qwen/qwen3.8-27b',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...messages.slice(-10),
-        ],
-        temperature: 0.3,
-        max_tokens: 500,
-      },
+      payload,
       {
         headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
         timeout: 15000,
       }
     );
 
+    console.log('[Chat] Groq response OK — model used:', data.model, '| tokens:', data.usage?.total_tokens);
     const reply = data.choices[0].message.content.trim();
     return NextResponse.json({ reply });
   } catch (err) {
-    console.error('[Chat] Groq error:', err.message);
-    return NextResponse.json({ reply: 'Sorry, I\'m having trouble connecting. Please try again or raise a support ticket.' });
+    const status = err.response?.status;
+    const body   = JSON.stringify(err.response?.data);
+    console.error('[Chat] Groq error:', status, '|', err.message, '| body:', body);
+    return NextResponse.json({ reply: `Sorry, I'm having trouble connecting (${status || 'timeout'}). Please try again or raise a support ticket.` });
   }
 }
