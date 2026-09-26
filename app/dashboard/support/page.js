@@ -33,7 +33,7 @@ export default function SupportPage() {
     try {
       const res  = await fetch('/api/tickets');
       const data = await res.json();
-      setTickets(Array.isArray(data) ? data : []);
+      setTickets(Array.isArray(data.tickets) ? data.tickets : []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }
@@ -56,7 +56,7 @@ export default function SupportPage() {
       setForm({ subject: '', message: '', priority: 'medium' });
       setShowForm(false);
       await fetchTickets();
-      setExpanded(data._id);
+      setExpanded(data.ticket?._id);
     } catch { setError('Network error. Try again.'); }
     finally { setSubmitting(false); }
   }
