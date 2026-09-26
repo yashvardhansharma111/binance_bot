@@ -4,8 +4,41 @@ import QRCode from 'react-qr-code';
 import { Crown, CheckCircle2, Clock, XCircle, RefreshCw, Copy, Zap } from 'lucide-react';
 
 const CURRENCIES = [
-  { value: 'usdttrc20', label: 'USDT TRC20', sub: 'Tron (TRC20)' },
-  { value: 'usdtbsc',   label: 'USDT BEP20', sub: 'BNB Smart Chain' },
+  {
+    value:       'usdttrc20',
+    label:       'USDT TRC20',
+    network:     'Tron Network',
+    tag:         'TRC20',
+    fee:         'Fee ~$1',
+    accentColor: '#EF0027',
+    bgSelected:  '#fff1f2',
+    borderSel:   '#EF0027',
+    warning:     'Send only USDT on Tron (TRC20). Do NOT send TRX or any other coin — it will be lost.',
+    Logo: () => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="18" fill="#EF0027"/>
+        <polygon points="18,8 28,14 28,24 18,30 8,24 8,14" fill="none" stroke="white" strokeWidth="1.5"/>
+        <text x="18" y="23" textAnchor="middle" fill="white" fontSize="10" fontWeight="800" fontFamily="sans-serif">TRX</text>
+      </svg>
+    ),
+  },
+  {
+    value:       'usdtbsc',
+    label:       'USDT BEP20',
+    network:     'BNB Smart Chain',
+    tag:         'BEP20',
+    fee:         'Fee ~$0.8',
+    accentColor: '#F0B90B',
+    bgSelected:  '#fffbeb',
+    borderSel:   '#F0B90B',
+    warning:     'Send only USDT on BNB Smart Chain (BEP20). Do NOT send BNB or any other coin — it will be lost.',
+    Logo: () => (
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+        <circle cx="18" cy="18" r="18" fill="#F0B90B"/>
+        <text x="18" y="22" textAnchor="middle" fill="white" fontSize="9" fontWeight="800" fontFamily="sans-serif">BNB</text>
+      </svg>
+    ),
+  },
 ];
 
 const STATUS_META = {
@@ -150,23 +183,59 @@ export default function SubscribePage() {
         /* Currency select + pay button */
         <div className="card glow-border p-5 space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Network</label>
-            <div className="flex gap-3">
-              {CURRENCIES.map(c => (
-                <button key={c.value} onClick={() => setCurrency(c.value)}
-                  className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left transition-all"
-                  style={{
-                    background:  currency === c.value ? '#eff6ff' : '#f8fafc',
-                    borderColor: currency === c.value ? '#2563eb' : '#e2e8f0',
-                  }}>
-                  <div>
-                    <div className="text-sm font-bold text-slate-800">{c.label}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{c.sub}</div>
-                  </div>
-                  {currency === c.value && <CheckCircle2 size={15} className="text-blue-500 shrink-0" />}
-                </button>
-              ))}
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Select Network</label>
+            <div className="flex gap-3 mb-3">
+              {CURRENCIES.map(c => {
+                const selected = currency === c.value;
+                return (
+                  <button key={c.value} onClick={() => setCurrency(c.value)}
+                    className="flex-1 text-left rounded-xl border-2 p-3 transition-all"
+                    style={{
+                      background:  selected ? c.bgSelected : '#f8fafc',
+                      borderColor: selected ? c.borderSel  : '#e2e8f0',
+                    }}>
+                    <div className="flex items-start gap-2.5">
+                      <c.Logo />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-sm font-bold text-slate-800">{c.label}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={{ background: c.accentColor + '20', color: c.accentColor }}>
+                            {c.tag}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5">{c.network}</div>
+                        <div className="text-xs font-medium mt-1" style={{ color: c.accentColor }}>{c.fee}</div>
+                      </div>
+                      {selected && (
+                        <div className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5"
+                          style={{ background: c.accentColor }}>
+                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+
+            {/* Warning banner — updates when network switches */}
+            {(() => { const c = CURRENCIES.find(x => x.value === currency); return c ? (
+              <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border"
+                style={{ background: '#fff7ed', borderColor: '#fed7aa' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 mt-0.5">
+                  <path d="M8 1.5L14.5 13H1.5L8 1.5Z" fill="#f97316" stroke="#ea580c" strokeWidth="0.5"/>
+                  <path d="M8 6v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="8" cy="11.5" r="0.75" fill="white"/>
+                </svg>
+                <div>
+                  <p className="text-xs font-bold text-orange-700 mb-0.5">Wrong coin = permanent loss</p>
+                  <p className="text-xs text-orange-600 leading-relaxed">{c.warning}</p>
+                </div>
+              </div>
+            ) : null; })()}
           </div>
 
           {error && (
@@ -192,40 +261,71 @@ export default function SubscribePage() {
             </div>
           )}
 
-          {status !== 'finished' && sub?.payAddress && (
-            <div className="card glow-border p-5 space-y-4">
-              <div className="text-center">
-                <div className="text-xs text-slate-400 mb-1">Send exactly</div>
-                <div className="text-2xl font-bold text-slate-900">
-                  {sub.payAmount} <span className="text-blue-500">{sub.payCurrency?.toUpperCase()}</span>
+          {status !== 'finished' && sub?.payAddress && (() => {
+            const payObj = CURRENCIES.find(c => c.value === sub.payCurrency) || CURRENCIES[0];
+            return (
+              <div className="card glow-border p-5 space-y-4">
+                {/* Network badge */}
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border"
+                  style={{ background: payObj.bgSelected, borderColor: payObj.borderSel + '80' }}>
+                  <payObj.Logo />
+                  <div>
+                    <div className="text-xs font-bold" style={{ color: payObj.accentColor }}>{payObj.label}</div>
+                    <div className="text-xs text-slate-500">{payObj.network} · {payObj.tag}</div>
+                  </div>
+                  <div className="ml-auto">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: payObj.accentColor, color: '#fff' }}>{payObj.tag}</span>
+                  </div>
                 </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Includes <span className="text-amber-600 font-semibold">${gasFee} network fee buffer</span> — plan price is $49
+
+                <div className="text-center">
+                  <div className="text-xs text-slate-400 mb-1">Send exactly</div>
+                  <div className="text-2xl font-bold text-slate-900">
+                    {sub.payAmount} <span style={{ color: payObj.accentColor }}>{sub.payCurrency?.toUpperCase()}</span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Includes <span className="text-amber-600 font-semibold">${gasFee} network fee buffer</span> — plan price is $49
+                  </div>
+                </div>
+                <div className="flex justify-center p-3 bg-white border border-slate-100 rounded-xl">
+                  <QRCode value={sub.payAddress} size={160} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-500 mb-1">Address</div>
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <span className="flex-1 text-xs font-mono text-slate-700 break-all">{sub.payAddress}</span>
+                    <button onClick={() => copy(sub.payAddress, setCopied)} className="shrink-0 p-1 rounded hover:bg-slate-100">
+                      {copied ? <CheckCircle2 size={13} className="text-emerald-500" /> : <Copy size={13} className="text-slate-400" />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-500 mb-1">Amount</div>
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <span className="flex-1 text-xs font-mono text-slate-700">{sub.payAmount} {sub.payCurrency?.toUpperCase()}</span>
+                    <button onClick={() => copy(String(sub.payAmount), setCopiedAmt)} className="shrink-0 p-1 rounded hover:bg-slate-100">
+                      {copiedAmt ? <CheckCircle2 size={13} className="text-emerald-500" /> : <Copy size={13} className="text-slate-400" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Critical warning */}
+                <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border"
+                  style={{ background: '#fef2f2', borderColor: '#fecaca' }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 mt-0.5">
+                    <circle cx="8" cy="8" r="7" fill="#dc2626" stroke="#b91c1c" strokeWidth="0.5"/>
+                    <path d="M8 5v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="8" cy="11" r="0.75" fill="white"/>
+                  </svg>
+                  <div>
+                    <p className="text-xs font-bold text-red-700 mb-0.5">Send only USDT on {payObj.tag}</p>
+                    <p className="text-xs text-red-600 leading-relaxed">{payObj.warning}</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-center p-3 bg-white border border-slate-100 rounded-xl">
-                <QRCode value={sub.payAddress} size={160} />
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-slate-500 mb-1">Address</div>
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                  <span className="flex-1 text-xs font-mono text-slate-700 break-all">{sub.payAddress}</span>
-                  <button onClick={() => copy(sub.payAddress, setCopied)} className="shrink-0 p-1 rounded hover:bg-slate-100">
-                    {copied ? <CheckCircle2 size={13} className="text-emerald-500" /> : <Copy size={13} className="text-slate-400" />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-slate-500 mb-1">Amount</div>
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                  <span className="flex-1 text-xs font-mono text-slate-700">{sub.payAmount} {sub.payCurrency?.toUpperCase()}</span>
-                  <button onClick={() => copy(String(sub.payAmount), setCopiedAmt)} className="shrink-0 p-1 rounded hover:bg-slate-100">
-                    {copiedAmt ? <CheckCircle2 size={13} className="text-emerald-500" /> : <Copy size={13} className="text-slate-400" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>
