@@ -50,9 +50,13 @@ export default function AdminPage() {
   const [replyText, setReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
 
-  // Users search
-  const [userSearch, setUserSearch] = useState('');
-  const [usersLoading, setUsersLoading] = useState(false);
+  // Users search + pagination
+  const [userSearch,  setUserSearch]  = useState('');
+  const [usersLoading,setUsersLoading]= useState(false);
+  const [userPage,    setUserPage]    = useState(1);
+  const [userPages,   setUserPages]   = useState(1);
+  const [userTotal,   setUserTotal]   = useState(0);
+  const USER_LIMIT = 50;
 
   // Trades tab
   const [trades, setTrades] = useState([]);
@@ -87,22 +91,33 @@ export default function AdminPage() {
   const [pwdLoading, setPwdLoading] = useState(false);
   const [pwdMsg,     setPwdMsg]     = useState('');
 
+  async function loadUsers(page = 1, search = userSearch) {
+    setUsersLoading(true);
+    const params = new URLSearchParams({ page, limit: USER_LIMIT });
+    if (search) params.set('search', search);
+    const res = await fetch(`/api/admin/users?${params}`);
+    const d   = await res.json();
+    setUsers(d.users || []);
+    setUserTotal(d.total || 0);
+    setUserPages(d.pages || 1);
+    setUserPage(page);
+    setUsersLoading(false);
+  }
+
   async function load() {
     setLoading(true);
-    const [sRes, uRes, cRes] = await Promise.all([
+    const [sRes, cRes] = await Promise.all([
       fetch('/api/admin/stats'),
-      fetch('/api/admin/users'),
       fetch('/api/admin/config'),
     ]);
     const s = await sRes.json();
-    const u = await uRes.json();
     const c = await cRes.json();
     setStats(s);
-    setUsers(Array.isArray(u) ? u : []);
     const cfgMap = {};
     (c || []).forEach(x => { cfgMap[x.key] = x.value; });
     DEFAULT_CONFIGS.forEach(d => { if (cfgMap[d.key] === undefined) cfgMap[d.key] = d.value; });
     setConfigs(cfgMap);
+    await loadUsers(1, '');
     setLoading(false);
   }
 
@@ -110,11 +125,8 @@ export default function AdminPage() {
 
   async function searchUsers(q) {
     setUserSearch(q);
-    setUsersLoading(true);
-    const res = await fetch(`/api/admin/users?search=${encodeURIComponent(q)}`);
-    const u = await res.json();
-    setUsers(Array.isArray(u) ? u : []);
-    setUsersLoading(false);
+    setUserPage(1);
+    await loadUsers(1, q);
   }
 
   async function loadTrades(page = 1) {
@@ -289,7 +301,7 @@ export default function AdminPage() {
     });
     setDeleteLoading(false);
     setDeleteConfirm(null);
-    load();
+    loadUsers(userPage, userSearch);
   }
 
   async function sendReply(ticketId) {
@@ -303,12 +315,12 @@ export default function AdminPage() {
 
   async function toggleUser(userId, currentStatus) {
     const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
+    setUsers(prev => prev.map(u => u._id === userId ? { ...u, status: newStatus } : u));
     await fetch('/api/admin/users', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, status: newStatus }),
     });
-    load();
   }
 
   async function grantSub(userId) {
@@ -321,7 +333,7 @@ export default function AdminPage() {
     setGrantLoading(false);
     setGrantingId(null);
     setGrantDays('30');
-    load();
+    loadUsers(userPage, userSearch);
   }
 
   async function updateBalance(userId) {
@@ -467,9 +479,9 @@ export default function AdminPage() {
       {/* Users */}
       {tab === 'users' && (
         <div className="card glow-border overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-base font-bold text-slate-900">All Users</h2>
-            <div className="flex items-center gap-2 flex-1 max-w-xs">
+          {/* Header */}
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
               <div className="relative flex-1">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -481,179 +493,166 @@ export default function AdminPage() {
               </div>
               {usersLoading && <RefreshCw size={13} className="text-blue-500 animate-spin shrink-0" />}
             </div>
-            <span className="text-sm text-slate-500">{users.length} shown</span>
+            <span className="text-xs text-slate-400 ml-auto">
+              {userTotal} users · page {userPage}/{userPages}
+            </span>
           </div>
+
+          {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  {['Name', 'Email', 'Phone', 'Referrals', 'Balance', 'Bot', 'Subscription', 'Status', 'Joined', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-slate-500 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  {['User', 'Contact', 'Balance', 'Status', 'Sub / Bot', 'Joined', 'Actions'].map(h => (
+                    <th key={h} className="text-left px-4 py-2.5 text-slate-400 font-semibold text-[11px] uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-50">
                 {users.map(u => (
-                  <tr key={u._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600 shrink-0">
+                  <tr key={u._id} className="hover:bg-slate-50/70 transition-colors group">
+
+                    {/* User */}
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          style={{ background: u.role === 'admin' ? '#d97706' : '#2563eb' }}>
                           {u.name?.[0]?.toUpperCase()}
                         </div>
-                        <span className="font-semibold text-slate-800 whitespace-nowrap">{u.name}</span>
-                        {u.role === 'admin' && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700 font-semibold">Admin</span>
-                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-800 text-xs leading-tight truncate max-w-[120px]">{u.name}</span>
+                            {u.role === 'admin' && <span className="px-1 py-0.5 rounded text-[9px] bg-amber-100 text-amber-700 font-bold shrink-0">ADMIN</span>}
+                          </div>
+                          <div className="text-[10px] text-blue-500 font-mono mt-0.5">{u.referralCode}</div>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs">{u.email}</td>
-                    <td className="px-4 py-3 text-xs font-mono text-slate-600 whitespace-nowrap">
-                      {u.phone || <span className="text-slate-300">—</span>}
+
+                    {/* Contact */}
+                    <td className="px-4 py-2.5">
+                      <div className="text-[11px] text-slate-500 truncate max-w-[160px]">{u.email}</div>
+                      <div className="text-[10px] font-mono text-slate-400 mt-0.5">{u.phone || '—'}</div>
                     </td>
-                    <td className="px-4 py-3 text-xs">
-                      <div className="font-mono text-blue-600 font-medium">{u.referralCode}</div>
-                      <div className="flex items-center gap-1 mt-0.5 text-slate-400">
-                        <GitBranch size={10} />
-                        <span>{u.referralCount || 0} referred</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
+
+                    {/* Balance */}
+                    <td className="px-4 py-2.5">
                       {balanceEditId === u._id ? (
                         <div className="flex items-center gap-1">
-                          <span className="text-xs text-slate-400">$</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={balanceValue}
-                            onChange={e => setBalanceValue(e.target.value)}
-                            className="w-20 px-1.5 py-1 text-xs border border-slate-300 rounded-lg font-mono"
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => updateBalance(u._id)}
-                            disabled={balanceLoading}
-                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 whitespace-nowrap">
-                            {balanceLoading ? '…' : 'Save'}
+                          <input type="number" min="0" step="0.01" value={balanceValue}
+                            onChange={e => setBalanceValue(e.target.value)} autoFocus
+                            className="w-16 px-1.5 py-1 text-xs border border-slate-300 rounded font-mono" />
+                          <button onClick={() => updateBalance(u._id)} disabled={balanceLoading}
+                            className="px-1.5 py-1 rounded text-[10px] font-bold bg-emerald-600 text-white disabled:opacity-50">
+                            {balanceLoading ? '…' : '✓'}
                           </button>
-                          <button
-                            onClick={() => { setBalanceEditId(null); setBalanceValue(''); }}
-                            className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200">
-                            ✕
-                          </button>
+                          <button onClick={() => { setBalanceEditId(null); setBalanceValue(''); }}
+                            className="px-1.5 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-500">✕</button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => {
-                            setBalanceEditId(u._id);
-                            setBalanceValue(String(u.assetBalance ?? 0));
-                            setGrantingId(null);
-                          }}
-                          title="Edit asset balance"
-                          className="text-slate-700 font-mono text-xs font-semibold hover:text-emerald-600 hover:underline decoration-dotted underline-offset-2 transition-colors">
+                        <button onClick={() => { setBalanceEditId(u._id); setBalanceValue(String(u.assetBalance ?? 0)); setGrantingId(null); }}
+                          className="text-xs font-mono font-semibold text-slate-700 hover:text-emerald-600 transition-colors">
                           ${(u.assetBalance || 0).toFixed(2)}
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                        u.botActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {u.botActive ? 'Running' : 'Off'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.subscriptionActive ? (
-                        <span className="text-xs font-semibold text-emerald-600">
-                          Active · {u.subscriptionDaysLeft}d left
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400">Inactive</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                        u.status === 'active' ? 'bg-emerald-100 text-emerald-700'
-                          : u.status === 'blocked' ? 'bg-red-100 text-red-600'
-                          : 'bg-slate-100 text-slate-500'
+
+                    {/* Status */}
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        u.status === 'active'  ? 'bg-emerald-100 text-emerald-700'
+                        : u.status === 'blocked' ? 'bg-red-100 text-red-600'
+                        : 'bg-slate-100 text-slate-500'
                       }`}>{u.status}</span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{new Date(u.createdAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <button onClick={() => toggleUser(u._id, u.status)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                            u.status === 'active'
-                              ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                          }`}>
-                          {u.status === 'active' ? <><UserX size={12} /> Block</> : <><UserCheck size={12} /> Activate</>}
+
+                    {/* Sub / Bot */}
+                    <td className="px-4 py-2.5">
+                      <div className="flex flex-col gap-0.5">
+                        {u.subscriptionActive
+                          ? <span className="text-[10px] font-semibold text-emerald-600">Sub · {u.subscriptionDaysLeft}d</span>
+                          : <span className="text-[10px] text-slate-300">No sub</span>}
+                        <span className={`text-[10px] font-medium ${u.botActive ? 'text-violet-600' : 'text-slate-300'}`}>
+                          {u.botActive ? '● Bot on' : '○ Bot off'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Joined */}
+                    <td className="px-4 py-2.5 text-[11px] text-slate-400 whitespace-nowrap">
+                      {new Date(u.createdAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' })}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-1">
+                        {/* View */}
+                        <button onClick={() => openUserDetail(u)} title="View user"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                          <Eye size={13} />
                         </button>
+
+                        {/* Block/Activate */}
+                        <button onClick={() => toggleUser(u._id, u.status)}
+                          title={u.status === 'active' ? 'Block user' : 'Activate user'}
+                          className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
+                            u.status === 'active'
+                              ? 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                              : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                          }`}>
+                          {u.status === 'active' ? <UserX size={13} /> : <UserCheck size={13} />}
+                        </button>
+
+                        {/* Grant Sub */}
                         {grantingId === u._id ? (
                           <div className="flex items-center gap-1">
-                            <input
-                              type="number" min="1" max="365"
-                              value={grantDays}
-                              onChange={e => setGrantDays(e.target.value)}
-                              className="w-14 px-1.5 py-1 text-xs border border-slate-300 rounded-lg text-center"
-                            />
-                            <span className="text-xs text-slate-400">d</span>
-                            <button
-                              onClick={() => grantSub(u._id)}
-                              disabled={grantLoading}
-                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
-                              {grantLoading ? '…' : 'OK'}
+                            <input type="number" min="1" max="365" value={grantDays}
+                              onChange={e => setGrantDays(e.target.value)} autoFocus
+                              className="w-12 px-1 py-0.5 text-xs border border-slate-300 rounded text-center" />
+                            <span className="text-[10px] text-slate-400">d</span>
+                            <button onClick={() => grantSub(u._id)} disabled={grantLoading}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white disabled:opacity-50">
+                              {grantLoading ? '…' : '✓'}
                             </button>
-                            <button
-                              onClick={() => setGrantingId(null)}
-                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200">
-                              ✕
-                            </button>
+                            <button onClick={() => setGrantingId(null)}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">✕</button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => { setGrantingId(u._id); setGrantDays('30'); setBalanceEditId(null); }}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 whitespace-nowrap">
-                            <Star size={11} /> Grant Sub
+                          <button onClick={() => { setGrantingId(u._id); setGrantDays('30'); setBalanceEditId(null); }}
+                            title="Grant subscription"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                            <Star size={13} />
                           </button>
                         )}
+
+                        {/* Overview toggle */}
                         {u.role !== 'admin' && (
-                          <button
-                            onClick={() => toggleOverviewAccess(u._id, u.canViewOverview)}
+                          <button onClick={() => toggleOverviewAccess(u._id, u.canViewOverview)}
                             title={u.canViewOverview ? 'Revoke overview access' : 'Grant overview access'}
-                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap ${
+                            className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
                               u.canViewOverview
-                                ? 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
-                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                                ? 'text-violet-600 bg-violet-50 hover:bg-violet-100'
+                                : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'
                             }`}>
-                            <LayoutDashboard size={11} /> {u.canViewOverview ? 'Overview ✓' : 'Overview'}
+                            <LayoutDashboard size={13} />
                           </button>
                         )}
-                        <button
-                          onClick={() => openUserDetail(u)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 whitespace-nowrap">
-                          <Eye size={11} /> View
-                        </button>
+
+                        {/* Delete */}
                         {deleteConfirm === u._id ? (
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-red-600 font-semibold whitespace-nowrap">Delete?</span>
-                            <button
-                              onClick={() => deleteUser(u._id)}
-                              disabled={deleteLoading}
-                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                            <span className="text-[10px] text-red-600 font-semibold">Sure?</span>
+                            <button onClick={() => deleteUser(u._id)} disabled={deleteLoading}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white disabled:opacity-50">
                               {deleteLoading ? '…' : 'Yes'}
                             </button>
-                            <button
-                              onClick={() => setDeleteConfirm(null)}
-                              className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200">
-                              No
-                            </button>
+                            <button onClick={() => setDeleteConfirm(null)}
+                              className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">No</button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => setDeleteConfirm(u._id)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 whitespace-nowrap">
-                            🗑 Delete
+                          <button onClick={() => setDeleteConfirm(u._id)} title="Delete user"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all">
+                            <Trash2 size={13} />
                           </button>
                         )}
                       </div>
@@ -663,6 +662,45 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {userPages > 1 && (
+            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                {(userPage - 1) * USER_LIMIT + 1}–{Math.min(userPage * USER_LIMIT, userTotal)} of {userTotal} users
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={userPage <= 1 || usersLoading}
+                  onClick={() => loadUsers(userPage - 1)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                  <ChevronLeft size={13} />
+                </button>
+                {Array.from({ length: Math.min(5, userPages) }, (_, i) => {
+                  const start = Math.max(1, Math.min(userPage - 2, userPages - 4));
+                  const p = start + i;
+                  return (
+                    <button key={p} onClick={() => loadUsers(p)}
+                      disabled={usersLoading}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition-all"
+                      style={{
+                        background: p === userPage ? '#2563eb' : 'transparent',
+                        color:      p === userPage ? 'white'    : '#64748b',
+                        border:     p === userPage ? 'none'     : '1px solid #e2e8f0',
+                      }}>
+                      {p}
+                    </button>
+                  );
+                })}
+                <button
+                  disabled={userPage >= userPages || usersLoading}
+                  onClick={() => loadUsers(userPage + 1)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                  <ChevronRight size={13} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

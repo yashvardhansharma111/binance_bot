@@ -1,15 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import {
   Users, Activity, BarChart2, TrendingUp, TrendingDown,
   DollarSign, RefreshCw, Globe, ShieldOff,
 } from 'lucide-react';
 
-const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function StatCard({ icon: Icon, label, value, sub, accent = '#3b82f6' }) {
+function StatCard({ icon: Icon, label, value, accent = '#3b82f6' }) {
   return (
     <div className="card glow-border p-5 flex items-start gap-4">
       <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -19,33 +15,26 @@ function StatCard({ icon: Icon, label, value, sub, accent = '#3b82f6' }) {
       <div>
         <div className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>{value}</div>
         <div className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-3)' }}>{label}</div>
-        {sub && <div className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{sub}</div>}
       </div>
     </div>
   );
 }
 
 export default function OverviewPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [stats, setStats]   = useState(null);
-  const [loading, setLoad]  = useState(true);
+  const [stats,   setStats]  = useState(null);
+  const [loading, setLoad]   = useState(true);
   const [denied,  setDenied] = useState(false);
 
   async function load() {
     setLoad(true);
     const res = await fetch('/api/admin/stats');
     if (res.status === 403) { setDenied(true); setLoad(false); return; }
-    if (res.status === 401) { router.push('/login'); return; }
     const data = await res.json();
     setStats(data);
     setLoad(false);
   }
 
-  useEffect(() => {
-    if (status === 'unauthenticated') { router.push('/login'); return; }
-    if (status === 'authenticated') load();
-  }, [status]);
+  useEffect(() => { load(); }, []);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -77,29 +66,28 @@ export default function OverviewPage() {
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-3)' }}>Live platform statistics</p>
         </div>
-        <button onClick={load}
-          className="btn-outline py-2 px-4 flex items-center gap-2 text-sm">
+        <button onClick={load} className="btn-outline py-2 px-4 flex items-center gap-2 text-sm">
           <RefreshCw size={13} /> Refresh
         </button>
       </div>
 
       {/* User stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={Users}     label="Total Users"     value={stats.totalUsers}     accent="#3b82f6" />
-        <StatCard icon={Activity}  label="Active Users"    value={stats.activeUsers}    accent="#10b981" />
-        <StatCard icon={Activity}  label="Active Bots"     value={stats.activeBots}     accent="#8b5cf6" />
-        <StatCard icon={Users}     label="Active Subs"     value={stats.activeSubs}     accent="#f59e0b" />
+        <StatCard icon={Users}    label="Total Users"  value={stats.totalUsers}  accent="#3b82f6" />
+        <StatCard icon={Activity} label="Active Users" value={stats.activeUsers} accent="#10b981" />
+        <StatCard icon={Activity} label="Active Bots"  value={stats.activeBots}  accent="#8b5cf6" />
+        <StatCard icon={Users}    label="Active Subs"  value={stats.activeSubs}  accent="#f59e0b" />
       </div>
 
       {/* Financial stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard icon={BarChart2}   label="Total Trades"     value={stats.totalTrades}                                        accent="#64748b" />
-        <StatCard icon={BarChart2}   label="Closed Trades"    value={stats.closedTrades}                                       accent="#64748b" />
-        <StatCard icon={DollarSign}  label="Platform Revenue" value={`$${(stats.totalPlatformRevenue || 0).toFixed(2)}`}       accent="#10b981" />
-        <StatCard icon={DollarSign}  label="Total User Funds" value={`$${(stats.totalFunds || 0).toFixed(2)}`}                 accent="#3b82f6" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={BarChart2}  label="Total Trades"     value={stats.totalTrades}                                  accent="#64748b" />
+        <StatCard icon={BarChart2}  label="Closed Trades"    value={stats.closedTrades}                                 accent="#64748b" />
+        <StatCard icon={DollarSign} label="Platform Revenue" value={`$${(stats.totalPlatformRevenue || 0).toFixed(2)}`} accent="#10b981" />
+        <StatCard icon={DollarSign} label="Total User Funds" value={`$${(stats.totalFunds || 0).toFixed(2)}`}           accent="#3b82f6" />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <div className="card glow-border p-5">
           <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-3)' }}>Total P&L (all users)</div>
           <div className={`text-3xl font-bold ${(stats.totalProfit || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
