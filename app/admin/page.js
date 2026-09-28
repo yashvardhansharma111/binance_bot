@@ -373,6 +373,7 @@ export default function AdminPage() {
   ];
 
   return (
+    <>
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -1263,5 +1264,6 @@ export default function AdminPage() {
         </div>
       </div>
     )}
+    </>
   );
 }
