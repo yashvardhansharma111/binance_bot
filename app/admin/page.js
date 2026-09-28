@@ -79,6 +79,14 @@ export default function AdminPage() {
   const [selected, setSelected] = useState(new Set());
   const [bulkAdding, setBulkAdding] = useState(false);
 
+  // User detail modal
+  const [viewUser,   setViewUser]   = useState(null);
+  const [viewTrades, setViewTrades] = useState([]);
+  const [viewLoading,setViewLoading]= useState(false);
+  const [pwdInput,   setPwdInput]   = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdMsg,     setPwdMsg]     = useState('');
+
   async function load() {
     setLoading(true);
     const [sRes, uRes, cRes] = await Promise.all([
@@ -134,6 +142,30 @@ export default function AdminPage() {
       body: JSON.stringify({ userId, canViewOverview: !current }),
     });
     setUsers(prev => prev.map(u => u._id === userId ? { ...u, canViewOverview: !current } : u));
+  }
+
+  async function openUserDetail(u) {
+    setViewUser(u); setPwdInput(''); setPwdMsg('');
+    setViewLoading(true);
+    const res = await fetch(`/api/admin/trades?userId=${u._id}&limit=20`);
+    const d   = await res.json();
+    setViewTrades(d.trades || []);
+    setViewLoading(false);
+  }
+
+  async function setUserPassword() {
+    if (!viewUser || !pwdInput) return;
+    if (pwdInput.length < 6) { setPwdMsg('Minimum 6 characters'); return; }
+    setPwdLoading(true);
+    const res = await fetch('/api/admin/users', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId: viewUser._id, newPassword: pwdInput }),
+    });
+    const d = await res.json();
+    setPwdLoading(false);
+    setPwdMsg(res.ok ? '✓ Password updated' : (d.error || 'Failed'));
+    if (res.ok) setPwdInput('');
   }
 
   async function loadTickets() {
@@ -596,6 +628,11 @@ export default function AdminPage() {
                             <LayoutDashboard size={11} /> {u.canViewOverview ? 'Overview ✓' : 'Overview'}
                           </button>
                         )}
+                        <button
+                          onClick={() => openUserDetail(u)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 whitespace-nowrap">
+                          <Eye size={11} /> View
+                        </button>
                         {deleteConfirm === u._id ? (
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-red-600 font-semibold whitespace-nowrap">Delete?</span>
@@ -1119,5 +1156,112 @@ export default function AdminPage() {
         </div>
       )}
     </div>
+
+    {/* ── User Detail Modal ── */}
+    {viewUser && (
+      <div className="fixed inset-0 z-50 flex items-start justify-end"
+        style={{ background: 'rgba(0,0,0,0.4)' }}
+        onClick={e => { if (e.target === e.currentTarget) setViewUser(null); }}>
+        <div className="w-full max-w-xl h-full bg-white overflow-y-auto shadow-2xl flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 sticky top-0 z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                {viewUser.name?.[0]?.toUpperCase()}
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-sm">{viewUser.name}</div>
+                <div className="text-xs text-slate-400">{viewUser.email}</div>
+              </div>
+            </div>
+            <button onClick={() => setViewUser(null)}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors text-base">
+              ✕
+            </button>
+          </div>
+
+          <div className="flex-1 p-6 space-y-6">
+            {/* User info grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Phone',         value: viewUser.phone || '—' },
+                { label: 'Status',        value: viewUser.status },
+                { label: 'Asset Balance', value: `$${viewUser.assetBalance?.toFixed(2) ?? '0.00'}` },
+                { label: 'Subscription',  value: viewUser.subscriptionActive ? `Active · ${viewUser.subscriptionDaysLeft}d left` : 'Inactive' },
+                { label: 'Bot',           value: viewUser.botActive ? 'Running' : 'Off' },
+                { label: 'Joined',        value: new Date(viewUser.createdAt).toLocaleDateString() },
+                { label: 'Referral Code', value: viewUser.referralCode || '—' },
+                { label: 'Referrals',     value: viewUser.referralCount ?? 0 },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-slate-50 rounded-xl px-4 py-3">
+                  <div className="text-xs text-slate-400 font-semibold mb-0.5">{label}</div>
+                  <div className="text-sm font-bold text-slate-800">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Set Password */}
+            <div className="border border-slate-200 rounded-xl p-4">
+              <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Set New Password</div>
+              <div className="flex gap-2">
+                <input type="text" placeholder="New password (min 6 chars)"
+                  value={pwdInput}
+                  onChange={e => { setPwdInput(e.target.value); setPwdMsg(''); }}
+                  className="input flex-1 text-sm py-2" />
+                <button onClick={setUserPassword} disabled={pwdLoading}
+                  className="btn-primary px-4 py-2 text-sm shrink-0 disabled:opacity-60">
+                  {pwdLoading ? '…' : 'Set'}
+                </button>
+              </div>
+              {pwdMsg && (
+                <p className={`text-xs mt-2 font-medium ${pwdMsg.startsWith('✓') ? 'text-emerald-600' : 'text-red-500'}`}>{pwdMsg}</p>
+              )}
+            </div>
+
+            {/* User Trades */}
+            <div>
+              <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Recent Trades</div>
+              {viewLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw size={18} className="animate-spin text-blue-500" />
+                </div>
+              ) : viewTrades.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-sm">No trades found</div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-100">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {['Symbol','Side','Price','P&L','Opened','Status'].map(h => (
+                          <th key={h} className="text-left px-3 py-2.5 font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {viewTrades.map(t => (
+                        <tr key={t._id} className="hover:bg-slate-50">
+                          <td className="px-3 py-2.5 font-mono font-semibold text-slate-800">{t.symbol}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${t.side === 'BUY' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>{t.side}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-600">${t.price?.toFixed(2)}</td>
+                          <td className={`px-3 py-2.5 font-semibold ${(t.profit || 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {(t.profit || 0) >= 0 ? '+' : ''}{(t.profit || 0).toFixed(4)}
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-400">{new Date(t.createdAt).toLocaleDateString()}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${t.status === 'closed' ? 'bg-slate-100 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>{t.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }

@@ -25,7 +25,10 @@ export async function GET(req) {
   const side   = searchParams.get('side')?.trim().toUpperCase() || '';
   const status = searchParams.get('status')?.trim() || '';
 
+  const userId = searchParams.get('userId')?.trim() || '';
+
   const filter = {};
+  if (userId) filter.userId = userId;
   if (symbol) filter.symbol = { $regex: symbol, $options: 'i' };
   if (side && ['BUY', 'SELL'].includes(side)) filter.side = side;
   if (status && ['open', 'closed'].includes(status)) filter.status = status;

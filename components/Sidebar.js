@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Key, Users, BarChart2, LogOut, Zap,
   ShieldCheck, Activity, ChevronRight, LineChart,
   ArrowDownToLine, Menu, X, Crown, Settings2, Zap as Trade,
-  Sun, Moon, ArrowUpRight, UserCircle, LifeBuoy,
+  Sun, Moon, ArrowUpRight, UserCircle, LifeBuoy, Globe,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/app/ThemeContext';
@@ -103,6 +103,22 @@ export function DesktopSidebar() {
             </Link>
           );
         })}
+
+        {(session?.user?.canViewOverview || session?.user?.role === 'admin') && (() => {
+          const active = isActive('/overview', pathname);
+          return (
+            <Link href="/overview"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: active ? 'var(--accent-dim)' : 'transparent',
+                color:      active ? 'var(--accent)'     : 'var(--text-2)',
+              }}>
+              <Globe size={16} />
+              <span className="flex-1">Overview</span>
+              {active && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
+            </Link>
+          );
+        })()}
 
         {session?.user?.role === 'admin' && (
           <div className="pt-3">
@@ -239,6 +255,20 @@ export function MobileTopBar() {
                 );
               })}
             </div>
+
+            {(session?.user?.canViewOverview || session?.user?.role === 'admin') && (
+              <>
+                <div className="my-2" style={{ borderTop: '1px solid var(--border)' }} />
+                <Link href="/overview" onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all"
+                  style={{
+                    background: pathname === '/overview' ? 'var(--accent-dim)' : 'transparent',
+                    color:      pathname === '/overview' ? 'var(--accent)'     : 'var(--text-2)',
+                  }}>
+                  <Globe size={16} /> Overview
+                </Link>
+              </>
+            )}
 
             {session?.user?.role === 'admin' && (
               <>

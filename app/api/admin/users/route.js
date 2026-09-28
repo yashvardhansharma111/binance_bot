@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import bcrypt from 'bcryptjs';
 
 async function adminGuard() {
   const session = await getServerSession(authOptions);
@@ -49,7 +50,7 @@ export async function GET(req) {
 export async function PATCH(req) {
   const admin = await adminGuard();
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { userId, status, role, grantDays, canViewOverview, assetBalance } = await req.json();
+  const { userId, status, role, grantDays, canViewOverview, assetBalance, newPassword } = await req.json();
   if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
 
   const update = {};
@@ -69,6 +70,11 @@ export async function PATCH(req) {
       ? new Date(user.subscriptionExpiry)
       : now;
     update.subscriptionExpiry = new Date(base.getTime() + Number(grantDays) * 86_400_000);
+  }
+  if (newPassword) {
+    if (newPassword.length < 6)
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    update.password = await bcrypt.hash(newPassword, 10);
   }
   if (Object.keys(update).length === 0)
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });

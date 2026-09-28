@@ -1,15 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, BarChart2, Filter } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, BarChart2, Filter, Calendar } from 'lucide-react';
 
 const SIDES = ['ALL', 'BUY', 'SELL'];
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export default function TradesPage() {
-  const [trades, setTrades] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [trades,  setTrades]  = useState([]);
+  const [total,   setTotal]   = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('ALL');
-  const [page, setPage] = useState(1);
+  const [filter,  setFilter]  = useState('ALL');
+  const [page,    setPage]    = useState(1);
+  const [monthly, setMonthly] = useState([]);
   const limit = 20;
 
   async function load(p = 1) {
@@ -22,7 +24,13 @@ export default function TradesPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  async function loadMonthly() {
+    const res = await fetch('/api/trades/monthly');
+    const data = await res.json();
+    setMonthly(data.monthly || []);
+  }
+
+  useEffect(() => { load(); loadMonthly(); }, []);
 
   const filtered = filter === 'ALL' ? trades : trades.filter(t => t.side === filter);
   const totalProfit = trades.reduce((s, t) => s + (t.profit || 0), 0);
@@ -62,6 +70,49 @@ export default function TradesPage() {
           <div className="text-slate-400 text-xs mt-1">Profitable Trades</div>
         </div>
       </div>
+
+      {/* Monthly P&L */}
+      {monthly.length > 0 && (
+        <div className="card glow-border p-5 mb-6">
+          <h2 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+            <Calendar size={14} className="text-blue-500" /> Monthly P&amp;L
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-slate-400 uppercase border-b border-slate-100">
+                  <th className="text-left pb-2.5 font-semibold">Month</th>
+                  <th className="text-right pb-2.5 font-semibold">Trades</th>
+                  <th className="text-right pb-2.5 font-semibold">Wins</th>
+                  <th className="text-right pb-2.5 font-semibold">Win Rate</th>
+                  <th className="text-right pb-2.5 font-semibold">P&amp;L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {monthly.map(m => {
+                  const winRate = m.tradeCount ? ((m.wins / m.tradeCount) * 100).toFixed(0) : 0;
+                  const label = `${MONTH_NAMES[m._id.month - 1]} ${m._id.year}`;
+                  return (
+                    <tr key={`${m._id.year}-${m._id.month}`} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 font-medium text-slate-700">{label}</td>
+                      <td className="py-2.5 text-right text-slate-500">{m.tradeCount}</td>
+                      <td className="py-2.5 text-right text-slate-500">{m.wins}</td>
+                      <td className="py-2.5 text-right">
+                        <span className={`font-semibold ${Number(winRate) >= 50 ? 'text-emerald-600' : 'text-red-500'}`}>{winRate}%</span>
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <span className={`font-bold ${m.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {m.totalProfit >= 0 ? '+' : ''}${m.totalProfit.toFixed(2)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Filter */}
       <div className="flex items-center gap-2 mb-5">

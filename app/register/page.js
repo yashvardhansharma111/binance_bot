@@ -32,7 +32,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
 
   const [step,       setStep]       = useState(1);
-  const [form,       setForm]       = useState({ name: '', email: '', password: '', phone: '', referralCode: '' });
+  const [form,       setForm]       = useState({ name: '', email: '', password: '', phone: '', countryCode: '+91', referralCode: '' });
   const [otp,        setOtp]        = useState('');
   const [showPass,   setShowPass]   = useState(false);
   const [loading,    setLoading]    = useState(false);
@@ -92,7 +92,7 @@ function RegisterForm() {
 
   async function sendOtp(e) {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password) return setError('Please fill all required fields');
+    if (!form.name || !form.email || !form.password || !form.phone) return setError('Please fill all required fields including phone number');
     if (form.referralCode && refStatus === 'invalid') return setError('Invalid referral code — please check and try again');
     if (refLocked && refStatus !== 'valid') return setError('Referral code could not be verified');
     const { valid, failures } = validatePassword(form.password);
@@ -102,7 +102,7 @@ function RegisterForm() {
     const res = await fetch('/api/auth/register', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ...form }),
+      body:    JSON.stringify({ ...form, phone: form.countryCode + form.phone }),
     });
     const data = await res.json();
     setLoading(false);
@@ -185,13 +185,34 @@ function RegisterForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Phone Number <span className="text-xs font-normal text-slate-400">(optional)</span>
-                    </label>
-                    <div className="relative">
-                      <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input className="input" style={{ paddingLeft: '2.5rem' }} type="tel" placeholder="+91 9876543210"
-                        value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone Number</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={form.countryCode}
+                        onChange={e => setForm({ ...form, countryCode: e.target.value })}
+                        className="input shrink-0 w-28 px-2 text-sm">
+                        <option value="+91">🇮🇳 +91</option>
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+44">🇬🇧 +44</option>
+                        <option value="+971">🇦🇪 +971</option>
+                        <option value="+92">🇵🇰 +92</option>
+                        <option value="+880">🇧🇩 +880</option>
+                        <option value="+60">🇲🇾 +60</option>
+                        <option value="+65">🇸🇬 +65</option>
+                        <option value="+27">🇿🇦 +27</option>
+                        <option value="+234">🇳🇬 +234</option>
+                        <option value="+62">🇮🇩 +62</option>
+                        <option value="+63">🇵🇭 +63</option>
+                        <option value="+66">🇹🇭 +66</option>
+                        <option value="+7">🇷🇺 +7</option>
+                        <option value="+55">🇧🇷 +55</option>
+                      </select>
+                      <div className="relative flex-1">
+                        <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input className="input w-full" style={{ paddingLeft: '2.5rem' }} type="tel"
+                          placeholder="9876543210" required
+                          value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })} />
+                      </div>
                     </div>
                   </div>
 
