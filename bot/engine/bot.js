@@ -201,13 +201,18 @@ export async function runBotForUser(user) {
 
     // 5. Fetch USDT balance once — shared across all symbol iterations
     const usdtBalance = await getUSDTBalance(apiKey, apiSecret, isTestnet, exchangeName);
+    await log(userId, 'info',
+      `💰 USDT balance: $${usdtBalance.toFixed(2)} | Checking ${tradingSymbols.length} symbol(s): ${tradingSymbols.join(', ')} | Mode: ${aggressiveMode ? 'AGGRESSIVE' : 'normal'}`
+    );
 
     // 6. Run new-entry logic for each configured symbol independently
     const maxConcurrent = settings.maxConcurrentTrades ?? 1;
+    const tickResults = { checked: 0, blocked: [], skipped: [], signals: [], trades: 0 };
 
     for (const sym of tradingSymbols) {
       // Per-symbol try/catch — one bad symbol never kills other symbols
       try {
+      tickResults.checked++;
       const openOnSym = openTrades.filter(t => t.symbol === sym);
 
       // At concurrent limit for this symbol — check SELL signal to close
@@ -247,7 +252,10 @@ export async function runBotForUser(user) {
         // Guard 1: 24h market change — block if coin dropped > 2% in last 24h
         change24h = await get24hChange(sym);
         if (change24h < -2) {
-          await log(userId, 'warn', `[${sym}] BLOCKED — down ${change24h.toFixed(2)}% in 24h (threshold: -2%)`);
+          tickResults.blocked.push(`${sym}(24h:${change24h.toFixed(1)}%)`);
+          await log(userId, 'warn',
+            `[${sym}] ⛔ BLOCKED — 24h change ${change24h.toFixed(2)}% exceeds -2% threshold. Coin in downtrend, protecting capital. Will retry next tick.`
+          );
           continue;
         }
 
@@ -255,7 +263,8 @@ export async function runBotForUser(user) {
         const h1candles = await getCandles(sym, '1h', 60);
         h1uptrend = checkMacroTrend(h1candles);
         if (!h1uptrend) {
-          await log(userId, 'warn', `[${sym}] BLOCKED — 1h trend bearish (EMA20 < EMA50 on 1h)`);
+          tickResults.blocked.push(`${sym}(1h-bear)`);
+          await log(userId, 'warn', `[${sym}] ⛔ BLOCKED — 1h trend bearish (EMA20 < EMA50 on 1h). Macro downtrend, waiting for recovery.`);
           continue;
         }
 
@@ -276,6 +285,7 @@ export async function runBotForUser(user) {
             if (manualProfit) {
               await log(userId, 'info', `[${sym}] Loss streak reset by profitable manual exit — allowing re-entry`);
             } else {
+              tickResults.blocked.push(`${sym}(loss-cooldown)`);
               await log(userId, 'warn',
                 `[${sym}] BLOCKED — 2 consecutive losses, cooling down for ${(6 - hoursSinceLoss).toFixed(1)}h more`);
               continue;
@@ -294,38 +304,43 @@ export async function runBotForUser(user) {
         const lowestEntry = Math.min(...openOnSym.map(t => t.price));
         const dropPct     = ((lowestEntry - currentPrice) / lowestEntry) * 100;
         if (dropPct < minGapPct) {
+          tickResults.skipped.push(`${sym}(DCA:${dropPct.toFixed(1)}%<${minGapPct}%)`);
           await log(userId, 'info',
-            `[${sym}] SKIPPED — price $${currentPrice} only ${dropPct.toFixed(2)}% below lowest open entry $${lowestEntry} (need ${minGapPct}% drop to add)`);
+            `[${sym}] ⏸ WAITING DCA — price $${currentPrice} is only ${dropPct.toFixed(2)}% below open entry $${lowestEntry}. Need ${minGapPct}% drop to add. Open positions: ${openOnSym.length}`
+          );
           continue;
         }
       }
 
       const candles = await getCandles(sym, timeframe, 120);
       if (candles.length < 100) {
-        await log(userId, 'warn', `[${sym}] Only ${candles.length} candles returned — symbol may not be listed on ${exchangeName.toUpperCase()} or is restricted in this region. Remove it from Settings to stop this warning.`);
+        await log(userId, 'warn', `[${sym}] Only ${candles.length} candles — symbol not available on ${exchangeName.toUpperCase()} or region-restricted. Remove from Settings.`);
         continue;
       }
-      const indicators   = calculateIndicators(candles);
+      const indicators = calculateIndicators(candles);
 
       await log(userId, 'info',
         aggressiveMode
-          ? `[${sym}] [AGGRESSIVE] RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | Trend:${indicators.uptrend ? '↑' : '↓'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
-          : `[${sym}] 24h:${change24h.toFixed(2)}% | RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | 1h:${h1uptrend ? '↑' : '↓'} | Trend:${indicators.uptrend ? '↑' : '→'} | Vol:${indicators.volumeIncreasing ? '↑' : '→'} | $${currentPrice}`
+          ? `[${sym}] 📊 AGGRESSIVE | RSI:${indicators.rsi} | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | Trend:${indicators.uptrend ? '↑' : '↓'} | Vol:${indicators.volumeIncreasing ? '↑HIGH' : '→avg'} | Price:$${currentPrice}`
+          : `[${sym}] 📊 RSI:${indicators.rsi} | 24h:${change24h.toFixed(2)}% | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | 1h:${h1uptrend ? '↑' : '↓'} | Trend:${indicators.uptrend ? '↑' : '→'} | Vol:${indicators.volumeIncreasing ? '↑HIGH' : '→avg'} | Price:$${currentPrice}`
       );
 
       const signal = detectSignal(indicators, aggressiveMode);
-      await log(userId, 'info', `[${sym}] Signal: ${signal}${aggressiveMode ? ' [AGGRESSIVE]' : ''}`);
+      const signalIcon = signal === 'BUY' ? '🟢' : signal === 'SELL' ? '🔴' : '⚪';
+      await log(userId, 'info', `[${sym}] ${signalIcon} Signal: ${signal}${aggressiveMode ? ' [AGGRESSIVE]' : ''} | RSI threshold: ${indicators.uptrend ? 48 : 40}${aggressiveMode ? '→60' : ''}`);
+      tickResults.signals.push(`${sym}:${signal}`);
 
-      if (signal === 'HOLD') continue;
+      if (signal === 'HOLD') { await log(userId, 'info', `[${sym}] ⚪ HOLD — RSI ${indicators.rsi} not in buy/sell zone. No action.`); continue; }
       if (signal === 'SELL') {
-        await log(userId, 'info', `[${sym}] SELL signal but no open position — nothing to close`);
+        await log(userId, 'info', `[${sym}] 🔴 SELL signal but no open position to close. Will watch for BUY next tick.`);
         continue;
       }
 
       // Risk checks
       const risk = await canTrade(userId, settings, usdtBalance, aggressiveMode);
       if (!risk.allowed) {
-        await log(userId, 'info', `[${sym}] Skipped: ${risk.reason}`);
+        tickResults.skipped.push(`${sym}(risk:${risk.reason})`);
+        await log(userId, 'info', `[${sym}] ⚠️ BUY skipped — risk check: ${risk.reason}`);
         continue;
       }
 
@@ -333,24 +348,35 @@ export async function runBotForUser(user) {
       let sentiment = { sentiment: 'neutral', confidence: 50, reason: 'Filter off' };
       if (settings.useGroqFilter && !aggressiveMode) {
         sentiment = await getSentiment(sym, indicators);
-        await log(userId, 'info', `[${sym}] Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
+        await log(userId, 'info', `[${sym}] 🧠 Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
         if (shouldBlock(signal, sentiment)) {
-          await log(userId, 'warn', `[${sym}] Trade BLOCKED — bearish sentiment (${sentiment.confidence}%)`);
+          tickResults.blocked.push(`${sym}(sentiment-bearish)`);
+          await log(userId, 'warn', `[${sym}] ⛔ BUY BLOCKED — Groq says bearish (${sentiment.confidence}% confidence)`);
           continue;
         }
       }
 
-      // Execute BUY — merge per-symbol overrides on top of global settings
+      // Execute BUY
       const sc = symCfg(settings, sym);
       const tradeSettings = { ...settings.toObject(), symbol: sym, ...sc };
       const amount = Math.min(sc.tradeUSDT, usdtBalance * 0.99);
+      await log(userId, 'info', `[${sym}] 🚀 EXECUTING BUY — $${amount.toFixed(2)} USDT | SL:${sc.stopLossPercent}% TP:${sc.takeProfitPercent}%`);
       await openPosition(userId, apiKey, apiSecret, tradeSettings, amount, indicators, sentiment, isTestnet, exchangeName);
+      tickResults.trades++;
 
       } catch (symErr) {
         const level = symErr.message.includes('candles') ? 'warn' : 'error';
-        await log(userId, level, `[${sym}] Symbol error — skipping: ${symErr.message}`);
+        await log(userId, level, `[${sym}] ❌ Symbol error: ${symErr.message}`);
       }
     }
+
+    // Tick summary
+    const blockedStr = tickResults.blocked.length ? `⛔ Blocked: ${tickResults.blocked.join(', ')}` : '';
+    const skippedStr = tickResults.skipped.length ? `⏸ Skipped: ${tickResults.skipped.join(', ')}` : '';
+    const tradesStr  = tickResults.trades > 0 ? `✅ Trades placed: ${tickResults.trades}` : '💤 No new trades';
+    await log(userId, 'info',
+      `📋 TICK DONE — ${tickResults.checked} symbol(s) | ${tradesStr} | ${blockedStr} ${skippedStr}`.trim()
+    );
 
   } catch (err) {
     await log(userId, 'error', `Bot error: ${err.message}`);
