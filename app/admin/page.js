@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import {
   Users, Bot, ShieldCheck, TrendingUp, RefreshCw, UserX, UserCheck,
   Settings, DollarSign, Percent, Star, CreditCard, Activity, Ticket,
@@ -83,6 +83,11 @@ export default function AdminPage() {
   const [selected, setSelected] = useState(new Set());
   const [bulkAdding, setBulkAdding] = useState(false);
 
+  // Overview permissions picker
+  const [overviewPickerId, setOverviewPickerId] = useState(null);
+  const [overviewPerms, setOverviewPerms] = useState({ users: true, trading: false, revenue: false, recentTrades: false });
+  const [overviewSaving, setOverviewSaving] = useState(false);
+
   // User detail modal
   const [viewUser,   setViewUser]   = useState(null);
   const [viewTrades, setViewTrades] = useState([]);
@@ -147,13 +152,45 @@ export default function AdminPage() {
 
   useEffect(() => { if (tab === 'trades') loadTrades(1); }, [tab]);
 
-  async function toggleOverviewAccess(userId, current) {
+  function openOverviewPicker(u) {
+    const perms = u.overviewPermissions || [];
+    setOverviewPerms({
+      users:        perms.includes('users'),
+      trading:      perms.includes('trading'),
+      revenue:      perms.includes('revenue'),
+      recentTrades: perms.includes('recentTrades'),
+    });
+    setOverviewPickerId(prev => prev === u._id ? null : u._id);
+  }
+
+  async function saveOverviewPerms(userId) {
+    const sections = Object.entries(overviewPerms).filter(([, v]) => v).map(([k]) => k);
+    const hasAccess = sections.length > 0;
+    setOverviewSaving(true);
     await fetch('/api/admin/users', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, canViewOverview: !current }),
+      body: JSON.stringify({ userId, canViewOverview: hasAccess, overviewPermissions: sections }),
     });
-    setUsers(prev => prev.map(u => u._id === userId ? { ...u, canViewOverview: !current } : u));
+    setOverviewSaving(false);
+    setOverviewPickerId(null);
+    setUsers(prev => prev.map(u => u._id === userId
+      ? { ...u, canViewOverview: hasAccess, overviewPermissions: sections }
+      : u));
+  }
+
+  async function revokeOverview(userId) {
+    setOverviewSaving(true);
+    await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, canViewOverview: false, overviewPermissions: [] }),
+    });
+    setOverviewSaving(false);
+    setOverviewPickerId(null);
+    setUsers(prev => prev.map(u => u._id === userId
+      ? { ...u, canViewOverview: false, overviewPermissions: [] }
+      : u));
   }
 
   async function openUserDetail(u) {
@@ -510,7 +547,8 @@ export default function AdminPage() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {users.map(u => (
-                  <tr key={u._id} className="hover:bg-slate-50/70 transition-colors group">
+                  <Fragment key={u._id}>
+                  <tr className="hover:bg-slate-50/70 transition-colors group">
 
                     {/* User */}
                     <td className="px-4 py-2.5">
@@ -625,10 +663,10 @@ export default function AdminPage() {
                           </button>
                         )}
 
-                        {/* Overview toggle */}
+                        {/* Overview permissions */}
                         {u.role !== 'admin' && (
-                          <button onClick={() => toggleOverviewAccess(u._id, u.canViewOverview)}
-                            title={u.canViewOverview ? 'Revoke overview access' : 'Grant overview access'}
+                          <button onClick={() => openOverviewPicker(u)}
+                            title={u.canViewOverview ? 'Edit overview access' : 'Grant overview access'}
                             className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
                               u.canViewOverview
                                 ? 'text-violet-600 bg-violet-50 hover:bg-violet-100'
@@ -658,6 +696,47 @@ export default function AdminPage() {
                       </div>
                     </td>
                   </tr>
+
+                  {/* Overview permissions picker — inline row */}
+                  {overviewPickerId === u._id && (
+                    <tr style={{ background: '#f5f3ff' }}>
+                      <td colSpan={7} style={{ padding: '12px 20px' }}>
+                        <div className="flex flex-wrap items-center gap-4">
+                          <span className="text-xs font-semibold text-violet-700">Overview sections:</span>
+                          {[
+                            { key: 'users',        label: 'User Stats' },
+                            { key: 'trading',      label: 'Trading Stats' },
+                            { key: 'revenue',      label: 'Revenue & Funds' },
+                            { key: 'recentTrades', label: 'Recent Trades' },
+                          ].map(({ key, label }) => (
+                            <label key={key} className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-700">
+                              <input type="checkbox" checked={overviewPerms[key]}
+                                onChange={e => setOverviewPerms(p => ({ ...p, [key]: e.target.checked }))}
+                                className="w-3.5 h-3.5 accent-violet-600" />
+                              {label}
+                            </label>
+                          ))}
+                          <div className="flex items-center gap-2 ml-auto">
+                            {u.canViewOverview && (
+                              <button onClick={() => revokeOverview(u._id)} disabled={overviewSaving}
+                                className="px-2.5 py-1 rounded text-xs font-semibold bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50">
+                                {overviewSaving ? '…' : 'Revoke'}
+                              </button>
+                            )}
+                            <button onClick={() => setOverviewPickerId(null)}
+                              className="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200">
+                              Cancel
+                            </button>
+                            <button onClick={() => saveOverviewPerms(u._id)} disabled={overviewSaving}
+                              className="px-2.5 py-1 rounded text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50">
+                              {overviewSaving ? '…' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

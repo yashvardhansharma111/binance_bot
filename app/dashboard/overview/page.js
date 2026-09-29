@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   Users, Activity, BarChart2, TrendingUp, TrendingDown,
   DollarSign, RefreshCw, Globe, ShieldOff,
@@ -21,9 +22,14 @@ function StatCard({ icon: Icon, label, value, accent = '#3b82f6' }) {
 }
 
 export default function OverviewPage() {
+  const { data: session } = useSession();
   const [stats,   setStats]  = useState(null);
   const [loading, setLoad]   = useState(true);
   const [denied,  setDenied] = useState(false);
+
+  const isAdmin = session?.user?.role === 'admin';
+  const perms   = session?.user?.overviewPermissions ?? [];
+  const can     = (section) => isAdmin || perms.includes(section);
 
   async function load() {
     setLoad(true);
@@ -72,39 +78,50 @@ export default function OverviewPage() {
       </div>
 
       {/* User stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={Users}    label="Total Users"  value={stats.totalUsers}  accent="#3b82f6" />
-        <StatCard icon={Activity} label="Active Users" value={stats.activeUsers} accent="#10b981" />
-        <StatCard icon={Activity} label="Active Bots"  value={stats.activeBots}  accent="#8b5cf6" />
-        <StatCard icon={Users}    label="Active Subs"  value={stats.activeSubs}  accent="#f59e0b" />
-      </div>
-
-      {/* Financial stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={BarChart2}  label="Total Trades"     value={stats.totalTrades}                                  accent="#64748b" />
-        <StatCard icon={BarChart2}  label="Closed Trades"    value={stats.closedTrades}                                 accent="#64748b" />
-        <StatCard icon={DollarSign} label="Platform Revenue" value={`$${(stats.totalPlatformRevenue || 0).toFixed(2)}`} accent="#10b981" />
-        <StatCard icon={DollarSign} label="Total User Funds" value={`$${(stats.totalFunds || 0).toFixed(2)}`}           accent="#3b82f6" />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div className="card glow-border p-5">
-          <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-3)' }}>Total P&L (all users)</div>
-          <div className={`text-3xl font-bold ${(stats.totalProfit || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-            {(stats.totalProfit || 0) >= 0 ? '+' : ''}${(stats.totalProfit || 0).toFixed(2)}
-          </div>
+      {can('users') && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <StatCard icon={Users}    label="Total Users"  value={stats.totalUsers}  accent="#3b82f6" />
+          <StatCard icon={Activity} label="Active Users" value={stats.activeUsers} accent="#10b981" />
+          <StatCard icon={Activity} label="Active Bots"  value={stats.activeBots}  accent="#8b5cf6" />
+          <StatCard icon={Users}    label="Active Subs"  value={stats.activeSubs}  accent="#f59e0b" />
         </div>
-        <div className="card glow-border p-5">
-          <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-3)' }}>Referral Commissions Paid</div>
-          <div className="text-3xl font-bold" style={{ color: 'var(--text-1)' }}>
-            ${(stats.totalReferrerPaid || 0).toFixed(2)}
-          </div>
+      )}
+
+      {/* Trading stats */}
+      {can('trading') && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <StatCard icon={BarChart2}  label="Total Trades"     value={stats.totalTrades}   accent="#64748b" />
+          <StatCard icon={BarChart2}  label="Closed Trades"    value={stats.closedTrades}  accent="#64748b" />
         </div>
-      </div>
+      )}
+
+      {/* Revenue & funds */}
+      {can('revenue') && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-6">
+            <StatCard icon={DollarSign} label="Platform Revenue" value={`$${(stats.totalPlatformRevenue || 0).toFixed(2)}`} accent="#10b981" />
+            <StatCard icon={DollarSign} label="Total User Funds" value={`$${(stats.totalFunds || 0).toFixed(2)}`}           accent="#3b82f6" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div className="card glow-border p-5">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-3)' }}>Total P&L (all users)</div>
+              <div className={`text-3xl font-bold ${(stats.totalProfit || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                {(stats.totalProfit || 0) >= 0 ? '+' : ''}${(stats.totalProfit || 0).toFixed(2)}
+              </div>
+            </div>
+            <div className="card glow-border p-5">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-3)' }}>Referral Commissions Paid</div>
+              <div className="text-3xl font-bold" style={{ color: 'var(--text-1)' }}>
+                ${(stats.totalReferrerPaid || 0).toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Recent trades */}
-      {recentTrades.length > 0 && (
-        <div className="card glow-border overflow-hidden">
+      {can('recentTrades') && recentTrades.length > 0 && (
+        <div className="card glow-border overflow-hidden mb-6">
           <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>Recent Trades (Platform-wide)</h2>
           </div>

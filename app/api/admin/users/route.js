@@ -55,13 +55,14 @@ export async function GET(req) {
 export async function PATCH(req) {
   const admin = await adminGuard();
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const { userId, status, role, grantDays, canViewOverview, assetBalance, newPassword } = await req.json();
+  const { userId, status, role, grantDays, canViewOverview, overviewPermissions, assetBalance, newPassword } = await req.json();
   if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
 
   const update = {};
   if (status) update.status = status;
   if (role)   update.role   = role;
   if (canViewOverview !== undefined) update.canViewOverview = canViewOverview;
+  if (overviewPermissions !== undefined) update.overviewPermissions = overviewPermissions;
   if (assetBalance !== undefined && assetBalance !== null && assetBalance !== '') {
     const bal = Number(assetBalance);
     if (!Number.isFinite(bal) || bal < 0)
