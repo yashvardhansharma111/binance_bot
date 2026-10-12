@@ -14,12 +14,13 @@ export default function DashboardLayout({ children }) {
       {/* Mobile: top bar */}
       <MobileTopBar />
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto
-        p-4 pt-4
-        lg:p-8
-        mt-14 lg:mt-0
-        mb-16 lg:mb-0">
+      {/* Main content.
+          min-w-0 stops wide children (tables, charts) from blowing out the
+          flex row; the bottom pad clears the tab bar plus the home-bar inset. */}
+      <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto
+        p-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))]
+        mt-14
+        lg:mt-0 lg:p-8 lg:pb-8">
         {children}
       </main>
 

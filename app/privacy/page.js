@@ -10,7 +10,7 @@ const WEBSITE = 'https://trickyx.ai';
 
 export default function PrivacyPage() {
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg)', color: 'var(--text-1)', fontFamily: 'var(--font-open-sans, sans-serif)' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg)', color: 'var(--text-1)', fontFamily: 'var(--font-sans, sans-serif)' }}>
 
       {/* Header */}
       <header style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 24px' }}>

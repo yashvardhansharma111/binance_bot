@@ -7,9 +7,9 @@ import {
 } from 'lucide-react';
 
 const LEVEL_STYLE = {
-  info:  { color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: Info },
-  warn:  { color: '#b45309', bg: '#fefce8', border: '#fde68a', icon: AlertTriangle },
-  error: { color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: XCircle },
+  info:  { color: 'var(--accent)', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.32)', icon: Info },
+  warn:  { color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.32)', icon: AlertTriangle },
+  error: { color: 'var(--danger)', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.32)', icon: XCircle },
 };
 
 function LogLine({ log }) {
@@ -101,10 +101,10 @@ export default function BotMonitorPage() {
   const { stats, openTrade, logs, settings, botActive, testnet, dryRun, todayTrades } = data;
   const modeLabel = dryRun ? 'DRY RUN' : testnet ? 'TESTNET' : 'LIVE';
   const modeStyle = dryRun
-    ? { color: '#b45309', bg: '#fefce8', border: '#fde68a' }
+    ? { color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.32)' }
     : testnet
-    ? { color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' }
-    : { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' };
+    ? { color: '#22d3ee', bg: 'rgba(6,182,212,0.12)', border: 'rgba(6,182,212,0.32)' }
+    : { color: 'var(--success)', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.32)' };
 
   return (
     <div className="max-w-6xl">
@@ -126,9 +126,9 @@ export default function BotMonitorPage() {
           <button onClick={() => setAutoRefresh(v => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border"
             style={{
-              background: autoRefresh ? '#f0fdf4' : '#f8fafc',
-              color: autoRefresh ? '#16a34a' : '#64748b',
-              borderColor: autoRefresh ? '#bbf7d0' : '#e2e8f0',
+              background: autoRefresh ? 'rgba(16,185,129,0.12)' : 'var(--surface-2)',
+              color: autoRefresh ? 'var(--success)' : 'var(--text-3)',
+              borderColor: autoRefresh ? 'rgba(16,185,129,0.32)' : 'var(--border)',
             }}>
             {autoRefresh ? <Wifi size={12} /> : <WifiOff size={12} />}
             {autoRefresh ? 'Live' : 'Paused'}
@@ -141,9 +141,9 @@ export default function BotMonitorPage() {
           <button onClick={toggleBot} disabled={toggling || !data.hasApiKey}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
             style={{
-              background: botActive ? '#fef2f2' : '#2563eb',
-              color: botActive ? '#dc2626' : 'white',
-              border: botActive ? '1px solid #fecaca' : 'none',
+              background: botActive ? 'rgba(239,68,68,0.12)' : 'var(--accent)',
+              color: botActive ? 'var(--danger)' : 'var(--bg)',
+              border: botActive ? '1px solid rgba(239,68,68,0.32)' : 'none',
             }}>
             {toggling ? <RefreshCw size={14} className="animate-spin" />
               : botActive ? <Square size={14} /> : <Play size={14} />}
@@ -155,11 +155,11 @@ export default function BotMonitorPage() {
       {/* Status bar */}
       <div className="flex items-center gap-3 mb-6 px-4 py-3 rounded-xl border"
         style={{
-          background:  botActive ? '#f0fdf4' : '#f8fafc',
-          borderColor: botActive ? '#bbf7d0' : '#e2e8f0',
+          background:  botActive ? 'rgba(16,185,129,0.12)' : 'var(--surface-2)',
+          borderColor: botActive ? 'rgba(16,185,129,0.32)' : 'var(--border)',
         }}>
         <span className={`w-2.5 h-2.5 rounded-full ${botActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-        <span className="text-sm font-medium" style={{ color: botActive ? '#16a34a' : '#94a3b8' }}>
+        <span className="text-sm font-medium" style={{ color: botActive ? 'var(--success)' : '#94a3b8' }}>
           {botActive
             ? `Bot running — scanning ${settings.symbol || 'BTCUSDT'} every 5 minutes`
             : 'Bot stopped'}
@@ -177,12 +177,12 @@ export default function BotMonitorPage() {
           color="#2563eb" icon={Zap} sub={`limit: ${settings.maxDailyTrades || 10}`} />
         <StatBox label="Today's P&L"
           value={`${stats.todayProfit >= 0 ? '+' : ''}$${stats.todayProfit.toFixed(2)}`}
-          color={stats.todayProfit >= 0 ? '#16a34a' : '#dc2626'}
+          color={stats.todayProfit >= 0 ? 'var(--success)' : 'var(--danger)'}
           icon={stats.todayProfit >= 0 ? TrendingUp : TrendingDown} />
         <StatBox label="Total Trades" value={stats.totalTrades} color="#64748b" icon={BarChart2} />
         <StatBox label="Total P&L"
           value={`${stats.totalProfit >= 0 ? '+' : ''}$${stats.totalProfit.toFixed(2)}`}
-          color={stats.totalProfit >= 0 ? '#16a34a' : '#dc2626'} />
+          color={stats.totalProfit >= 0 ? 'var(--success)' : 'var(--danger)'} />
         <StatBox label="Win Rate" value={`${stats.winRate}%`}
           color="#0891b2" icon={Target} sub={`${stats.wins}W / ${stats.losses}L`} />
         <StatBox label="Symbol" value={settings.symbol || 'BTCUSDT'}

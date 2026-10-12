@@ -3,10 +3,12 @@ import { Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle, MonitorSmartphone } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, MonitorSmartphone, ArrowRight, RefreshCw } from 'lucide-react';
+import { AuthShell, AuthAlert } from '@/components/ui/auth-shell';
 
 function LoginForm() {
-  const router       = useRouter();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const sessionExpired = searchParams.get('reason') === 'session_expired';
 
@@ -30,23 +32,19 @@ function LoginForm() {
   }
 
   return (
-    <div className="card p-8 glow-border">
+    <>
       {sessionExpired && (
-        <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-amber-50 border border-amber-200 text-amber-700">
-          <MonitorSmartphone size={15} /> You were signed in on another device. Please log in again.
-        </div>
+        <AuthAlert tone="warn" icon={MonitorSmartphone}>
+          You were signed in on another device. Please log in again.
+        </AuthAlert>
       )}
-      {error && (
-        <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-red-50 border border-red-200 text-red-600">
-          <AlertCircle size={15} /> {error}
-        </div>
-      )}
+      {error && <AuthAlert tone="error" icon={AlertCircle}>{error}</AuthAlert>}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email address</label>
+          <label className="mb-1.5 block text-[13px] font-medium text-neutral-300">Email address</label>
           <div className="relative">
-            <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600" />
             <input
               className="input"
               style={{ paddingLeft: '2.5rem' }}
@@ -60,9 +58,9 @@ function LoginForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+          <label className="mb-1.5 block text-[13px] font-medium text-neutral-300">Password</label>
           <div className="relative">
-            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600" />
             <input
               className="input"
               style={{ paddingLeft: '2.5rem', paddingRight: '3rem' }}
@@ -73,77 +71,51 @@ function LoginForm() {
               required
             />
             <button type="button" onClick={() => setShowPass(!showPass)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-600 transition-colors hover:text-neutral-300">
               {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
         </div>
 
-        <div className="flex justify-end -mt-2">
-          <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+        <div className="-mt-2 flex justify-end">
+          <Link href="/forgot-password" className="text-[13px] font-medium text-emerald-400 transition-colors hover:text-emerald-300">
             Forgot password?
           </Link>
         </div>
 
-        <button type="submit" disabled={loading}
-          className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-60">
-          {loading ? 'Signing in...' : 'Sign In'}
-        </button>
+        <motion.button type="submit" disabled={loading}
+          whileHover={{ y: -1 }} whileTap={{ scale: 0.985 }}
+          className="group relative mt-1 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-[14px] font-semibold text-black transition disabled:opacity-60"
+          style={{ boxShadow: '0 8px 28px -8px rgba(16,185,129,0.55)' }}>
+          <span className="relative z-10 inline-flex items-center gap-2">
+            {loading
+              ? <><RefreshCw size={14} className="animate-spin" /> Signing in…</>
+              : <>Sign In <ArrowRight size={15} /></>}
+          </span>
+          <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+        </motion.button>
       </form>
-
-      <p className="text-center text-slate-500 text-sm mt-6">
-        Don&apos;t have an account?{' '}
-        <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
-          Create one
-        </Link>
-      </p>
-    </div>
+    </>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 flex-col justify-between p-12">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/20">
-            <Zap size={16} className="text-white" />
-          </div>
-          <span className="text-lg font-bold text-white">TrickyX.ai</span>
-        </Link>
-        <div>
-          <h2 className="text-4xl font-extrabold text-white mb-4 leading-tight">
-            Trade smarter.<br />Earn more.
-          </h2>
-          <p className="text-blue-200 text-lg leading-relaxed">
-            AI-powered crypto trading that works while you sleep.
-            Connect Binance, activate the bot, and watch it go.
-          </p>
-        </div>
-        <p className="text-blue-300 text-sm">
-          &copy; 2026 TrickyX.ai
-        </p>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden mb-8 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
-              <Zap size={16} className="text-white" />
-            </div>
-            <span className="text-lg font-bold text-slate-900">TrickyX<span className="text-blue-600">.ai</span></span>
-          </div>
-
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">Welcome back</h1>
-          <p className="text-slate-500 mb-8">Sign in to your trading account</p>
-
-          <Suspense fallback={<div className="card p-8 glow-border text-center text-slate-400 text-sm">Loading...</div>}>
-            <LoginForm />
-          </Suspense>
-        </div>
-      </div>
-    </div>
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to your trading account"
+      footer={
+        <>
+          Don&apos;t have an account?{' '}
+          <Link href="/register" className="font-semibold text-emerald-400 transition-colors hover:text-emerald-300">
+            Create one
+          </Link>
+        </>
+      }
+    >
+      <Suspense fallback={<div className="py-8 text-center text-[13px] text-neutral-600">Loading…</div>}>
+        <LoginForm />
+      </Suspense>
+    </AuthShell>
   );
 }

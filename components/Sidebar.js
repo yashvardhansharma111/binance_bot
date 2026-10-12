@@ -2,253 +2,268 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
+import { useState } from 'react';
+import { motion } from 'motion/react';
 import {
   LayoutDashboard, Key, Users, BarChart2, LogOut, Zap,
-  ShieldCheck, Activity, ChevronRight, LineChart,
-  ArrowDownToLine, Menu, X, Crown, Settings2, Zap as Trade,
+  ShieldCheck, Activity, LineChart, ArrowDownToLine,
+  Menu, X, Crown, Settings2, Zap as Trade,
   Sun, Moon, ArrowUpRight, UserCircle, LifeBuoy, Globe,
 } from 'lucide-react';
-import { useState } from 'react';
 import { useTheme } from '@/app/ThemeContext';
+import { Sidebar, SidebarBody, SidebarLink, useSidebar } from '@/components/ui/sidebar';
+
+const ICON = 'h-[18px] w-[18px] shrink-0';
 
 const navItems = [
-  { href: '/dashboard',             label: 'Dashboard',  icon: LayoutDashboard },
-  { href: '/dashboard/bot',         label: 'Bot Monitor',icon: Activity },
-  { href: '/dashboard/chart',       label: 'Live Chart', icon: LineChart },
-  { href: '/dashboard/trade',       label: 'Trade',      icon: Trade },
-  { href: '/dashboard/trades',      label: 'History',    icon: BarChart2 },
-  { href: '/dashboard/settings',    label: 'Bot Config', icon: Settings2 },
-  { href: '/dashboard/deposit',     label: 'Deposit',    icon: ArrowDownToLine },
-  { href: '/dashboard/subscribe',   label: 'Subscribe',  icon: Crown },
-  { href: '/dashboard/apikeys',     label: 'API Keys',   icon: Key },
-  { href: '/dashboard/referral',    label: 'Referral',   icon: Users },
-  { href: '/dashboard/support',     label: 'Support',    icon: LifeBuoy },
-  { href: '/dashboard/profile',     label: 'Profile',    icon: UserCircle },
+  { href: '/dashboard',           label: 'Dashboard',   Icon: LayoutDashboard },
+  { href: '/dashboard/bot',       label: 'Bot Monitor', Icon: Activity },
+  { href: '/dashboard/chart',     label: 'Live Chart',  Icon: LineChart },
+  { href: '/dashboard/trade',     label: 'Trade',       Icon: Trade },
+  { href: '/dashboard/trades',    label: 'History',     Icon: BarChart2 },
+  { href: '/dashboard/settings',  label: 'Bot Config',  Icon: Settings2 },
+  { href: '/dashboard/deposit',   label: 'Deposit',     Icon: ArrowDownToLine },
+  { href: '/dashboard/subscribe', label: 'Subscribe',   Icon: Crown },
+  { href: '/dashboard/apikeys',   label: 'API Keys',    Icon: Key },
+  { href: '/dashboard/referral',  label: 'Referral',    Icon: Users },
+  { href: '/dashboard/support',   label: 'Support',     Icon: LifeBuoy },
+  { href: '/dashboard/profile',   label: 'Profile',     Icon: UserCircle },
 ];
 
 function isActive(href, pathname) {
   return pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
 }
 
-/* ── Theme toggle button ──────────────────────────────────────────────────── */
-function ThemeToggle({ compact = false }) {
+/* ── Logo: wordmark collapses with the rail ──────────────────────────────── */
+function SidebarLogo() {
+  const { open } = useSidebar();
+  return (
+    <Link href="/" className="relative z-20 flex items-center gap-2.5 px-1 py-1">
+      <span className="grid size-[26px] shrink-0 place-items-center rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500"
+        style={{ boxShadow: '0 0 14px var(--accent-glow)' }}>
+        <Zap size={13} className="text-black" strokeWidth={2.6} />
+      </span>
+      <motion.span
+        animate={{ opacity: open ? 1 : 0, display: open ? 'inline-block' : 'none' }}
+        className="whitespace-pre text-[15px] font-bold tracking-tight"
+        style={{ color: 'var(--text-1)' }}
+      >
+        TrickyX<span style={{ color: 'var(--accent)' }}>.ai</span>
+      </motion.span>
+    </Link>
+  );
+}
+
+function SectionLabel({ children }) {
+  const { open } = useSidebar();
+  return (
+    <motion.p
+      animate={{ opacity: open ? 1 : 0, height: open ? 'auto' : 0 }}
+      className="overflow-hidden px-2.5 text-[9.5px] font-bold uppercase tracking-[0.14em]"
+      style={{ color: 'var(--text-3)' }}
+    >
+      {children}
+    </motion.p>
+  );
+}
+
+function ThemeToggleRow() {
   const { theme, toggle } = useTheme();
+  const { open } = useSidebar();
   const dark = theme === 'dark';
   return (
-    <button
-      onClick={toggle}
-      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-medium transition-all"
-      style={{
-        color:      'var(--text-2)',
-        background: 'transparent',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.background = 'var(--accent-dim)';
-        e.currentTarget.style.color      = 'var(--accent)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color      = 'var(--text-2)';
-      }}
-    >
-      {dark
-        ? <Sun  size={compact ? 16 : 15} />
-        : <Moon size={compact ? 16 : 15} />}
-      {!compact && <span>{dark ? 'Light Mode' : 'Dark Mode'}</span>}
+    <button onClick={toggle} title={dark ? 'Light mode' : 'Dark mode'}
+      className="group/sidebar flex w-full items-center justify-start gap-2.5 rounded-lg px-2.5 py-2.5 transition-colors"
+      style={{ color: 'var(--text-3)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-2)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+      <motion.span className="shrink-0" initial={false} animate={{ rotate: dark ? 0 : 180 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
+        {dark ? <Sun className={ICON} /> : <Moon className={ICON} />}
+      </motion.span>
+      <motion.span animate={{ opacity: open ? 1 : 0, display: open ? 'inline-block' : 'none' }}
+        className="whitespace-pre text-[13.5px] font-medium">
+        {dark ? 'Light Mode' : 'Dark Mode'}
+      </motion.span>
     </button>
   );
 }
 
-/* ── Desktop sidebar ──────────────────────────────────────────────────────── */
-export function DesktopSidebar() {
-  const pathname = usePathname();
-  const { data: session } = useSession();
-
+function SignOutRow() {
+  const { open } = useSidebar();
   return (
-    <aside
-      className="hidden lg:flex w-64 h-full flex-col shrink-0 overflow-y-auto"
-      style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
-    >
-      {/* Logo */}
-      <div className="px-6 py-5" style={{ borderBottom: '1px solid var(--border)' }}>
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
-            <Zap size={16} className="text-white" />
-          </div>
-          <span className="text-lg font-bold" style={{ color: 'var(--text-1)' }}>
-            TrickyX<span style={{ color: 'var(--accent)' }}>.ai</span>
-          </span>
-        </Link>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <p className="text-[10px] font-semibold uppercase tracking-widest px-3 mb-2"
-          style={{ color: 'var(--text-3)' }}>
-          Navigation
-        </p>
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = isActive(href, pathname);
-          return (
-            <Link key={href} href={href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: active ? 'var(--accent-dim)' : 'transparent',
-                color:      active ? 'var(--accent)'     : 'var(--text-2)',
-              }}>
-              <Icon size={16} />
-              <span className="flex-1">{label}</span>
-              {active && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
-            </Link>
-          );
-        })}
-
-        {(session?.user?.canViewOverview || session?.user?.role === 'admin') && (
-          <Link href="/dashboard/overview"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-            style={{
-              background: isActive('/dashboard/overview', pathname) ? 'var(--accent-dim)' : 'transparent',
-              color:      isActive('/dashboard/overview', pathname) ? 'var(--accent)'     : 'var(--text-2)',
-            }}>
-            <Globe size={16} />
-            <span className="flex-1">Overview</span>
-            {isActive('/dashboard/overview', pathname) && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
-          </Link>
-        )}
-
-        {session?.user?.role === 'admin' && (
-          <div className="pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest px-3 mb-2"
-              style={{ color: 'var(--text-3)' }}>
-              Admin
-            </p>
-            {[
-              { href: '/admin',              label: 'Admin Panel',  icon: ShieldCheck },
-              { href: '/admin/withdrawals',  label: 'Withdrawals',  icon: ArrowUpRight },
-            ].map(({ href, label, icon: Icon }) => {
-              const active = pathname === href;
-              return (
-                <Link key={href} href={href}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-                  style={{
-                    background: active ? '#fefce8' : 'transparent',
-                    color:      active ? '#b45309' : 'var(--text-2)',
-                  }}>
-                  <Icon size={16} />
-                  <span className="flex-1">{label}</span>
-                  {active && <ChevronRight size={13} style={{ opacity: 0.5 }} />}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </nav>
-
-      {/* User + controls */}
-      <div className="px-3 py-4" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1"
-          style={{ background: 'var(--surface-2)' }}>
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600 shrink-0">
-            {session?.user?.name?.[0]?.toUpperCase() || 'U'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-1)' }}>
-              {session?.user?.name}
-            </div>
-          </div>
-        </div>
-
-        <ThemeToggle />
-
-        <button onClick={() => signOut({ callbackUrl: window.location.origin + '/' })}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-colors mt-0.5"
-          style={{ color: 'var(--text-2)' }}
-          onMouseEnter={e => {
-            e.currentTarget.style.color      = '#dc2626';
-            e.currentTarget.style.background = '#fef2f2';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.color      = 'var(--text-2)';
-            e.currentTarget.style.background = 'transparent';
-          }}>
-          <LogOut size={15} />
-          Sign Out
-        </button>
-      </div>
-    </aside>
+    <button onClick={() => signOut({ callbackUrl: window.location.origin + '/' })}
+      className="flex w-full items-center justify-start gap-2.5 rounded-lg px-2.5 py-2.5 transition-colors"
+      style={{ color: 'var(--text-3)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}>
+      <LogOut className={ICON} />
+      <motion.span animate={{ opacity: open ? 1 : 0, display: open ? 'inline-block' : 'none' }}
+        className="whitespace-pre text-[13.5px] font-medium">
+        Sign Out
+      </motion.span>
+    </button>
   );
 }
 
-/* ── Mobile top bar ───────────────────────────────────────────────────────── */
+function UserRow() {
+  const { data: session } = useSession();
+  const { open } = useSidebar();
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg px-2 py-2"
+      style={{ background: open ? 'var(--surface-2)' : 'transparent', border: open ? '1px solid var(--border)' : '1px solid transparent' }}>
+      <span className="grid size-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold"
+        style={{ background: 'var(--accent)', color: 'var(--bg)' }}>
+        {session?.user?.name?.[0]?.toUpperCase() || 'U'}
+      </span>
+      <motion.span animate={{ opacity: open ? 1 : 0, display: open ? 'inline-block' : 'none' }}
+        className="truncate whitespace-pre text-[13px] font-semibold"
+        style={{ color: 'var(--text-1)' }}>
+        {session?.user?.name}
+      </motion.span>
+    </div>
+  );
+}
+
+/* ── Desktop sidebar (hover to expand) ───────────────────────────────────── */
+export function DesktopSidebar() {
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const [open, setOpen] = useState(false);
+
+  const canOverview = session?.user?.canViewOverview || session?.user?.role === 'admin';
+  const isAdmin = session?.user?.role === 'admin';
+
+  const links = navItems.map(({ href, label, Icon }) => ({
+    href, label,
+    icon: <Icon className={ICON} />,
+    active: isActive(href, pathname),
+  }));
+
+  if (canOverview) {
+    links.push({
+      href: '/dashboard/overview',
+      label: 'Overview',
+      icon: <Globe className={ICON} />,
+      active: isActive('/dashboard/overview', pathname),
+    });
+  }
+
+  const adminLinks = [
+    { href: '/admin',             label: 'Admin Panel', icon: <ShieldCheck className={ICON} />, active: pathname === '/admin' },
+    { href: '/admin/withdrawals', label: 'Withdrawals', icon: <ArrowUpRight className={ICON} />, active: pathname === '/admin/withdrawals' },
+  ];
+
+  return (
+    <div className="hidden h-full lg:block">
+      <Sidebar open={open} setOpen={setOpen}>
+        <SidebarBody className="h-full justify-between gap-6 overflow-x-hidden">
+          <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
+            <SidebarLogo />
+
+            <div className="mt-7 flex flex-col gap-2">
+              <SectionLabel>Navigation</SectionLabel>
+              <div className="flex flex-col gap-0.5">
+                {links.map((link) => <SidebarLink key={link.href} link={link} />)}
+              </div>
+            </div>
+
+            {isAdmin && (
+              <div className="mt-6 flex flex-col gap-2">
+                <SectionLabel>Admin</SectionLabel>
+                <div className="flex flex-col gap-0.5">
+                  {adminLinks.map((link) => <SidebarLink key={link.href} link={link} />)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-0.5">
+            <UserRow />
+            <ThemeToggleRow />
+            <SignOutRow />
+          </div>
+        </SidebarBody>
+      </Sidebar>
+    </div>
+  );
+}
+
+/* ── Mobile top bar ──────────────────────────────────────────────────────── */
 export function MobileTopBar() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
+  const dark = theme === 'dark';
+
+  const drawerLinks = [
+    { href: '/dashboard/trades',    label: 'History',   Icon: BarChart2 },
+    { href: '/dashboard/deposit',   label: 'Deposit',   Icon: ArrowDownToLine },
+    { href: '/dashboard/subscribe', label: 'Subscribe', Icon: Crown },
+    { href: '/dashboard/apikeys',   label: 'API Keys',  Icon: Key },
+    { href: '/dashboard/referral',  label: 'Referral',  Icon: Users },
+    { href: '/dashboard/support',   label: 'Support',   Icon: LifeBuoy },
+    { href: '/dashboard/profile',   label: 'Profile',   Icon: UserCircle },
+  ];
 
   return (
     <>
-      <header
-        className="lg:hidden fixed top-0 left-0 right-0 z-40 px-4 h-14 flex items-center justify-between"
-        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
-      >
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between px-4 lg:hidden"
+        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', backdropFilter: 'blur(10px)' }}>
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-blue-600">
-            <Zap size={14} className="text-white" />
-          </div>
-          <span className="text-base font-bold" style={{ color: 'var(--text-1)' }}>
+          <span className="grid size-[24px] place-items-center rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-500">
+            <Zap size={12} className="text-black" strokeWidth={2.6} />
+          </span>
+          <span className="text-[15px] font-bold tracking-tight" style={{ color: 'var(--text-1)' }}>
             TrickyX<span style={{ color: 'var(--accent)' }}>.ai</span>
           </span>
         </Link>
         <div className="flex items-center gap-1">
-          <ThemeToggle compact />
-          <button onClick={() => setOpen(v => !v)}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: 'var(--text-2)' }}>
+          <button onClick={toggle} className="rounded-lg p-2" style={{ color: 'var(--text-3)' }}>
+            {dark ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+          <button onClick={() => setOpen(v => !v)} className="rounded-lg p-2" style={{ color: 'var(--text-2)' }}>
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </header>
 
-      {/* Slide-down drawer */}
       {open && (
-        <div className="lg:hidden fixed inset-0 z-30" onClick={() => setOpen(false)}>
-          <div
-            className="absolute top-14 left-0 right-0 shadow-xl px-4 py-3"
+        <div className="fixed inset-0 z-30 lg:hidden" onClick={() => setOpen(false)}>
+          <motion.div
+            initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-x-0 top-14 px-3 py-3 shadow-2xl"
             style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-3"
-              style={{ background: 'var(--surface-2)' }}>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-blue-600 shrink-0">
+            onClick={e => e.stopPropagation()}>
+            <div className="mb-3 flex items-center gap-2.5 rounded-lg px-2.5 py-2"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+              <span className="grid size-7 place-items-center rounded-full text-[11px] font-bold"
+                style={{ background: 'var(--accent)', color: 'var(--bg)' }}>
                 {session?.user?.name?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-1)' }}>
-                  {session?.user?.name}
-                </div>
-              </div>
+              </span>
+              <span className="truncate text-[13px] font-semibold" style={{ color: 'var(--text-1)' }}>
+                {session?.user?.name}
+              </span>
             </div>
 
-            {/* Nav links not in bottom tab bar */}
-            <div className="mb-2">
-              {[
-                { href: '/dashboard/trades',    label: 'History',   icon: BarChart2 },
-                { href: '/dashboard/deposit',   label: 'Deposit',   icon: ArrowDownToLine },
-                { href: '/dashboard/subscribe', label: 'Subscribe', icon: Crown },
-                { href: '/dashboard/apikeys',   label: 'API Keys',  icon: Key },
-                { href: '/dashboard/referral',  label: 'Referral',  icon: Users },
-              ].map(({ href, label, icon: Icon }) => {
+            <div className="flex flex-col gap-0.5">
+              {drawerLinks.map(({ href, label, Icon }, i) => {
                 const active = isActive(href, pathname);
                 return (
-                  <Link key={href} href={href} onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-0.5 transition-all"
-                    style={{
-                      background: active ? 'var(--accent-dim)' : 'transparent',
-                      color:      active ? 'var(--accent)'     : 'var(--text-2)',
-                    }}>
-                    <Icon size={16} /> {label}
-                  </Link>
+                  <motion.div key={href}
+                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.03, duration: 0.25 }}>
+                    <Link href={href} onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium"
+                      style={{
+                        background: active ? 'var(--accent-dim)' : 'transparent',
+                        color: active ? 'var(--accent)' : 'var(--text-2)',
+                      }}>
+                      <Icon size={16} /> {label}
+                    </Link>
+                  </motion.div>
                 );
               })}
             </div>
@@ -257,10 +272,10 @@ export function MobileTopBar() {
               <>
                 <div className="my-2" style={{ borderTop: '1px solid var(--border)' }} />
                 <Link href="/dashboard/overview" onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all"
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium"
                   style={{
                     background: pathname === '/dashboard/overview' ? 'var(--accent-dim)' : 'transparent',
-                    color:      pathname === '/dashboard/overview' ? 'var(--accent)'     : 'var(--text-2)',
+                    color: pathname === '/dashboard/overview' ? 'var(--accent)' : 'var(--text-2)',
                   }}>
                   <Globe size={16} /> Overview
                 </Link>
@@ -270,75 +285,65 @@ export function MobileTopBar() {
             {session?.user?.role === 'admin' && (
               <>
                 <div className="my-2" style={{ borderTop: '1px solid var(--border)' }} />
-                <Link href="/admin" onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all"
-                  style={{
-                    background: pathname === '/admin' ? '#fefce8' : 'transparent',
-                    color:      pathname === '/admin' ? '#b45309' : 'var(--text-2)',
-                  }}>
-                  <ShieldCheck size={16} /> Admin Panel
-                </Link>
-                <Link href="/admin/withdrawals" onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium mb-1 transition-all"
-                  style={{
-                    background: pathname === '/admin/withdrawals' ? '#fefce8' : 'transparent',
-                    color:      pathname === '/admin/withdrawals' ? '#b45309' : 'var(--text-2)',
-                  }}>
-                  <ArrowUpRight size={16} /> Withdrawals
-                </Link>
+                {[{ href: '/admin', label: 'Admin Panel', Icon: ShieldCheck },
+                  { href: '/admin/withdrawals', label: 'Withdrawals', Icon: ArrowUpRight }].map(({ href, label, Icon }) => (
+                  <Link key={href} href={href} onClick={() => setOpen(false)}
+                    className="mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium"
+                    style={{
+                      background: pathname === href ? 'rgba(251,191,36,0.1)' : 'transparent',
+                      color: pathname === href ? 'var(--warn)' : 'var(--text-2)',
+                    }}>
+                    <Icon size={16} /> {label}
+                  </Link>
+                ))}
               </>
             )}
 
-            <div className="mt-2" style={{ borderTop: '1px solid var(--border)' }} />
+            <div className="my-2" style={{ borderTop: '1px solid var(--border)' }} />
             <button onClick={() => { signOut({ callbackUrl: window.location.origin + '/' }); setOpen(false); }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-colors mt-1"
-              style={{ color: '#ef4444' }}>
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium"
+              style={{ color: 'var(--danger)' }}>
               <LogOut size={15} /> Sign Out
             </button>
-          </div>
+          </motion.div>
         </div>
       )}
     </>
   );
 }
 
-/* ── Mobile bottom tab bar ────────────────────────────────────────────────── */
+/* ── Mobile bottom tab bar ───────────────────────────────────────────────── */
 export function MobileTabBar() {
   const pathname = usePathname();
-
   const tabs = [
-    { href: '/dashboard',           label: 'Home',    icon: LayoutDashboard },
-    { href: '/dashboard/bot',       label: 'Bot',     icon: Activity },
-    { href: '/dashboard/trade',     label: 'Trade',   icon: Trade },
-    { href: '/dashboard/chart',     label: 'Chart',   icon: LineChart },
-    { href: '/dashboard/settings',  label: 'Config',  icon: Settings2 },
+    { href: '/dashboard',          label: 'Home',   Icon: LayoutDashboard },
+    { href: '/dashboard/bot',      label: 'Bot',    Icon: Activity },
+    { href: '/dashboard/trade',    label: 'Trade',  Icon: Trade },
+    { href: '/dashboard/chart',    label: 'Chart',  Icon: LineChart },
+    { href: '/dashboard/settings', label: 'Config', Icon: Settings2 },
   ];
 
   return (
-    <nav
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40"
-      style={{
-        background:    'var(--surface)',
-        borderTop:     '1px solid var(--border)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
-    >
+    <nav className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
+      style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex">
-        {tabs.map(({ href, label, icon: Icon }) => {
+        {tabs.map(({ href, label, Icon }) => {
           const active = isActive(href, pathname);
           return (
             <Link key={href} href={href}
-              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors"
-              style={{ color: active ? 'var(--accent)' : 'var(--text-3)' }}>
-              <div className="relative">
-                <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
-                {active && (
-                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
-                    style={{ background: 'var(--accent)' }} />
-                )}
-              </div>
-              <span className="text-[10px] font-semibold leading-none"
-                style={{ color: active ? 'var(--accent)' : 'var(--text-3)' }}>
+              className="relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2"
+              style={{ color: active ? 'var(--accent)' : 'var(--text-3)', transition: 'color 0.15s' }}>
+              {active && (
+                <motion.span layoutId="tabbar-active"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  className="absolute inset-x-4 top-0 h-[2px] rounded-full"
+                  style={{ background: 'var(--accent)' }} />
+              )}
+              <motion.span whileTap={{ scale: 0.86 }} className="relative">
+                <Icon size={19} strokeWidth={active ? 2.3 : 1.7} />
+              </motion.span>
+              <span className="text-[10px] font-semibold tracking-wide"
+                style={{ fontWeight: active ? 700 : 500 }}>
                 {label}
               </span>
             </Link>
@@ -349,7 +354,6 @@ export function MobileTabBar() {
   );
 }
 
-/* ── Default export ───────────────────────────────────────────────────────── */
-export default function Sidebar() {
+export default function Sidebar_() {
   return <DesktopSidebar />;
 }

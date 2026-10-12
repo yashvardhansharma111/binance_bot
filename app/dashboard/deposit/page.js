@@ -15,7 +15,7 @@ const CURRENCIES = [
     tag:         'TRC20',
     fee:         'Fee ~$1',
     accentColor: '#EF0027',
-    bgSelected:  '#fff1f2',
+    bgSelected:  'rgba(239,0,39,0.14)',
     borderSel:   '#EF0027',
     warning:     'Send only USDT on Tron (TRC20). Do NOT send TRX or any other coin — it will be lost.',
     Logo: () => (
@@ -33,7 +33,7 @@ const CURRENCIES = [
     tag:         'BEP20',
     fee:         'Fee ~$0.8',
     accentColor: '#F0B90B',
-    bgSelected:  '#fffbeb',
+    bgSelected:  'rgba(240,185,11,0.14)',
     borderSel:   '#F0B90B',
     warning:     'Send only USDT on BNB Smart Chain (BEP20). Do NOT send BNB or any other coin — it will be lost.',
     Logo: () => (
@@ -48,15 +48,15 @@ const CURRENCIES = [
 const AMOUNTS = [10, 25, 50, 100, 250, 500];
 
 const STATUS_META = {
-  waiting:        { label: 'Waiting for payment',  color: '#b45309', bg: '#fefce8', icon: Clock },
-  confirming:     { label: 'Confirming on-chain',  color: '#2563eb', bg: '#eff6ff', icon: RefreshCw },
-  confirmed:      { label: 'Confirmed',             color: '#2563eb', bg: '#eff6ff', icon: RefreshCw },
-  sending:        { label: 'Sending funds',         color: '#7c3aed', bg: '#f5f3ff', icon: RefreshCw },
-  partially_paid: { label: 'Partial payment received — funds credited to wallet!', color: '#16a34a', bg: '#f0fdf4', icon: CheckCircle2 },
-  finished:       { label: 'Payment complete!',     color: '#16a34a', bg: '#f0fdf4', icon: CheckCircle2 },
-  failed:         { label: 'Payment failed',        color: '#dc2626', bg: '#fef2f2', icon: XCircle },
-  expired:        { label: 'Payment expired',       color: '#dc2626', bg: '#fef2f2', icon: XCircle },
-  refunded:       { label: 'Refunded',              color: '#64748b', bg: '#f8fafc', icon: CheckCircle2 },
+  waiting:        { label: 'Waiting for payment',  color: '#fbbf24', bg: 'rgba(245,158,11,0.12)', icon: Clock },
+  confirming:     { label: 'Confirming on-chain',  color: 'var(--accent)', bg: 'rgba(59,130,246,0.12)', icon: RefreshCw },
+  confirmed:      { label: 'Confirmed',             color: 'var(--accent)', bg: 'rgba(59,130,246,0.12)', icon: RefreshCw },
+  sending:        { label: 'Sending funds',         color: '#a78bfa', bg: 'rgba(139,92,246,0.12)', icon: RefreshCw },
+  partially_paid: { label: 'Partial payment received — funds credited to wallet!', color: 'var(--success)', bg: 'rgba(16,185,129,0.12)', icon: CheckCircle2 },
+  finished:       { label: 'Payment complete!',     color: 'var(--success)', bg: 'rgba(16,185,129,0.12)', icon: CheckCircle2 },
+  failed:         { label: 'Payment failed',        color: 'var(--danger)', bg: 'rgba(239,68,68,0.12)', icon: XCircle },
+  expired:        { label: 'Payment expired',       color: 'var(--danger)', bg: 'rgba(239,68,68,0.12)', icon: XCircle },
+  refunded:       { label: 'Refunded',              color: 'var(--text-3)', bg: 'var(--surface-2)', icon: CheckCircle2 },
 };
 
 export default function DepositPage() {
@@ -167,9 +167,9 @@ export default function DepositPage() {
                 <button key={a} onClick={() => { setAmount(a); setCustom(''); }}
                   className="py-2.5 rounded-lg text-sm font-bold border transition-all"
                   style={{
-                    background:   !custom && amount === a ? '#2563eb' : '#f8fafc',
-                    color:        !custom && amount === a ? '#fff'    : '#64748b',
-                    borderColor:  !custom && amount === a ? '#2563eb' : '#e2e8f0',
+                    background:   !custom && amount === a ? 'var(--accent)' : 'var(--surface-2)',
+                    color:        !custom && amount === a ? 'var(--bg)' : 'var(--text-3)',
+                    borderColor:  !custom && amount === a ? 'var(--accent)' : 'var(--border)',
                   }}>
                   ${a}
                 </button>
@@ -193,8 +193,8 @@ export default function DepositPage() {
                   <button key={c.value} onClick={() => setCurrency(c.value)}
                     className="flex-1 text-left rounded-xl border-2 p-3.5 transition-all"
                     style={{
-                      background:  selected ? c.bgSelected : '#f8fafc',
-                      borderColor: selected ? c.borderSel  : '#e2e8f0',
+                      background:  selected ? c.bgSelected : 'var(--surface-2)',
+                      borderColor: selected ? c.borderSel  : 'var(--border)',
                     }}>
                     <div className="flex items-start gap-3">
                       <c.Logo />
@@ -226,7 +226,7 @@ export default function DepositPage() {
             {/* Warning banner */}
             {currObj && (
               <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border"
-                style={{ background: '#fff7ed', borderColor: '#fed7aa' }}>
+                style={{ background: 'rgba(249,115,22,0.12)', borderColor: 'rgba(249,115,22,0.32)' }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 mt-0.5">
                   <path d="M8 1.5L14.5 13H1.5L8 1.5Z" fill="#f97316" stroke="#ea580c" strokeWidth="0.5"/>
                   <path d="M8 6v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
@@ -313,7 +313,7 @@ export default function DepositPage() {
               <div className="text-center">
                 <div className="text-xs text-slate-400 mb-1">Send exactly</div>
                 <div className="text-3xl font-bold text-slate-900">
-                  {payment.payAmount} <span style={{ color: payObj?.accentColor || '#2563eb' }}>{payment.payCurrency?.toUpperCase()}</span>
+                  {payment.payAmount} <span style={{ color: payObj?.accentColor || 'var(--accent)' }}>{payment.payCurrency?.toUpperCase()}</span>
                 </div>
                 <div className="text-sm text-slate-400 mt-0.5">
                   ${finalAmt} deposit
@@ -323,9 +323,11 @@ export default function DepositPage() {
                 </div>
               </div>
 
-              {/* QR */}
-              <div className="flex justify-center p-4 bg-white border border-slate-100 rounded-xl">
-                <QRCode value={payment.payAddress} size={180} />
+              {/* QR — must stay literally white. `bg-white` is remapped to a
+                  near-black surface in dark mode, which makes the code unscannable. */}
+              <div className="flex justify-center rounded-xl p-4"
+                style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.14)' }}>
+                <QRCode value={payment.payAddress} size={180} bgColor="#ffffff" fgColor="#000000" />
               </div>
 
               {/* Address */}
@@ -354,7 +356,7 @@ export default function DepositPage() {
 
               {/* Critical warning on payment screen */}
               <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl border"
-                style={{ background: '#fef2f2', borderColor: '#fecaca' }}>
+                style={{ background: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.32)' }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 mt-0.5">
                   <circle cx="8" cy="8" r="7" fill="#dc2626" stroke="#b91c1c" strokeWidth="0.5"/>
                   <path d="M8 5v3.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>

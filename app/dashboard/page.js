@@ -9,36 +9,55 @@ import {
   Zap, AlertTriangle, LogOut,
 } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
+import { motion } from 'motion/react';
 
 const LEVERAGES = [1, 2, 3, 5, 10, 20, 50, 75, 100, 125];
 
-function StatCard({ title, value, sub, icon: Icon, iconBg, iconColor, trend, href }) {
+// Shared entrance for dashboard blocks — staggered by `i`.
+const rise = (i = 0) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { delay: i * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+});
+
+function StatCard({ title, value, sub, icon: Icon, iconBg, iconColor, trend, href, index = 0 }) {
   const inner = (
     <>
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="text-slate-500 text-xs mb-1">{title}</p>
-          <p className="text-xl font-bold text-slate-900">{value}</p>
-          {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 }}>{title}</p>
+          <p className="font-display" style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.1, letterSpacing: '-0.01em', wordBreak: 'break-word' }}>{value}</p>
+          {sub && <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{sub}</p>}
         </div>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: iconBg }}>
-          <Icon size={16} style={{ color: iconColor }} />
-        </div>
+        <motion.div
+          whileHover={{ scale: 1.1, rotate: -6 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 16 }}
+          style={{
+            width: 36, height: 36, borderRadius: 9, flexShrink: 0, marginLeft: 12,
+            background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+          <Icon size={15} style={{ color: iconColor }} />
+        </motion.div>
       </div>
       {trend !== undefined && (
-        <div className={`flex items-center gap-1 text-xs font-semibold ${trend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: trend >= 0 ? 'var(--success)' : 'var(--danger)' }}>
           {trend >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
           {Math.abs(trend)}% this week
         </div>
       )}
     </>
   );
-  if (href) return (
-    <a href={href} className="card p-5 glow-border block transition-all hover:shadow-md active:scale-95" style={{ cursor: 'pointer' }}>
-      {inner}
-    </a>
-  );
-  return <div className="card p-5 glow-border">{inner}</div>;
+
+  const common = {
+    className: 'card glow-border',
+    style: { padding: '18px 20px', ...(href ? { cursor: 'pointer', display: 'block' } : {}) },
+    ...rise(index),
+    whileHover: { y: -3 },
+    ...(href ? { whileTap: { scale: 0.975 } } : {}),
+  };
+
+  if (href) return <motion.a href={href} {...common}>{inner}</motion.a>;
+  return <motion.div {...common}>{inner}</motion.div>;
 }
 
 function QuickTrade({ balances, onTradeComplete }) {
@@ -235,26 +254,28 @@ function QuickTrade({ balances, onTradeComplete }) {
         )}
       </div>
 
-      {/* Side buttons */}
+      {/* Side buttons — inactive side is a translucent tint, not a near-white fill */}
       <div className="flex gap-2 mb-4">
-        <button onClick={() => setSide('BUY')}
-          className="flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all"
+        <motion.button onClick={() => setSide('BUY')} whileTap={{ scale: 0.97 }}
+          className="flex-1 rounded-lg border py-2.5 text-sm font-bold transition-all"
           style={{
-            background:  isLong ? '#16a34a' : '#f0fdf4',
-            color:       isLong ? '#fff'    : '#16a34a',
-            borderColor: '#16a34a',
+            background:  isLong ? 'var(--success)'       : 'rgba(16,185,129,0.09)',
+            color:       isLong ? '#04120c'              : 'var(--success)',
+            borderColor: isLong ? 'var(--success)'       : 'rgba(16,185,129,0.35)',
+            boxShadow:   isLong ? '0 6px 20px -6px rgba(16,185,129,0.6)' : 'none',
           }}>
           {mode === 'futures' ? 'LONG' : <><ArrowUpCircle size={13} className="inline mr-1" />BUY</>}
-        </button>
-        <button onClick={() => setSide('SELL')}
-          className="flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all"
+        </motion.button>
+        <motion.button onClick={() => setSide('SELL')} whileTap={{ scale: 0.97 }}
+          className="flex-1 rounded-lg border py-2.5 text-sm font-bold transition-all"
           style={{
-            background:  !isLong ? '#dc2626' : '#fef2f2',
-            color:       !isLong ? '#fff'    : '#dc2626',
-            borderColor: '#dc2626',
+            background:  !isLong ? 'var(--danger)'       : 'rgba(239,68,68,0.09)',
+            color:       !isLong ? '#140405'             : 'var(--danger)',
+            borderColor: !isLong ? 'var(--danger)'       : 'rgba(239,68,68,0.35)',
+            boxShadow:   !isLong ? '0 6px 20px -6px rgba(239,68,68,0.55)' : 'none',
           }}>
           {mode === 'futures' ? 'SHORT' : <><ArrowDownCircle size={13} className="inline mr-1" />SELL</>}
-        </button>
+        </motion.button>
       </div>
 
       {mode === 'spot' ? (
@@ -327,7 +348,7 @@ function QuickTrade({ balances, onTradeComplete }) {
                 <button key={lv} onClick={() => setLeverage(lv)}
                   className="px-2.5 py-1 rounded-lg text-xs font-bold border transition-all"
                   style={{
-                    background:  leverage === lv ? '#2563eb' : '#f8fafc',
+                    background:  leverage === lv ? 'var(--accent)' : 'var(--surface-2)',
                     color:       leverage === lv ? '#fff'    : '#64748b',
                     borderColor: leverage === lv ? '#2563eb' : '#e2e8f0',
                   }}>
@@ -446,7 +467,7 @@ function QuickTrade({ balances, onTradeComplete }) {
                   </div>
                   <button onClick={() => exitTrade(t._id)} disabled={exitLoading === t._id}
                     className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 transition-all"
-                    style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                    style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}>
                     {exitLoading === t._id ? <RefreshCw size={11} className="animate-spin" /> : <LogOut size={11} />}
                     Exit
                   </button>
@@ -577,7 +598,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="mb-5 px-4 py-3 rounded-xl flex items-center gap-3 text-sm border"
-          style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#16a34a' }}>
+          style={{ background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)', color: 'var(--success)' }}>
           <Crown size={15} />
           <span>
             <strong>Pro subscription</strong> active — {sub.daysLeft} days remaining
@@ -616,46 +637,62 @@ export default function DashboardPage() {
               ? 'N/A'
               : `$${(balances?.balances?.find(b => b.asset === 'USDT')?.free ?? 0).toFixed(2)}`}
           sub="Exchange balance"
-          icon={Wallet} iconBg="#eff6ff" iconColor="#2563eb"
+          icon={Wallet} iconBg="rgba(37,99,235,0.14)" iconColor="#60a5fa"
+          index={0}
         />
         <StatCard
           title="Asset Balance"
           value={`$${(user?.assetBalance ?? 0).toFixed(2)}`}
           sub="Deposits + commissions"
-          icon={Activity} iconBg="#ecfeff" iconColor="#0891b2"
+          icon={Activity} iconBg="rgba(6,182,212,0.14)" iconColor="#22d3ee"
           href="/dashboard/deposit"
+          index={1}
         />
         <StatCard
           title="Total Profit"
           value={`${totalProfit >= 0 ? '+' : ''}$${totalProfit.toFixed(2)}`}
           sub="From all trades"
           icon={TrendingUp}
-          iconBg={totalProfit >= 0 ? '#f0fdf4' : '#fef2f2'}
-          iconColor={totalProfit >= 0 ? '#16a34a' : '#dc2626'}
+          iconBg={totalProfit >= 0 ? 'rgba(16,185,129,0.14)' : 'rgba(239,68,68,0.14)'}
+          iconColor={totalProfit >= 0 ? '#34d399' : '#f87171'}
           trend={totalProfit >= 0 ? 5.2 : -1.8}
+          index={2}
         />
-        <button onClick={copyReferral}
-          className="card p-5 glow-border text-left w-full transition-all active:scale-95 hover:shadow-md"
-          style={{ cursor: 'pointer' }}>
-          <div className="flex items-start justify-between mb-3">
+        <motion.button onClick={copyReferral}
+          className="card glow-border w-full text-left"
+          style={{ padding: '18px 20px', cursor: 'pointer' }}
+          {...rise(3)} whileHover={{ y: -3 }} whileTap={{ scale: 0.975 }}>
+          <div className="flex items-start justify-between" style={{ marginBottom: 12 }}>
             <div className="min-w-0 flex-1">
-              <p className="text-slate-500 text-xs mb-1">Referral Code</p>
-              <p className="text-xl font-bold text-slate-900 font-mono tracking-wide">
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 }}>
+                Referral Code
+              </p>
+              <p className="font-mono" style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', letterSpacing: '0.04em' }}>
                 {user?.referralCode || '—'}
               </p>
-              <p className="text-xs mt-0.5 flex items-center gap-1"
-                style={{ color: refCopied ? '#16a34a' : '#94a3b8' }}>
+              <motion.p key={refCopied ? 'copied' : 'idle'}
+                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center gap-1"
+                style={{ fontSize: 11, marginTop: 4, color: refCopied ? 'var(--success)' : 'var(--text-3)' }}>
                 {refCopied ? <><Check size={11} /> Link copied!</> : <><Copy size={11} /> Tap to copy link</>}
-              </p>
+              </motion.p>
             </div>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors"
-              style={{ background: refCopied ? '#f0fdf4' : '#fefce8' }}>
+            <motion.div
+              animate={refCopied ? { scale: [1, 1.22, 1], rotate: [0, -8, 0] } : {}}
+              transition={{ duration: 0.4 }}
+              className="flex shrink-0 items-center justify-center"
+              style={{
+                width: 36, height: 36, borderRadius: 9, marginLeft: 12,
+                background: refCopied ? 'rgba(16,185,129,0.16)' : 'rgba(245,158,11,0.14)',
+                transition: 'background 0.25s',
+              }}>
               {refCopied
-                ? <Check size={16} className="text-emerald-500" />
-                : <Users size={16} style={{ color: '#b45309' }} />}
-            </div>
+                ? <Check size={15} style={{ color: 'var(--success)' }} />
+                : <Users size={15} style={{ color: '#fbbf24' }} />}
+            </motion.div>
           </div>
-        </button>
+        </motion.button>
       </div>
 
       {/* Exchange Balance */}
@@ -710,7 +747,7 @@ export default function DashboardPage() {
                 <div key={b.asset}
                   className="rounded-xl px-3 py-2.5 border transition-colors"
                   style={{
-                    background:  isUsdt ? '#eff6ff' : '#f8fafc',
+                    background:  isUsdt ? 'var(--accent-dim)' : 'var(--surface-2)',
                     borderColor: isUsdt ? '#bfdbfe' : '#e2e8f0',
                   }}>
                   <div className="flex items-center justify-between mb-1">

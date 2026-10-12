@@ -6,6 +6,7 @@ import {
 } from 'lightweight-charts';
 import { RefreshCw, BarChart2, Wifi, WifiOff, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
+import { useTheme } from '@/app/ThemeContext';
 
 const INTERVALS = ['1m', '5m', '15m', '1h', '4h'];
 
@@ -28,25 +29,58 @@ function calcRSI(closes, period = 14) {
   return rsi;
 }
 
-const CHART_OPTS = {
+/* lightweight-charts paints to canvas, so it can't inherit the CSS theme —
+   its palette has to be passed in explicitly and re-applied on theme change. */
+const CHART_THEME = {
+  dark: {
+    bg:        '#09090f',
+    text:      '#6b8299',
+    grid:      'rgba(255,255,255,0.055)',
+    border:    'rgba(255,255,255,0.09)',
+    up:        '#10b981',
+    down:      '#f43f5e',
+    volume:    'rgba(16,185,129,0.35)',
+    rsi:       '#a78bfa',
+    overbought:'#f43f5e',
+    mid:       '#38bdf8',
+    oversold:  '#10b981',
+  },
+  light: {
+    bg:        '#ffffff',
+    text:      '#64748b',
+    grid:      '#f1f5f9',
+    border:    '#e2e8f0',
+    up:        '#16a34a',
+    down:      '#ef4444',
+    volume:    '#2563eb',
+    rsi:       '#7c3aed',
+    overbought:'#ef4444',
+    mid:       '#2563eb',
+    oversold:  '#16a34a',
+  },
+};
+
+const chartOpts = (t) => ({
   layout: {
-    background: { type: ColorType.Solid, color: '#ffffff' },
-    textColor: '#64748b',
-    fontFamily: "'Open Sans', sans-serif",
+    background: { type: ColorType.Solid, color: t.bg },
+    textColor: t.text,
+    fontFamily: "'Inter', system-ui, sans-serif",
     fontSize: 11,
     attributionLogo: false,
   },
   grid: {
-    vertLines: { color: '#f1f5f9' },
-    horzLines: { color: '#f1f5f9' },
+    vertLines: { color: t.grid },
+    horzLines: { color: t.grid },
   },
   crosshair: { mode: CrosshairMode.Normal },
-  rightPriceScale: { borderColor: '#e2e8f0' },
-  timeScale: { borderColor: '#e2e8f0', timeVisible: true, secondsVisible: false },
+  rightPriceScale: { borderColor: t.border },
+  timeScale: { borderColor: t.border, timeVisible: true, secondsVisible: false },
   autoSize: true,
-};
+});
 
 export default function ChartPage() {
+  const { theme }      = useTheme();
+  const themeRef       = useRef(theme);
   const mainRef        = useRef(null);
   const rsiRef         = useRef(null);
   const chartRef       = useRef(null);
@@ -74,22 +108,24 @@ export default function ChartPage() {
 
     const isMobile = window.innerWidth < 640;
 
+    const t = CHART_THEME[themeRef.current] ?? CHART_THEME.dark;
+
     const chart = createChart(mainRef.current, {
-      ...CHART_OPTS,
+      ...chartOpts(t),
       height: isMobile ? 260 : 380,
     });
 
     const candleSer = chart.addSeries(CandlestickSeries, {
-      upColor:         '#16a34a',
-      downColor:       '#ef4444',
-      borderUpColor:   '#16a34a',
-      borderDownColor: '#ef4444',
-      wickUpColor:     '#16a34a',
-      wickDownColor:   '#ef4444',
+      upColor:         t.up,
+      downColor:       t.down,
+      borderUpColor:   t.up,
+      borderDownColor: t.down,
+      wickUpColor:     t.up,
+      wickDownColor:   t.down,
     });
 
     const volumeSer = chart.addSeries(HistogramSeries, {
-      color:        '#2563eb',
+      color:        t.volume,
       priceFormat:  { type: 'volume' },
       priceScaleId: 'vol',
     });
@@ -98,7 +134,7 @@ export default function ChartPage() {
     });
 
     const rsiChart = createChart(rsiRef.current, {
-      ...CHART_OPTS,
+      ...chartOpts(t),
       height: isMobile ? 100 : 130,
     });
     rsiChart.priceScale('right').applyOptions({
@@ -107,15 +143,15 @@ export default function ChartPage() {
     });
 
     const rsiSer = rsiChart.addSeries(LineSeries, {
-      color:       '#7c3aed',
+      color:       t.rsi,
       lineWidth:   2,
       priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
     });
 
     [
-      { price: 70, color: '#ef4444', label: '70' },
-      { price: 60, color: '#2563eb', label: '60' },
-      { price: 30, color: '#16a34a', label: '30' },
+      { price: 70, color: t.overbought, label: '70' },
+      { price: 60, color: t.mid,        label: '60' },
+      { price: 30, color: t.oversold,   label: '30' },
     ].forEach(({ price: p, color, label }) => {
       rsiSer.createPriceLine({
         price: p, color, lineWidth: 1,
@@ -155,6 +191,24 @@ export default function ChartPage() {
       rsiSerRef.current    = null;
     };
   }, []);
+
+  // ── Repaint the canvas palette when the theme toggles ──────────────────
+  useEffect(() => {
+    themeRef.current = theme;
+    const t = CHART_THEME[theme] ?? CHART_THEME.dark;
+    const opts = chartOpts(t);
+
+    chartRef.current?.applyOptions(opts);
+    rsiChartRef.current?.applyOptions(opts);
+
+    candleSerRef.current?.applyOptions({
+      upColor: t.up, downColor: t.down,
+      borderUpColor: t.up, borderDownColor: t.down,
+      wickUpColor: t.up, wickDownColor: t.down,
+    });
+    volumeSerRef.current?.applyOptions({ color: t.volume });
+    rsiSerRef.current?.applyOptions({ color: t.rsi });
+  }, [theme]);
 
   // ── Reload history + reconnect WS when symbol / timeframe changes ──────
   useEffect(() => {
@@ -300,9 +354,9 @@ export default function ChartPage() {
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border"
             style={{
-              background:   wsOk ? '#f0fdf4' : '#fef2f2',
-              color:        wsOk ? '#16a34a' : '#dc2626',
-              borderColor:  wsOk ? '#bbf7d0' : '#fecaca',
+              background:   wsOk ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              color:        wsOk ? 'var(--success)'       : 'var(--danger)',
+              borderColor:  wsOk ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
             }}>
             {wsOk ? <Wifi size={11} /> : <WifiOff size={11} />}
             {wsOk ? 'Live' : '...'}
@@ -318,14 +372,14 @@ export default function ChartPage() {
       {/* Symbol + Interval */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <SymbolSearch value={symbol} onChange={setSymbol} size="sm" />
-        <div className="flex gap-0.5 bg-slate-100 p-1 rounded-lg">
+        <div className="flex gap-0.5 rounded-lg p-1" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
           {INTERVALS.map(iv => (
             <button key={iv} onClick={() => setTimeframe(iv)}
               className="px-2.5 py-1.5 rounded-md text-xs font-bold transition-all"
               style={{
-                background: timeframe === iv ? 'white' : 'transparent',
-                color:      timeframe === iv ? '#0f172a' : '#64748b',
-                boxShadow:  timeframe === iv ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                background: timeframe === iv ? 'var(--accent-dim)' : 'transparent',
+                color:      timeframe === iv ? 'var(--accent)'     : 'var(--text-3)',
+                boxShadow:  timeframe === iv ? 'inset 0 0 0 1px var(--border-hover)' : 'none',
               }}>
               {iv}
             </button>

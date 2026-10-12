@@ -326,8 +326,8 @@ export default function ApiKeysPage() {
               <button type="submit" disabled={loading}
                 className={`w-full py-3 mt-1 text-sm font-semibold rounded-lg disabled:opacity-60 transition-all text-white ${
                   accountType === 'testnet'
-                    ? 'bg-violet-600 hover:bg-violet-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
+                    ? 'bg-violet-600 hover:bg-violet-500'
+                    : 'bg-blue-600 hover:bg-blue-500'
                 }`}>
                 {loading ? 'Connecting...' : exchange === 'bingx' ? '🟠 Connect BingX' : accountType === 'testnet' ? '🧪 Connect Testnet' : '✅ Connect Binance'}
               </button>

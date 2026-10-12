@@ -2,11 +2,13 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { motion } from 'motion/react';
 import {
-  Zap, Mail, Lock, User, Eye, EyeOff, AlertCircle,
-  CheckCircle, Hash, ShieldCheck, RefreshCw, Wand2, Check, X, Copy, Phone,
+  Mail, Lock, User, Eye, EyeOff, AlertCircle, ArrowRight,
+  CheckCircle, Hash, RefreshCw, Wand2, Check, X, Copy, Phone,
 } from 'lucide-react';
 import { PASSWORD_RULES, validatePassword, generatePassword } from '@/lib/passwordUtils';
+import { AuthShell, AuthAlert } from '@/components/ui/auth-shell';
 
 function StrengthChecklist({ password }) {
   if (!password) return null;
@@ -19,7 +21,7 @@ function StrengthChecklist({ password }) {
             {pass
               ? <Check size={11} className="text-emerald-500 shrink-0" />
               : <X     size={11} className="text-red-400 shrink-0" />}
-            <span className={pass ? 'text-emerald-600' : 'text-slate-400'}>{rule.label}</span>
+            <span className={pass ? 'text-emerald-400' : 'text-neutral-600'}>{rule.label}</span>
           </div>
         );
       })}
@@ -115,57 +117,24 @@ function RegisterForm() {
   const strengthCount = PASSWORD_RULES.filter(r => r.test(form.password)).length;
   const strengthColor = strengthCount <= 2 ? '#ef4444' : strengthCount <= 3 ? '#f59e0b' : strengthCount === 4 ? '#3b82f6' : '#10b981';
 
-  const leftPanel = (
-    <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 flex-col justify-between p-12">
-      <Link href="/" className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/20">
-          <Zap size={16} className="text-white" />
-        </div>
-        <span className="text-lg font-bold text-white">TrickyX.ai</span>
-      </Link>
-      <div>
-        <h2 className="text-4xl font-extrabold text-white mb-4 leading-tight">
-          Start earning<br />in minutes.
-        </h2>
-        <p className="text-blue-200 text-lg leading-relaxed">
-          Create your free account and activate the AI trading bot.
-          No KYC, no credit card required.
-        </p>
-      </div>
-      <p className="text-blue-300 text-sm">&copy; 2026 TrickyX.ai</p>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {leftPanel}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden mb-8 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600">
-              <Zap size={16} className="text-white" />
-            </div>
-            <span className="text-lg font-bold text-slate-900">TrickyX<span className="text-blue-600">.ai</span></span>
-          </div>
+    <AuthShell
+      title="Create your account"
+      subtitle="Start trading with AI in minutes"
+      maxWidth="max-w-lg"
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link href="/login" className="font-semibold text-emerald-400 transition-colors hover:text-emerald-300">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      {error   && <AuthAlert tone="error"   icon={AlertCircle}>{error}</AuthAlert>}
+      {success && <AuthAlert tone="success" icon={CheckCircle}>{success}</AuthAlert>}
 
-          {step === 1 && (
-            <>
-              <h1 className="text-2xl font-bold text-slate-900 mb-1">Create your account</h1>
-              <p className="text-slate-500 mb-8">Start trading with AI in minutes</p>
-
-              <div className="card p-8 glow-border">
-                {error && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-red-50 border border-red-200 text-red-600">
-                    <AlertCircle size={15} /> {error}
-                  </div>
-                )}
-                {success && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg mb-5 text-sm bg-emerald-50 border border-emerald-200 text-emerald-700">
-                    <CheckCircle size={15} /> {success}
-                  </div>
-                )}
-
-                <form onSubmit={sendOtp} className="space-y-5">
+      <form onSubmit={sendOtp} className="space-y-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
                     <div className="relative">
@@ -283,12 +252,12 @@ function RegisterForm() {
                       <div className="flex gap-1.5">
                         {form.password && (
                           <button type="button" onClick={handleCopy}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2 py-0.5 rounded border border-slate-200 hover:border-slate-300 transition-all">
+                            className="flex items-center gap-1 rounded border border-white/10 px-2 py-0.5 text-xs text-neutral-400 transition-all hover:border-white/20 hover:text-neutral-200">
                             <Copy size={11} /> {copied ? 'Copied!' : 'Copy'}
                           </button>
                         )}
                         <button type="button" onClick={handleGenerate}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 px-2 py-0.5 rounded border border-blue-200 hover:border-blue-400 bg-blue-50 hover:bg-blue-100 transition-all font-medium">
+                          className="flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400 transition-all hover:border-emerald-500/50 hover:bg-emerald-500/20">
                           <Wand2 size={11} /> Generate
                         </button>
                       </div>
@@ -311,7 +280,7 @@ function RegisterForm() {
                         <div className="flex gap-1 mb-1.5">
                           {[1,2,3,4,5].map(i => (
                             <div key={i} className="h-1 flex-1 rounded-full transition-all"
-                              style={{ background: i <= strengthCount ? strengthColor : '#e2e8f0' }} />
+                              style={{ background: i <= strengthCount ? strengthColor : 'rgba(255,255,255,0.1)' }} />
                           ))}
                         </div>
                         <StrengthChecklist password={form.password} />
@@ -323,8 +292,8 @@ function RegisterForm() {
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                       Referral Code
                       {refLocked
-                        ? <span className="ml-2 text-xs font-normal text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Applied</span>
-                        : <span className="ml-1 text-xs font-normal text-slate-400">(optional)</span>
+                        ? <span className="ml-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-normal text-emerald-400">Applied</span>
+                        : <span className="ml-1 text-xs font-normal text-neutral-600">(optional)</span>
                       }
                     </label>
                     <div className="relative">
@@ -334,7 +303,7 @@ function RegisterForm() {
                         style={{
                           paddingLeft: '2.5rem',
                           borderColor: refStatus === 'valid' ? '#10b981' : refStatus === 'invalid' ? '#ef4444' : undefined,
-                          background:  refLocked ? '#f0fdf4' : undefined,
+                          background:  refLocked ? 'rgba(16,185,129,0.07)' : undefined,
                           cursor:      refLocked ? 'not-allowed' : undefined,
                         }}
                         type="text"
@@ -359,23 +328,20 @@ function RegisterForm() {
                     )}
                   </div>
 
-                  <button type="submit" disabled={loading || !pwdValid || refStatus === 'invalid' || refStatus === 'checking' || (refLocked && refStatus !== 'valid')}
-                    className="btn-primary w-full py-3 text-sm mt-1 disabled:opacity-60 flex items-center justify-center gap-2">
-                    {loading ? <><RefreshCw size={14} className="animate-spin" /> Creating account...</> : 'Create Account'}
-                  </button>
-                </form>
-
-                <p className="text-center text-slate-500 text-sm mt-6">
-                  Already have an account?{' '}
-                  <Link href="/login" className="text-blue-600 hover:text-blue-700 font-semibold">Sign in</Link>
-                </p>
-              </div>
-            </>
-          )}
-
-        </div>
-      </div>
-    </div>
+        <motion.button type="submit"
+          disabled={loading || !pwdValid || refStatus === 'invalid' || refStatus === 'checking' || (refLocked && refStatus !== 'valid')}
+          whileHover={{ y: -1 }} whileTap={{ scale: 0.985 }}
+          className="group relative mt-1 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 text-[14px] font-semibold text-black transition disabled:opacity-50"
+          style={{ boxShadow: '0 8px 28px -8px rgba(16,185,129,0.55)' }}>
+          <span className="relative z-10 inline-flex items-center gap-2">
+            {loading
+              ? <><RefreshCw size={14} className="animate-spin" /> Creating account…</>
+              : <>Create Account <ArrowRight size={15} /></>}
+          </span>
+          <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+        </motion.button>
+      </form>
+    </AuthShell>
   );
 }
 

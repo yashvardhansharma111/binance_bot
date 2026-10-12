@@ -288,8 +288,10 @@ export default function SubscribePage() {
                     Includes <span className="text-amber-600 font-semibold">${gasFee} network fee buffer</span> — plan price is $49
                   </div>
                 </div>
-                <div className="flex justify-center p-3 bg-white border border-slate-100 rounded-xl">
-                  <QRCode value={sub.payAddress} size={160} />
+                {/* QR must stay literally white — `bg-white` is remapped dark. */}
+                <div className="flex justify-center rounded-xl p-3"
+                  style={{ background: '#ffffff', border: '1px solid rgba(255,255,255,0.14)' }}>
+                  <QRCode value={sub.payAddress} size={160} bgColor="#ffffff" fgColor="#000000" />
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-slate-500 mb-1">Address</div>

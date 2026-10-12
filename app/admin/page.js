@@ -728,7 +728,7 @@ export default function AdminPage() {
                               Cancel
                             </button>
                             <button onClick={() => saveOverviewPerms(u._id)} disabled={overviewSaving}
-                              className="px-2.5 py-1 rounded text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50">
+                              className="px-2.5 py-1 rounded text-xs font-semibold bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-50">
                               {overviewSaving ? '…' : 'Save'}
                             </button>
                           </div>
