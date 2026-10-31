@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { PASSWORD_RULES, validatePassword, generatePassword } from '@/lib/passwordUtils';
 import { AuthShell, AuthAlert } from '@/components/ui/auth-shell';
+import MetaMaskButton from '@/components/MetaMaskButton';
 
 function StrengthChecklist({ password }) {
   if (!password) return null;
@@ -133,6 +134,14 @@ function RegisterForm() {
     >
       {error   && <AuthAlert tone="error"   icon={AlertCircle}>{error}</AuthAlert>}
       {success && <AuthAlert tone="success" icon={CheckCircle}>{success}</AuthAlert>}
+
+      <MetaMaskButton callbackUrl="/dashboard" />
+
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-white/10" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-neutral-600">or sign up with email</span>
+        <span className="h-px flex-1 bg-white/10" />
+      </div>
 
       <form onSubmit={sendOtp} className="space-y-5">
                   <div>

@@ -43,7 +43,7 @@ export async function getCandles(symbol, interval = '5m', limit = 100) {
     try {
       const { data } = await bingxAxios.get(`${base}/openApi/spot/v2/market/kline`, {
         params: { symbol: toSymbol(symbol), interval, limit },
-        timeout: 10000,
+        timeout: 20000,
       });
       if (data?.code !== 0) {
         // Symbol not available on BingX — return empty so bot's candle guard handles it
@@ -70,7 +70,7 @@ export async function getCurrentPrice(symbol) {
     try {
       const { data } = await bingxAxios.get(`${base}/openApi/spot/v1/ticker/price`, {
         params: { symbol: toSymbol(symbol) },
-        timeout: 5000,
+        timeout: 12000,
       });
       // BingX returns data.data as object OR array depending on version/symbol
       const priceData = Array.isArray(data?.data) ? data.data[0] : data?.data;
@@ -83,7 +83,7 @@ export async function getCurrentPrice(symbol) {
     try {
       const { data } = await bingxAxios.get(`${base}/openApi/spot/v2/market/kline`, {
         params: { symbol: toSymbol(symbol), interval: '1m', limit: 1 },
-        timeout: 5000,
+        timeout: 12000,
       });
       if (data?.code === 0 && Array.isArray(data?.data) && data.data.length > 0) {
         const price = parseFloat(data.data[0][4]); // index 4 = close

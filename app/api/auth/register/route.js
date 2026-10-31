@@ -6,11 +6,7 @@ import { getOtp, deleteOtp } from '@/lib/otpCache';
 import { sendWelcomeEmail } from '@/lib/mail';
 import { validatePassword } from '@/lib/passwordUtils';
 
-function generateReferralCode(name) {
-  const base = name.replace(/\s+/g, '').toUpperCase().slice(0, 4);
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `${base}${rand}`;
-}
+import { generateReferralCode } from '@/lib/referral';
 
 export async function POST(req) {
   try {

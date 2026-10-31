@@ -9,7 +9,7 @@
  * 6. Groq sentiment filter (BUY only)
  * 7. Execute
  */
-import { getExchange } from '../services/exchange.js';
+import { getExchange, requiresClientSignature } from '../services/exchange.js';
 import { get24hChange } from '../services/binance.js';
 import { checkMacroTrend } from '../services/indicators.js';
 import { calculateIndicators, detectSignal } from '../services/indicators.js';
@@ -54,6 +54,17 @@ export async function runBotForUser(user) {
     if (!keyDoc) return await log(userId, 'warn', 'No active API key — skipped');
 
     const isTestnet = keyDoc.accountType === 'testnet';
+    const exchangeName = keyDoc.exchange || 'binance';
+
+    // On-chain venues cannot be traded from the server — the signing key lives
+    // in the user's wallet. Skip cleanly rather than failing mid-tick.
+    if (requiresClientSignature(exchangeName)) {
+      return await log(
+        userId, 'warn',
+        '⛔ MetaMask is connected — the bot cannot place on-chain trades on your behalf. ' +
+        'Swaps must be signed in your wallet. Connect Binance or BingX for automated trading.'
+      );
+    }
 
     let apiKey, apiSecret;
     try {
@@ -63,8 +74,6 @@ export async function runBotForUser(user) {
       return await log(userId, 'error', 'Failed to decrypt API keys');
     }
 
-    // Exchange service — Binance or BingX based on saved key
-    const exchangeName = keyDoc.exchange || 'binance';
     const svc = getExchange(exchangeName);
     const { getCandles, getCurrentPrice, getUSDTBalance } = svc;
 
@@ -128,13 +137,24 @@ export async function runBotForUser(user) {
           openTrade.trailingHighPrice = newHigh;
         }
 
-        await log(userId, 'info',
-          `[Trailing] ${openTrade.symbol} | High: $${newHigh} | Stop: $${trailPrice} | Now: $${tradePrice}`
-        );
+        // Only log when something changed or the stop is close. Logging this
+        // every tick for every open trade produced ~290k rows/day and filled
+        // the 512 MB cluster, which blocks writes for the whole app.
+        const nearStop = tradePrice <= trailPrice * 1.01;
+        if (newHigh !== prevHigh || nearStop) {
+          await log(userId, 'info',
+            `[Trailing] ${openTrade.symbol} | High: $${newHigh} | Stop: $${trailPrice} | Now: $${tradePrice}`
+          );
+        }
 
         if (tradePrice <= trailPrice) {
           if (settings.useStopLoss === false && tradePrice < openTrade.price) {
-            await log(userId, 'info', `[Trailing] ${openTrade.symbol} trail hit but SL is OFF and trade is at a loss — holding`);
+            // Repeats every tick while underwater — throttle to once an hour.
+            const lastNote = openTrade.trailHoldLoggedAt ? new Date(openTrade.trailHoldLoggedAt).getTime() : 0;
+            if (Date.now() - lastNote > 3600000) {
+              await log(userId, 'info', `[Trailing] ${openTrade.symbol} trail hit but SL is OFF and trade is at a loss — holding`);
+              await Trade.findByIdAndUpdate(openTrade._id, { trailHoldLoggedAt: new Date() });
+            }
           } else {
             await closePosition(userId, apiKey, apiSecret, openTrade,
               `Trailing stop hit — peak $${newHigh} → dropped ${trailPct}% → stop $${trailPrice}`, isTestnet, exchangeName);
@@ -165,9 +185,13 @@ export async function runBotForUser(user) {
           const sCan  = await getCandles(openTrade.symbol, timeframe, 120);
           const sInd  = calculateIndicators(sCan);
           const sSent = await getSentiment(openTrade.symbol, sInd);
-          await log(userId, 'info',
-            `[${openTrade.symbol}] Exit-sentiment: ${sSent.sentiment} (${sSent.confidence}%) — ${sSent.reason}`
-          );
+          // Neutral/bullish readings repeat every tick and say nothing —
+          // only record a reading that is at least leaning bearish.
+          if (sSent.sentiment === 'bearish' || sSent.confidence >= 70) {
+            await log(userId, 'info',
+              `[${openTrade.symbol}] Exit-sentiment: ${sSent.sentiment} (${sSent.confidence}%) — ${sSent.reason}`
+            );
+          }
           if (shouldSellOnSentiment(sSent)) {
             // When SL is off, don't exit on sentiment if trade is at a loss
             if (settings.useStopLoss === false && tradePrice < openTrade.price) {

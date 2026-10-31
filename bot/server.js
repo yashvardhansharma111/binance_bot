@@ -8,6 +8,7 @@
  */
 import mongoose from 'mongoose';
 import { startScheduler } from './scheduler/cron.js';
+import { startSentimentScheduler } from './scheduler/sentimentCron.js';
 
 process.on('unhandledRejection', (reason) => {
   console.error('[Bot] Unhandled rejection:', reason?.message || reason);
@@ -24,6 +25,7 @@ async function boot() {
   console.log('[Bot] Connected to MongoDB');
 
   startScheduler();
+  startSentimentScheduler();
 
   console.log(`\n🤖  TrickyX Bot running`);
   console.log(`    Mode : ${process.env.DRY_RUN === 'true' ? '🟡 DRY RUN (no real orders)' : '🟢 LIVE'}`);

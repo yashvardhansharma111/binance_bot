@@ -18,7 +18,7 @@ if (TESTNET) console.log('[Binance] ⚠️  TESTNET MODE — fake money, real pr
 export async function getCandles(symbol, interval = '5m', limit = 100) {
   const { data } = await axios.get(`${BASE}/api/v3/klines`, {
     params: { symbol, interval, limit },
-    timeout: 10000,
+    timeout: 20000,
   });
   return data.map(c => ({
     open: parseFloat(c[1]), high: parseFloat(c[2]),
@@ -29,7 +29,7 @@ export async function getCandles(symbol, interval = '5m', limit = 100) {
 
 export async function getCurrentPrice(symbol) {
   const { data } = await axios.get(`${BASE}/api/v3/ticker/price`, {
-    params: { symbol }, timeout: 5000,
+    params: { symbol }, timeout: 12000,
   });
   return parseFloat(data.price);
 }
@@ -60,7 +60,7 @@ async function fetchAccountBalances(apiKey, apiSecret, isTestnet) {
   const sig    = createHmac('sha256', apiSecret).update(qs).digest('hex');
   const { data } = await axios.get(`${base}/api/v3/account?${qs}&signature=${sig}`, {
     headers: { 'X-MBX-APIKEY': apiKey },
-    timeout: 10000,
+    timeout: 20000,
   });
   return data.balances || [];
 }
@@ -92,7 +92,7 @@ export async function getAssetBalance(apiKey, apiSecret, symbol, isTestnet = TES
 export async function get24hChange(symbol) {
   try {
     const { data } = await axios.get(`${BASE}/api/v3/ticker/24hr`, {
-      params: { symbol }, timeout: 5000,
+      params: { symbol }, timeout: 12000,
     });
     return parseFloat(data.priceChangePercent);
   } catch { return 0; }

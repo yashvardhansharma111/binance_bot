@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, MonitorSmartphone, ArrowRight, RefreshCw } from 'lucide-react';
 import { AuthShell, AuthAlert } from '@/components/ui/auth-shell';
+import MetaMaskButton from '@/components/MetaMaskButton';
 
 function LoginForm() {
   const router = useRouter();
@@ -39,6 +40,14 @@ function LoginForm() {
         </AuthAlert>
       )}
       {error && <AuthAlert tone="error" icon={AlertCircle}>{error}</AuthAlert>}
+
+      <MetaMaskButton callbackUrl="/dashboard" />
+
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-white/10" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-neutral-600">or</span>
+        <span className="h-px flex-1 bg-white/10" />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>

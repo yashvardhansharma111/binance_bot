@@ -4,6 +4,7 @@ import {
   Key, Shield, Trash2, CheckCircle, AlertCircle, Eye, EyeOff,
   RefreshCw, Plus, FlaskConical, BadgeCheck, ExternalLink, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import WalletCard from '@/components/WalletCard';
 
 function GuideSection({ accountType }) {
   const [open, setOpen] = useState(false);
@@ -133,8 +134,23 @@ export default function ApiKeysPage() {
   return (
     <div className="max-w-2xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">API Keys</h1>
-        <p className="text-slate-500 mt-0.5 text-sm">Connect your Binance account — real or testnet</p>
+        <h1 className="text-2xl font-bold text-slate-900">Connections</h1>
+        <p className="text-slate-500 mt-0.5 text-sm">
+          Connect an exchange for automated trading, and/or a wallet for on-chain trading
+        </p>
+      </div>
+
+      {/* MetaMask — stored on the user, independent of the exchange API key */}
+      <div className="mb-6">
+        <WalletCard />
+      </div>
+
+      <div className="mb-6 flex items-center gap-3">
+        <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>
+          Exchange API
+        </span>
+        <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
       </div>
 
       {/* Security notice */}
