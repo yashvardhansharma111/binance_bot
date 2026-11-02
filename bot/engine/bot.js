@@ -125,6 +125,25 @@ export async function runBotForUser(user) {
         continue;
       }
 
+      /* ── Hard max-loss circuit breaker ───────────────────────────────────
+         Runs BEFORE every other exit rule and ignores useStopLoss.
+         Turning off the stop loss was meant to avoid being shaken out by
+         noise — not to hold a position down 25-35% indefinitely, which is
+         exactly what happened through this downtrend. 0 disables it. */
+      const maxLossPct = settings.maxLossPercent ?? 0;   // off unless explicitly set
+      if (maxLossPct > 0) {
+        const lossPct = ((openTrade.price - tradePrice) / openTrade.price) * 100;
+        if (lossPct >= maxLossPct) {
+          await log(userId, 'error',
+            `🛑 [${openTrade.symbol}] MAX LOSS ${lossPct.toFixed(1)}% (limit ${maxLossPct}%) — closing to stop further bleed. ` +
+            `Entry $${openTrade.price} → now $${tradePrice}`
+          );
+          await closePosition(userId, apiKey, apiSecret, openTrade,
+            `Max loss ${lossPct.toFixed(1)}% breached (limit ${maxLossPct}%)`, isTestnet, exchangeName);
+          continue;
+        }
+      }
+
       // Trailing stop takes priority over fixed SL when enabled
       const trailPct = symCfg(settings, openTrade.symbol).trailingStopPercent;
       if (trailPct > 0) {
@@ -247,7 +266,7 @@ export async function runBotForUser(user) {
           continue;
         }
         const indicators = calculateIndicators(candles);
-        const signal     = detectSignal(indicators, aggressiveMode);
+        const signal     = detectSignal(indicators, aggressiveMode, settings.respectMacroInAggressive !== false);
         if (signal === 'SELL') {
           for (const t of openOnSym) {
             const heldMins = (Date.now() - new Date(t.createdAt).getTime()) / 60000;
@@ -324,6 +343,19 @@ export async function runBotForUser(user) {
       // Guard: if positions already open on this symbol, only add another if price
       // has dropped at least minEntryGapPct% below the lowest existing entry (DCA on dips only)
       if (openOnSym.length > 0) {
+        // Cap how deep DCA can go. Without this the bot kept averaging down
+        // through the whole downtrend — one symbol reached 25 open lots, all
+        // underwater, turning a small loss into the largest on the book.
+        const maxPerSym = settings.maxPositionsPerSymbol ?? 5;
+        if (maxPerSym > 0 && openOnSym.length >= maxPerSym) {
+          tickResults.skipped.push(`${sym}(maxPos:${openOnSym.length}/${maxPerSym})`);
+          await log(userId, 'warn',
+            `[${sym}] ⛔ DCA CAPPED — ${openOnSym.length} positions already open (limit ${maxPerSym}). ` +
+            `Not adding more until some close.`
+          );
+          continue;
+        }
+
         const minGapPct   = settings.minEntryGapPct ?? 1.5;
         const lowestEntry = Math.min(...openOnSym.map(t => t.price));
         const dropPct     = ((lowestEntry - currentPrice) / lowestEntry) * 100;
@@ -349,7 +381,7 @@ export async function runBotForUser(user) {
           : `[${sym}] 📊 RSI:${indicators.rsi} | 24h:${change24h.toFixed(2)}% | Macro:${indicators.macroUptrend ? '🟢Bull' : '🔴Bear'} | 1h:${h1uptrend ? '↑' : '↓'} | Trend:${indicators.uptrend ? '↑' : '→'} | Vol:${indicators.volumeIncreasing ? '↑HIGH' : '→avg'} | Price:$${currentPrice}`
       );
 
-      const signal = detectSignal(indicators, aggressiveMode);
+      const signal = detectSignal(indicators, aggressiveMode, settings.respectMacroInAggressive !== false);
       const signalIcon = signal === 'BUY' ? '🟢' : signal === 'SELL' ? '🔴' : '⚪';
       await log(userId, 'info', `[${sym}] ${signalIcon} Signal: ${signal}${aggressiveMode ? ' [AGGRESSIVE]' : ''} | RSI threshold: ${indicators.uptrend ? 48 : 40}${aggressiveMode ? '→60' : ''}`);
       tickResults.signals.push(`${sym}:${signal}`);

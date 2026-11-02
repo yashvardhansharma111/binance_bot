@@ -10,12 +10,12 @@ import MarketSentiment from '../../lib/models/MarketSentiment.js';
  * everyone, so it is now computed once and shared.
  */
 
-// Tried in order; first one that answers wins.
-// gpt-oss-20b is primary: fast (~750ms) and honours JSON mode.
-// gpt-oss-120b is deliberately excluded — it 400s on response_format.
+// Tried in order; first one that answers wins. These reasoning models
+// occasionally return an empty message, so a chain matters more than usual.
 export const MODEL_CHAIN = [
-  'openai/gpt-oss-20b',
-  'qwen/qwen3.8-27b',
+  'openai/gpt-oss-20b',   // primary — fast (~750ms), reliable JSON
+  'openai/gpt-oss-120b',  // usable now that response_format is gone
+  'qwen/qwen3.8-27b',     // last resort — its daily quota runs out quickly
 ];
 
 const NEUTRAL = { sentiment: 'neutral', confidence: 50, reason: 'No data' };

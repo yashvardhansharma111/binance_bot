@@ -57,15 +57,22 @@ export function checkMacroTrend(candles) {
 
 export function detectSignal(
   { rsi, bullishCrossover, bearishCrossover, uptrend, macroUptrend, volumeIncreasing },
-  aggressive = false
+  aggressive = false,
+  respectMacroInAggressive = true
 ) {
   // SELL always evaluated regardless of mode
   const sell = rsi > 70 || bearishCrossover;
 
-  // ── Aggressive mode — all macro/trend/sentiment gates bypassed ────────────
-  // No EMA100 check, no uptrend requirement, no volume requirement.
-  // Enters on any RSI < 60 dip. Exits at RSI 72 to let profits run.
+  // ── Aggressive mode — trend and volume gates relaxed ──────────────────────
+  // Enters on any RSI < 60 dip, exits at RSI 72 to let profits run.
+  //
+  // The macro gate is NOT relaxed by default. Previously aggressive ignored
+  // EMA100 entirely, so in a sustained downtrend it bought every dip of a
+  // falling market — the main source of the deep unrealised losses.
   if (aggressive) {
+    if (respectMacroInAggressive && !macroUptrend) {
+      return sell ? 'SELL' : 'HOLD';
+    }
     const buy    = rsi < 60;
     const agSell = rsi > 72 || bearishCrossover;
     return buy ? 'BUY' : agSell ? 'SELL' : 'HOLD';
