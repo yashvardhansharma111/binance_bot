@@ -10,13 +10,9 @@ import MarketSentiment from '../../lib/models/MarketSentiment.js';
  * everyone, so it is now computed once and shared.
  */
 
-// Tried in order; first one that answers wins. These reasoning models
-// occasionally return an empty message, so a chain matters more than usual.
-export const MODEL_CHAIN = [
-  'openai/gpt-oss-20b',   // primary — fast (~750ms), reliable JSON
-  'openai/gpt-oss-120b',  // usable now that response_format is gone
-  'qwen/qwen3.8-27b',     // last resort — its daily quota runs out quickly
-];
+// Single source of truth, shared with the support chat route.
+export { MODEL_CHAIN } from '../../lib/groqModels.js';
+import { MODEL_CHAIN } from '../../lib/groqModels.js';
 
 const NEUTRAL = { sentiment: 'neutral', confidence: 50, reason: 'No data' };
 
