@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export const metadata = {
   title: 'Terms of Service — TrickyX.ai',
   description: 'Terms of Service for TrickyX.ai — AI-powered crypto trading bot.',
@@ -15,13 +17,13 @@ export default function TermsPage() {
       {/* Header */}
       <header style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>T</span>
             </div>
             <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-1)' }}>{APP_NAME}</span>
-          </a>
-          <a href="/" style={{ fontSize: 14, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>← Back to App</a>
+          </Link>
+          <Link href="/" style={{ fontSize: 14, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>← Back to App</Link>
         </div>
       </header>
 
@@ -45,7 +47,7 @@ export default function TermsPage() {
 
         <Section title="2. Description of Service">
           <p>{APP_NAME} provides an automated cryptocurrency trading bot that connects to your exchange account (Binance or BingX) via API keys and executes trades based on AI-driven signals. The Service also includes a referral commission system, deposit/withdrawal management, push notifications, and a web and mobile dashboard.</p>
-          <p><strong>Cryptocurrency trading involves substantial risk of loss.</strong> The bot's trading decisions are not financial advice. Past performance does not guarantee future results.</p>
+          <p><strong>Cryptocurrency trading involves substantial risk of loss.</strong> The bot&apos;s trading decisions are not financial advice. Past performance does not guarantee future results.</p>
         </Section>
 
         <Section title="3. Account Registration">
@@ -113,10 +115,10 @@ export default function TermsPage() {
         <Section title="9. Disclaimers &amp; Risk Warning">
           <p style={{ fontWeight: 700, color: 'var(--text-1)' }}>⚠️ IMPORTANT RISK WARNING</p>
           <p>Cryptocurrency trading is highly speculative and volatile. You may lose some or all of your trading capital. The {APP_NAME} bot does not guarantee profits. By using the Service, you acknowledge and accept all trading risks.</p>
-          <p>The Service is provided "AS IS" and "AS AVAILABLE" without warranties of any kind, express or implied. We do not warrant that:</p>
+          <p>The Service is provided &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; without warranties of any kind, express or implied. We do not warrant that:</p>
           <ul>
             <li>The Service will be uninterrupted or error-free</li>
-            <li>The bot's trading strategy will be profitable</li>
+            <li>The bot&apos;s trading strategy will be profitable</li>
             <li>The Service will be compatible with all devices or exchanges</li>
           </ul>
         </Section>
@@ -156,7 +158,7 @@ export default function TermsPage() {
 
       <footer style={{ borderTop: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '24px', textAlign: 'center' }}>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>
-          © {new Date().getFullYear()} TrickyX.ai · <a href="/privacy" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Privacy Policy</a> · <a href="/terms" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Terms of Service</a>
+          © {new Date().getFullYear()} TrickyX.ai · <Link href="/privacy" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Privacy Policy</Link> · <Link href="/terms" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Terms of Service</Link>
         </p>
       </footer>
 

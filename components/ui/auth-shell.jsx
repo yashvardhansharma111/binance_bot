@@ -32,7 +32,7 @@ export function AuthShell({ title, subtitle, children, footer, badge, maxWidth =
 
         <div className="mb-6 text-center">
           {badge && <div className="mb-3 flex justify-center">{badge}</div>}
-          <h1 className="mb-2 bg-gradient-to-b from-white to-white/55 bg-clip-text text-[26px] font-extrabold tracking-[-0.03em] text-transparent sm:text-[30px]">
+          <h1 className="mb-2 text-[26px] font-extrabold tracking-[-0.03em] text-neutral-100 sm:text-[30px]">
             {title}
           </h1>
           {subtitle && <p className="text-[14px] text-neutral-500">{subtitle}</p>}

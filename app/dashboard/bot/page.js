@@ -262,7 +262,7 @@ export default function BotMonitorPage() {
           {/* Today's trades — auto-refreshed every 3s, includes Binance trades */}
           <div className="card p-5 glow-border flex-1">
             <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2 text-sm">
-              <BarChart2 size={15} className="text-blue-500" /> Today's Trades
+              <BarChart2 size={15} className="text-blue-500" /> Today&apos;s Trades
               {autoRefresh && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />}
             </h2>
             {trades.length === 0 ? (

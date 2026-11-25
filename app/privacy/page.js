@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export const metadata = {
   title: 'Privacy Policy — TrickyX.ai',
   description: 'Privacy Policy for TrickyX.ai — AI-powered crypto trading bot.',
@@ -15,13 +17,13 @@ export default function PrivacyPage() {
       {/* Header */}
       <header style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 24px' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>T</span>
             </div>
             <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-1)' }}>{APP_NAME}</span>
-          </a>
-          <a href="/" style={{ fontSize: 14, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>← Back to App</a>
+          </Link>
+          <Link href="/" style={{ fontSize: 14, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>← Back to App</Link>
         </div>
       </header>
 
@@ -37,7 +39,7 @@ export default function PrivacyPage() {
             Last updated: <strong>{LAST_UPDATED}</strong> · Effective immediately
           </p>
           <p style={{ marginTop: 16, color: 'var(--text-2)', fontSize: 15, lineHeight: 1.7 }}>
-            This Privacy Policy describes how <strong>{APP_NAME}</strong> ("{APP_NAME}", "we", "us", or "our") collects, uses, and shares information about you when you use our website ({WEBSITE}), mobile application, and trading bot services (collectively, the "Service").
+            This Privacy Policy describes how <strong>{APP_NAME}</strong> (&quot;{APP_NAME}&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, and shares information about you when you use our website ({WEBSITE}), mobile application, and trading bot services (collectively, the &quot;Service&quot;).
           </p>
         </div>
 
@@ -145,7 +147,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="10. Changes to This Policy">
-          <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by email or via an in-app notification. Continued use of the Service after changes constitutes acceptance of the updated policy. The "Last updated" date at the top of this page will always reflect the most recent revision.</p>
+          <p>We may update this Privacy Policy from time to time. We will notify you of significant changes by email or via an in-app notification. Continued use of the Service after changes constitutes acceptance of the updated policy. The &quot;Last updated&quot; date at the top of this page will always reflect the most recent revision.</p>
         </Section>
 
         <Section title="11. Contact Us">
@@ -162,7 +164,7 @@ export default function PrivacyPage() {
       {/* Footer */}
       <footer style={{ borderTop: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '24px', textAlign: 'center' }}>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>
-          © {new Date().getFullYear()} TrickyX.ai · <a href="/privacy" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Privacy Policy</a> · <a href="/terms" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Terms of Service</a>
+          © {new Date().getFullYear()} TrickyX.ai · <Link href="/privacy" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Privacy Policy</Link> · <Link href="/terms" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Terms of Service</Link>
         </p>
       </footer>
 

@@ -7,7 +7,7 @@ import { Zap, Lock, Eye, EyeOff, AlertCircle, CheckCircle, RefreshCw, ShieldChec
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => searchParams.get('email') || '');
   const [otp, setOtp] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -17,11 +17,6 @@ function ResetPasswordForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    const e = searchParams.get('email');
-    if (e) setEmail(e);
-  }, [searchParams]);
 
   useEffect(() => {
     if (countdown <= 0) return;

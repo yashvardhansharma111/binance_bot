@@ -147,7 +147,7 @@ export default function SupportPage() {
         <div className="card p-10 text-center">
           <MessageSquare size={32} className="text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500 font-medium">No tickets yet</p>
-          <p className="text-slate-400 text-sm mt-1">Click "New Ticket" to contact support.</p>
+          <p className="text-slate-400 text-sm mt-1">Click &quot;New Ticket&quot; to contact support.</p>
         </div>
       ) : (
         <div className="space-y-3">

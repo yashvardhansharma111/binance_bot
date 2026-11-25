@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useState } from 'react';
 
 const CONTACT_EMAIL = 'support@trickyx.ai';
@@ -48,13 +49,13 @@ export default function DeleteAccountPage() {
       {/* Header */}
       <header style={{ borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '0 24px', flexShrink: 0 }}>
         <div style={{ maxWidth: 520, margin: '0 auto', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>T</span>
             </div>
             <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-1)' }}>TrickyX.ai</span>
-          </a>
-          <a href="/" style={{ fontSize: 14, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>← Back</a>
+          </Link>
+          <Link href="/" style={{ fontSize: 14, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>← Back</Link>
         </div>
       </header>
 
@@ -75,9 +76,9 @@ export default function DeleteAccountPage() {
               <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 32px' }}>
                 A confirmation email has been sent to <strong style={{ color: 'var(--text-2)' }}>{email}</strong>.
               </p>
-              <a href="/" style={{ display: 'inline-block', padding: '12px 28px', background: 'var(--accent)', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+              <Link href="/" style={{ display: 'inline-block', padding: '12px 28px', background: 'var(--accent)', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
                 Go to Homepage
-              </a>
+              </Link>
             </div>
           )}
 
@@ -100,7 +101,7 @@ export default function DeleteAccountPage() {
               {step === 'email' && (<>
                 <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', color: 'var(--text-1)' }}>Delete Account</h1>
                 <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 28px', lineHeight: 1.6 }}>
-                  Enter your registered email address. We'll send a 6-digit verification code to confirm it's you.
+                  Enter your registered email address. We&apos;ll send a 6-digit verification code to confirm it&apos;s you.
                 </p>
 
                 <form onSubmit={sendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -184,7 +185,7 @@ export default function DeleteAccountPage() {
 
             <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-3)' }}>
               Changed your mind?{' '}
-              <a href="/dashboard" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Go to dashboard</a>
+              <Link href="/dashboard" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Go to dashboard</Link>
               {' '}or contact{' '}
               <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{CONTACT_EMAIL}</a>
             </p>
@@ -195,8 +196,8 @@ export default function DeleteAccountPage() {
       <footer style={{ borderTop: '1px solid var(--border)', backgroundColor: 'var(--surface)', padding: '20px 24px', textAlign: 'center', flexShrink: 0 }}>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>
           © {new Date().getFullYear()} TrickyX.ai ·{' '}
-          <a href="/privacy" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Privacy Policy</a> ·{' '}
-          <a href="/terms" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Terms of Service</a>
+          <Link href="/privacy" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Privacy Policy</Link> ·{' '}
+          <Link href="/terms" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>Terms of Service</Link>
         </p>
       </footer>
     </div>

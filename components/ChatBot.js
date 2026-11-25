@@ -102,14 +102,13 @@ export default function ChatBot() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        className="fixed z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center select-none touch-none"
+        className="fixed z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center select-none touch-none cursor-grab active:cursor-grabbing"
         style={{
           background: 'var(--accent)',
           color: '#fff',
           ...(pos.x !== null
             ? { left: pos.x, top: pos.y, bottom: 'auto', right: 'auto' }
             : { bottom: 24, right: 24 }),
-          cursor: dragging.current ? 'grabbing' : 'grab',
         }}
         aria-label="Open support chat">
         {open ? <X size={22} /> : <MessageCircle size={22} />}

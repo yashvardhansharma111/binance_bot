@@ -92,7 +92,7 @@ export default function SymbolSearch({ value, onChange, size = 'md' }) {
           <div className="overflow-y-auto" style={{ maxHeight: 260 }}>
             {filtered.length === 0 ? (
               <div className="px-4 py-6 text-xs text-center" style={{ color: 'var(--text-3)' }}>
-                No pairs match "{query}"
+                No pairs match &quot;{query}&quot;
               </div>
             ) : filtered.map(s => {
               const coin   = s.replace('USDT', '');

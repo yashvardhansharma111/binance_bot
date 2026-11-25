@@ -35,7 +35,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
 
   const [step,       setStep]       = useState(1);
-  const [form,       setForm]       = useState({ name: '', email: '', password: '', phone: '', countryCode: '+91', referralCode: '' });
+  const [form,       setForm]       = useState(() => ({ name: '', email: '', password: '', phone: '', countryCode: '+91', referralCode: searchParams.get('ref') || '' }));
   const [otp,        setOtp]        = useState('');
   const [showPass,   setShowPass]   = useState(false);
   const [loading,    setLoading]    = useState(false);
@@ -45,23 +45,7 @@ function RegisterForm() {
   const [countdown,  setCountdown]  = useState(0);
   const [copied,     setCopied]     = useState(false);
   const [refStatus,  setRefStatus]  = useState('idle'); // idle | checking | valid | invalid
-  const [refLocked,  setRefLocked]  = useState(false);  // true when code came from ?ref= URL param
-
-  useEffect(() => {
-    const ref = searchParams.get('ref');
-    if (ref) {
-      setForm(f => ({ ...f, referralCode: ref }));
-      setRefLocked(true);
-      checkRef(ref);
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (!form.referralCode) { setRefStatus('idle'); return; }
-    setRefStatus('checking');
-    const t = setTimeout(() => checkRef(form.referralCode), 600);
-    return () => clearTimeout(t);
-  }, [form.referralCode]);
+  const [refLocked]                   = useState(() => !!searchParams.get('ref'));  // true when code came from ?ref= URL param
 
   async function checkRef(code) {
     if (!code) { setRefStatus('idle'); return; }
@@ -72,6 +56,12 @@ function RegisterForm() {
       setRefStatus(valid ? 'valid' : 'invalid');
     } catch { setRefStatus('idle'); }
   }
+
+  useEffect(() => {
+    const code = form.referralCode;
+    const t = setTimeout(() => checkRef(code), code ? 600 : 0);
+    return () => clearTimeout(t);
+  }, [form.referralCode]);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -165,10 +155,11 @@ function RegisterForm() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone Number</label>
                     <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="sm:w-40 sm:shrink-0">
                       <select
                         value={form.countryCode}
                         onChange={e => setForm({ ...form, countryCode: e.target.value })}
-                        className="input px-2 text-sm sm:shrink-0 sm:w-36">
+                        className="input px-2 text-sm">
                         <optgroup label="Popular">
                           <option value="+91">🇮🇳 India +91</option>
                           <option value="+1">🇺🇸 USA / Canada +1</option>
@@ -245,6 +236,7 @@ function RegisterForm() {
                           <option value="+64">🇳🇿 New Zealand +64</option>
                         </optgroup>
                       </select>
+                      </div>
                       <div className="relative flex-1 min-w-0">
                         <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                         <input className="input w-full" style={{ paddingLeft: '2.5rem' }} type="tel"
@@ -327,7 +319,7 @@ function RegisterForm() {
                       </span>
                     </div>
                     {refStatus === 'invalid' && (
-                      <p className="text-xs text-red-500 mt-1">This referral code doesn't exist.</p>
+                      <p className="text-xs text-red-500 mt-1">This referral code doesn&apos;t exist.</p>
                     )}
                     {refStatus === 'valid' && (
                       <p className="text-xs text-emerald-600 mt-1">Referral code verified ✓</p>

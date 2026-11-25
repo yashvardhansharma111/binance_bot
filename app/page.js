@@ -226,11 +226,11 @@ function CandlestickChart() {
   // EMA20 overlay across closes
   const closes = CANDLES.map(c => c[3]);
   const k = 2 / 21;
-  let ema = closes.slice(0, 5).reduce((a, b) => a + b, 0) / 5;
-  const emaPts = closes.map((c, i) => {
-    ema = i === 0 ? ema : c * k + ema * (1 - k);
-    return `${i * slot + slot / 2},${y(ema)}`;
-  });
+  const emaVals = closes.reduce((acc, c, i) => {
+    acc.push(i === 0 ? closes.slice(0, 5).reduce((a, b) => a + b, 0) / 5 : c * k + acc[i - 1] * (1 - k));
+    return acc;
+  }, []);
+  const emaPts = emaVals.map((e, i) => `${i * slot + slot / 2},${y(e)}`);
 
   const gridLines = [0.2, 0.4, 0.6, 0.8].map(f => lo + (hi - lo) * f);
 
