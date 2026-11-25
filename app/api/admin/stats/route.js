@@ -18,7 +18,7 @@ export async function GET() {
   const now = new Date();
 
   const [
-    totalUsers, activeUsers, blockedUsers, activeBots,
+    totalUsers, activeUsers, blockedUsers, activeBots, adminStoppedBots,
     totalTrades, closedTrades, recentTrades,
     totalSubs, activeSubs,
     commissions,
@@ -28,6 +28,7 @@ export async function GET() {
     User.countDocuments({ status: 'active' }),
     User.countDocuments({ status: 'blocked' }),
     User.countDocuments({ botActive: true }),
+    User.countDocuments({ botStoppedByAdmin: true, botActive: false }),
     Trade.countDocuments({}),
     Trade.countDocuments({ status: 'closed' }),
     Trade.find({}).sort({ createdAt: -1 }).limit(10).populate('userId', 'name email'),
@@ -46,7 +47,7 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
-    totalUsers, activeUsers, blockedUsers, activeBots,
+    totalUsers, activeUsers, blockedUsers, activeBots, adminStoppedBots,
     totalTrades, closedTrades, recentTrades,
     totalSubs, activeSubs,
     totalPlatformRevenue: parseFloat(totalPlatformRevenue.toFixed(4)),

@@ -21,6 +21,7 @@ import ApiKey from '../../lib/models/ApiKey.js';
 import BotSettings from '../../lib/models/BotSettings.js';
 import Trade from '../../lib/models/Trade.js';
 import BotLog from '../../lib/models/BotLog.js';
+import User from '../../lib/models/User.js';
 
 function symCfg(settings, sym) {
   const over = settings.symbolConfigs?.find(c => c.symbol === sym);
@@ -410,6 +411,13 @@ export async function runBotForUser(user) {
           await log(userId, 'warn', `[${sym}] ⛔ BUY BLOCKED — Groq says bearish (${sentiment.confidence}% confidence)`);
           continue;
         }
+      }
+
+      // The bot may have been stopped (by the user or the admin) after this tick began.
+      const fresh = await User.findById(userId).select('botActive').lean();
+      if (!fresh?.botActive) {
+        await log(userId, 'warn', `[${sym}] ⏹ Bot stopped mid-tick — BUY cancelled`);
+        break;
       }
 
       // Execute BUY

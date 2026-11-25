@@ -13,7 +13,7 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   const key  = await ApiKey.findOne({ userId: user._id, isActive: true });
   if (!key) return NextResponse.json({ error: 'Connect your Binance API key first' }, { status: 400 });
-  await User.findByIdAndUpdate(user._id, { botActive: true });
+  await User.findByIdAndUpdate(user._id, { botActive: true, botStoppedByAdmin: false });
 
   // Push notification — fire and forget
   try {

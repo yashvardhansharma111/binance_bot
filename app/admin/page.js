@@ -4,7 +4,7 @@ import {
   Users, Bot, ShieldCheck, TrendingUp, RefreshCw, UserX, UserCheck,
   Settings, DollarSign, Percent, Star, CreditCard, Activity, Ticket,
   Send, BarChart2, Plus, Trash2, Eye, EyeOff, Search, ChevronLeft,
-  ChevronRight, LayoutDashboard, GitBranch,
+  ChevronRight, LayoutDashboard, GitBranch, Power, Play, Square,
 } from 'lucide-react';
 
 const DEFAULT_CONFIGS = [
@@ -34,6 +34,9 @@ export default function AdminPage() {
   const [configs, setConfigs] = useState({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
+  const [stopAllLoading, setStopAllLoading] = useState(false);
+  const [stopAllMsg, setStopAllMsg] = useState('');
+  const [botBusyId, setBotBusyId] = useState(null);
   const [saving, setSaving] = useState('');
   const [grantingId, setGrantingId] = useState(null);
   const [grantDays, setGrantDays] = useState('30');
@@ -392,6 +395,70 @@ export default function AdminPage() {
       : u));
   }
 
+  async function stopAllBots() {
+    const n = stats?.activeBots || 0;
+    if (!n) return;
+    if (!window.confirm(`Stop ${n} running bot${n > 1 ? 's' : ''} for all users?\n\nOpen trades will NOT be closed. Users can start their bot again.`)) return;
+    setStopAllLoading(true);
+    setStopAllMsg('');
+    try {
+      const res = await fetch('/api/admin/bots/stop-all', { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      setStopAllMsg(`✓ ${d.stopped} bot${d.stopped === 1 ? '' : 's'} stopped`);
+      await refreshBotState();
+    } catch (e) {
+      setStopAllMsg(`✗ ${e.message}`);
+    }
+    setStopAllLoading(false);
+  }
+
+  async function startAllBots() {
+    const n = stats?.adminStoppedBots || 0;
+    if (!n) return;
+    if (!window.confirm(`Start again the ${n} bot${n > 1 ? 's' : ''} stopped by admin?\n\nBots that users stopped themselves will stay off.`)) return;
+    setStopAllLoading(true);
+    setStopAllMsg('');
+    try {
+      const res = await fetch('/api/admin/bots/start-all', { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      const skip = d.skipped?.length ? ` · ${d.skipped.length} skipped (${d.skipped.map(s => `${s.email}: ${s.reason}`).join(', ')})` : '';
+      setStopAllMsg(`✓ ${d.started} bot${d.started === 1 ? '' : 's'} started${skip}`);
+      await refreshBotState();
+    } catch (e) {
+      setStopAllMsg(`✗ ${e.message}`);
+    }
+    setStopAllLoading(false);
+  }
+
+  async function toggleUserBot(u) {
+    const action = u.botActive ? 'stop' : 'start';
+    if (!window.confirm(`${action === 'start' ? 'Start' : 'Stop'} bot for ${u.email}?`)) return;
+    setBotBusyId(u._id);
+    try {
+      const res = await fetch('/api/admin/bots/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u._id, action }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      setUsers(list => list.map(x => x._id === u._id ? { ...x, botActive: d.botActive, botStoppedByAdmin: !d.botActive } : x));
+      const s = await fetch('/api/admin/stats').then(r => r.json()).catch(() => null);
+      if (s && !s.error) setStats(s);
+    } catch (e) {
+      window.alert(e.message);
+    }
+    setBotBusyId(null);
+  }
+
+  async function refreshBotState() {
+    const s = await fetch('/api/admin/stats').then(r => r.json()).catch(() => null);
+    if (s && !s.error) setStats(s);
+    await loadUsers(userPage, userSearch);
+  }
+
   async function saveConfig(key, label) {
     setSaving(key);
     await fetch('/api/admin/config', {
@@ -455,7 +522,27 @@ export default function AdminPage() {
       {tab === 'overview' && (
         <div>
           {/* User stats */}
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Users & Bots</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Users & Bots</p>
+            {isAdmin && (
+              <div className="flex items-center gap-3">
+                {stopAllMsg && <span className="text-xs font-medium text-slate-500">{stopAllMsg}</span>}
+                <button onClick={startAllBots} disabled={stopAllLoading || !stats?.adminStoppedBots}
+                  title="Resume only the bots that the admin stopped"
+                  className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: 'rgba(16,185,129,0.12)', color: '#059669', border: '1px solid rgba(16,185,129,0.35)' }}>
+                  {stopAllLoading ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />}
+                  Start All{stats?.adminStoppedBots ? ` (${stats.adminStoppedBots})` : ''}
+                </button>
+                <button onClick={stopAllBots} disabled={stopAllLoading || !stats?.activeBots}
+                  className="flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: 'rgba(239,68,68,0.12)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.35)' }}>
+                  {stopAllLoading ? <RefreshCw size={13} className="animate-spin" /> : <Power size={13} />}
+                  Stop All Bots
+                </button>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard label="Total Users"    value={stats?.totalUsers}  icon={Users}     iconBg="#eff6ff" iconColor="#2563eb" />
             <StatCard label="Active Users"   value={stats?.activeUsers} icon={UserCheck} iconBg="#f0fdf4" iconColor="#16a34a" />
@@ -610,9 +697,19 @@ export default function AdminPage() {
                         {u.subscriptionActive
                           ? <span className="text-[10px] font-semibold text-emerald-600">Sub · {u.subscriptionDaysLeft}d</span>
                           : <span className="text-[10px] text-slate-300">No sub</span>}
-                        <span className={`text-[10px] font-medium ${u.botActive ? 'text-violet-600' : 'text-slate-300'}`}>
-                          {u.botActive ? '● Bot on' : '○ Bot off'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-medium ${u.botActive ? 'text-violet-600' : 'text-slate-300'}`}>
+                            {u.botActive ? '● Bot on' : u.botStoppedByAdmin ? '○ Off (admin)' : '○ Bot off'}
+                          </span>
+                          <button onClick={() => toggleUserBot(u)} disabled={botBusyId === u._id}
+                            title={u.botActive ? 'Stop this bot' : 'Start this bot'}
+                            className={`flex h-5 items-center gap-0.5 rounded px-1.5 text-[10px] font-semibold transition-colors disabled:opacity-50 ${
+                              u.botActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+                            {botBusyId === u._id ? <RefreshCw size={9} className="animate-spin" />
+                              : u.botActive ? <Square size={9} /> : <Play size={9} />}
+                            {u.botActive ? 'Stop' : 'Start'}
+                          </button>
+                        </div>
                       </div>
                     </td>
 

@@ -8,7 +8,7 @@ export async function POST() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   await connectDB();
-  await User.findOneAndUpdate({ email: session.user.email }, { botActive: false });
+  await User.findOneAndUpdate({ email: session.user.email }, { botActive: false, botStoppedByAdmin: false });
 
   try {
     const dbUser = await User.findOne({ email: session.user.email });
