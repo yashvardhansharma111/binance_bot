@@ -12,7 +12,7 @@ import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import ApiKey from '@/lib/models/ApiKey';
 import { decrypt } from '@/lib/encryption';
-import { getDemoAccount } from '@/bot/services/demo';
+import { getVirtualAccount, virtualKindOf } from '@/bot/services/demo';
 
 // ── Binance ───────────────────────────────────────────────────────────────────
 const REAL_BASES   = ['https://api.binance.com', 'https://api2.binance.com', 'https://api3.binance.com'];
@@ -114,11 +114,12 @@ export async function GET() {
   const user   = await User.findOne({ email: session.user.email });
   if (!user)   return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  if (user.tradingAccount === 'demo') {
-    const acct = await getDemoAccount(user._id);
+  const vkind = virtualKindOf(user);
+  if (vkind) {
+    const acct = await getVirtualAccount(user._id, vkind);
     const balances = [{ asset: 'USDT', free: acct.usdt, locked: 0 }];
     for (const [asset, qty] of acct.holdings || new Map()) if (qty > 1e-9) balances.push({ asset, free: qty, locked: 0 });
-    return NextResponse.json({ balances, exchange: 'demo', dryRun: false, demo: true, accountType: 'demo' });
+    return NextResponse.json({ balances, exchange: vkind, dryRun: false, demo: true, accountType: vkind });
   }
 
   const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });

@@ -17,7 +17,7 @@ import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/se
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
 import { openPosition, closePosition } from './executor.js';
 import { manageFuturesPositions, runFuturesEntries } from './futures.js';
-import { demoFuturesVenue, tradeScope } from '../services/demo.js';
+import { demoFuturesVenue, tradeScope, virtualKindOf, virtualKey } from '../services/demo.js';
 import { liveFuturesVenue } from '../services/binanceFutures.js';
 import { decrypt } from '../../lib/encryption.js';
 import ApiKey from '../../lib/models/ApiKey.js';
@@ -53,8 +53,9 @@ export async function runBotForUser(user) {
   ).catch(() => {});
 
   try {
-    // 1. Account: demo (virtual exchange, no key) or live (API key).
-    const demo  = user.tradingAccount === 'demo';
+    // 1. Account: virtual (demo / admin-funded wallet — no key) or live (API key).
+    const vkind = virtualKindOf(user);           // 'demo' | 'wallet' | null
+    const demo  = vkind !== null;
     const scope = tradeScope(user);
     let keyDoc = null;
     if (!demo) {
@@ -77,7 +78,7 @@ export async function runBotForUser(user) {
 
     let apiKey, apiSecret;
     if (demo) {
-      apiKey = String(userId); apiSecret = '';      // the demo exchange is keyed by userId
+      apiKey = virtualKey(userId, vkind); apiSecret = '';   // the virtual exchange is keyed by userId (+kind)
     } else {
       try {
         apiKey    = decrypt(keyDoc.encryptedKey);
@@ -244,8 +245,8 @@ export async function runBotForUser(user) {
     }
 
     // 3b. Futures positions — managed every tick whatever the current mode.
-    const fut  = demo ? demoFuturesVenue(userId) : liveFuturesVenue(apiKey, apiSecret, isTestnet);
-    const fctx = { user, userId, settings, exchangeName, log, symCfg, demo, scope, fut };
+    const fut  = demo ? demoFuturesVenue(userId, vkind) : liveFuturesVenue(apiKey, apiSecret, isTestnet);
+    const fctx = { user, userId, settings, exchangeName, log, symCfg, demo, kind: vkind, scope, fut };
     try {
       await manageFuturesPositions(fctx);
     } catch (e) {
@@ -254,7 +255,7 @@ export async function runBotForUser(user) {
 
     // 4. Gate new entries — subscription and balance checks only block opening new trades,
     //    never the exit loop above.
-    // Demo is for trying the bot before paying/depositing — no subscription or asset-balance gate.
+    // Virtual accounts (demo / wallet credits) need no subscription or asset balance.
     const subActive = demo || (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date());
     if (!subActive) {
       await log(userId, 'warn', 'No active subscription — skipping new entries');

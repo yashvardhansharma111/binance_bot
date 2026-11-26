@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
 import bcrypt from 'bcryptjs';
+import WalletAccount from '@/lib/models/WalletAccount';
 
 async function adminGuard() {
   const session = await getServerSession(authOptions);
@@ -40,6 +41,8 @@ export async function GET(req) {
     { $group: { _id: '$referredBy', count: { $sum: 1 } } },
   ]);
   const refMap = Object.fromEntries(refCounts.map(r => [r._id, r.count]));
+  const wallets = await WalletAccount.find({ userId: { $in: users.map(u => u._id) } }).select('userId usdt').lean();
+  const walletMap = Object.fromEntries(wallets.map(w => [String(w.userId), w.usdt]));
 
   const result = users.map(u => ({
     ...u.toObject(),
@@ -48,6 +51,7 @@ export async function GET(req) {
       ? Math.max(0, Math.ceil((new Date(u.subscriptionExpiry) - now) / 86400000))
       : 0,
     referralCount: refMap[u.referralCode] || 0,
+    walletBalance: walletMap[String(u._id)] ?? 0,
   }));
   return NextResponse.json({ users: result, total, pages: Math.ceil(total / limit), page });
 }

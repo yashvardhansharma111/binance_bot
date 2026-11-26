@@ -95,7 +95,7 @@ async function settle(ctx, trade, exitPrice, qty, reason, orderId) {
     price: exitPrice, qty, total: exitPrice * qty, profit, orderId,
     status: 'closed', source: trade.source || 'bot', closedAt: new Date(), reason,
     market: 'futures', positionSide: dirOf(trade), leverage: trade.leverage, margin: trade.margin,
-    demo: !!ctx.demo,
+    demo: !!ctx.demo, virtualAccount: trade.virtualAccount ?? (ctx.demo ? ctx.kind : null),
   });
 
   await recordTrade(userId);
@@ -299,7 +299,7 @@ export async function runFuturesEntries(ctx) {
         stopLoss, takeProfit, orderId: order.orderId, status: 'open', source: 'bot',
         market: 'futures', positionSide: direction, leverage,
         margin: parseFloat(((order.price * order.qty) / leverage).toFixed(4)),
-        liquidationPrice, demo: !!ctx.demo,
+        liquidationPrice, demo: !!ctx.demo, virtualAccount: ctx.demo ? ctx.kind : null,
         protectionIds: { stopLossId: prot.stopLossId, takeProfitId: prot.takeProfitId },
         reason: `Futures ${direction} ${leverage}x | RSI:${ind.rsi}`,
       });

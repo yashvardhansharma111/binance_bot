@@ -453,6 +453,27 @@ export default function AdminPage() {
     setBotBusyId(null);
   }
 
+  async function creditWallet(u) {
+    const raw = window.prompt(`Wallet credits for ${u.email}\nCurrent balance: ${(u.walletBalance || 0).toFixed(2)} USDT\n\nAmount to ADD (use a minus sign to deduct, e.g. -50):`);
+    if (raw === null) return;
+    const amount = parseFloat(raw);
+    if (!Number.isFinite(amount) || amount === 0) { window.alert('Enter a non-zero number'); return; }
+    const note = window.prompt('Note (optional) — e.g. "Contest prize", "Welcome bonus":', '') ?? '';
+    setBotBusyId(u._id);
+    try {
+      const res = await fetch('/api/admin/wallet', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u._id, amount, note }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      setUsers(list => list.map(x => (x._id === u._id ? { ...x, walletBalance: d.usdt } : x)));
+    } catch (e) {
+      window.alert(e.message);
+    }
+    setBotBusyId(null);
+  }
+
   async function refreshBotState() {
     const s = await fetch('/api/admin/stats').then(r => r.json()).catch(() => null);
     if (s && !s.error) setStats(s);
@@ -627,7 +648,7 @@ export default function AdminPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  {['User', 'Contact', 'Balance', 'Status', 'Sub / Bot', 'Joined', 'Actions'].map(h => (
+                  {['User', 'Contact', 'Balance', 'Status', 'Subscription', 'Bot', 'Wallet credits', 'Joined', 'Actions'].map(h => (
                     <th key={h} className="text-left px-4 py-2.5 text-slate-400 font-semibold text-[11px] uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -691,25 +712,57 @@ export default function AdminPage() {
                       }`}>{u.status}</span>
                     </td>
 
-                    {/* Sub / Bot */}
-                    <td className="px-4 py-2.5">
-                      <div className="flex flex-col gap-0.5">
-                        {u.subscriptionActive
-                          ? <span className="text-[10px] font-semibold text-emerald-600">Sub · {u.subscriptionDaysLeft}d</span>
-                          : <span className="text-[10px] text-slate-300">No sub</span>}
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-medium ${u.botActive ? 'text-violet-600' : 'text-slate-300'}`}>
-                            {u.botActive ? '● Bot on' : u.botStoppedByAdmin ? '○ Off (admin)' : '○ Bot off'}
+                    {/* Subscription */}
+                    <td className="px-4 py-3">
+                      {u.subscriptionActive ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 whitespace-nowrap">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active · {u.subscriptionDaysLeft}d left
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 whitespace-nowrap">
+                          No subscription
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Bot */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-start gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
+                            u.botActive ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' : 'bg-slate-100 text-slate-500'}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${u.botActive ? 'bg-violet-500 animate-pulse' : 'bg-slate-400'}`} />
+                            {u.botActive ? 'Running' : u.botStoppedByAdmin ? 'Stopped by admin' : 'Stopped'}
                           </span>
                           <button onClick={() => toggleUserBot(u)} disabled={botBusyId === u._id}
                             title={u.botActive ? 'Stop this bot' : 'Start this bot'}
-                            className={`flex h-5 items-center gap-0.5 rounded px-1.5 text-[10px] font-semibold transition-colors disabled:opacity-50 ${
-                              u.botActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
-                            {botBusyId === u._id ? <RefreshCw size={9} className="animate-spin" />
-                              : u.botActive ? <Square size={9} /> : <Play size={9} />}
+                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors disabled:opacity-50 ${
+                              u.botActive ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                            {botBusyId === u._id ? <RefreshCw size={12} className="animate-spin" />
+                              : u.botActive ? <Square size={12} /> : <Play size={12} />}
                             {u.botActive ? 'Stop' : 'Start'}
                           </button>
                         </div>
+                        <span className="text-[11px] text-slate-400">
+                          Account: <strong className={
+                            u.tradingAccount === 'wallet' ? 'text-violet-600' : u.tradingAccount === 'demo' ? 'text-amber-600' : 'text-slate-600'}>
+                            {u.tradingAccount === 'wallet' ? 'Wallet' : u.tradingAccount === 'demo' ? 'Demo' : 'Live'}
+                          </strong>
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Wallet credits */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-mono text-sm font-bold whitespace-nowrap ${u.walletBalance > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                          ${(u.walletBalance || 0).toFixed(2)}
+                        </span>
+                        <button onClick={() => creditWallet(u)} disabled={botBusyId === u._id}
+                          title="Add or deduct wallet credits"
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap">
+                          <Plus size={12} /> Add credits
+                        </button>
                       </div>
                     </td>
 
@@ -797,7 +850,7 @@ export default function AdminPage() {
                   {/* Overview permissions picker — inline row */}
                   {overviewPickerId === u._id && (
                     <tr style={{ background: '#f5f3ff' }}>
-                      <td colSpan={7} style={{ padding: '12px 20px' }}>
+                      <td colSpan={9} style={{ padding: '12px 20px' }}>
                         <div className="flex flex-wrap items-center gap-4">
                           <span className="text-xs font-semibold text-violet-700">Overview sections:</span>
                           {[

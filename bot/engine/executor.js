@@ -1,4 +1,5 @@
 import { getExchange } from '../services/exchange.js';
+import { parseVirtualKey } from '../services/demo.js';
 import { calcRiskLevels, recordTrade } from './risk.js';
 import Trade from '../../lib/models/Trade.js';
 import User from '../../lib/models/User.js';
@@ -68,11 +69,12 @@ export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmou
   const stopLoss = useStopLoss === false ? null : sl;
 
   const demo = exchange === 'demo';
+  const virtualAccount = demo ? parseVirtualKey(apiKey).kind : null;
   await Trade.create({
     userId, symbol, side: 'BUY',
     price: order.price, qty: order.qty, total: order.total,
     stopLoss, takeProfit, orderId: order.orderId,
-    status: 'open', source: 'bot', demo,
+    status: 'open', source: 'bot', demo, virtualAccount,
     reason: `RSI:${indicators.rsi} sentiment:${sentiment?.sentiment}`,
   });
 
@@ -157,6 +159,7 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
 
   const profit = parseFloat(((order.price - entry) * order.qty).toFixed(6));
   const demo = exchange === 'demo' || openTrade.demo === true;
+  const virtualAccount = demo ? (openTrade.virtualAccount || parseVirtualKey(apiKey).kind) : null;
 
   const closedTrade = await Trade.findByIdAndUpdate(openTrade._id, {
     status: 'closed', closedAt: new Date(), profit,
@@ -167,7 +170,7 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
     userId, symbol, side: 'SELL',
     price: order.price, qty: order.qty, total: order.total,
     profit, orderId: order.orderId,
-    status: 'closed', source: 'bot', closedAt: new Date(), reason, demo,
+    status: 'closed', source: 'bot', closedAt: new Date(), reason, demo, virtualAccount,
   });
 
   await recordTrade(userId);

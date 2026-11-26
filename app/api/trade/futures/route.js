@@ -7,7 +7,7 @@ import Trade from '@/lib/models/Trade';
 import User from '@/lib/models/User';
 import { decrypt } from '@/lib/encryption';
 import * as fx from '@/bot/services/binanceFutures';
-import { demoFuturesVenue } from '@/bot/services/demo';
+import { demoFuturesVenue, virtualKindOf } from '@/bot/services/demo';
 
 /** Manual futures order (user-initiated). The bot never manages these. */
 export async function POST(req) {
@@ -37,11 +37,12 @@ export async function POST(req) {
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const demo = user.tradingAccount === 'demo';
+  const vkind = virtualKindOf(user);
+  const demo = vkind !== null;
   const dryRun = process.env.DRY_RUN === 'true';
   let venue;
   if (demo) {
-    venue = demoFuturesVenue(user._id);
+    venue = demoFuturesVenue(user._id, vkind);
   } else {
     const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
     if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
@@ -97,6 +98,7 @@ export async function POST(req) {
       margin:     parseFloat(((order.price * order.qty) / leverage).toFixed(4)),
       liquidationPrice: order.liquidationPrice ?? pos?.liquidationPrice ?? null,
       demo,
+      virtualAccount: vkind,
       protectionIds: { stopLossId: prot.stopLossId, takeProfitId: prot.takeProfitId },
       reason:     `Futures ${direction} ${leverage}x`,
     });

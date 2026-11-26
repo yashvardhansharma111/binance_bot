@@ -17,7 +17,7 @@ export async function GET() {
   const user = await User.findOne({ email: session.user.email });
   const uid  = user._id;
   const scope = tradeScope(user);
-  const demo  = user.tradingAccount === 'demo';
+  const demo  = ['demo', 'wallet'].includes(user.tradingAccount);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -44,6 +44,7 @@ export async function GET() {
     botActive:    user.botActive,
     hasApiKey:    demo || !!apiKey,
     demo,
+    account:      user.tradingAccount || 'live',
     testnet:      process.env.BINANCE_TESTNET === 'true',
     dryRun:       process.env.DRY_RUN === 'true',
     settings:     settings || {},

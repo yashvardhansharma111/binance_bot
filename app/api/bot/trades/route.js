@@ -30,7 +30,7 @@ export async function GET() {
   // Binance trades fetched directly from exchange
   let binanceTrades = [];
   const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
-  if (keyDoc && user.tradingAccount !== 'demo') {
+  if (keyDoc && !['demo', 'wallet'].includes(user.tradingAccount)) {
     try {
       const apiKey    = decrypt(keyDoc.encryptedKey);
       const apiSecret = decrypt(keyDoc.encryptedSecret);

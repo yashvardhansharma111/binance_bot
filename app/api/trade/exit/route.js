@@ -9,7 +9,7 @@ import Commission from '@/lib/models/Commission';
 import { decrypt } from '@/lib/encryption';
 import { getExchange } from '@/bot/services/exchange';
 import * as fx from '@/bot/services/binanceFutures';
-import { demoFuturesVenue, settleDemoFutures } from '@/bot/services/demo';
+import { demoFuturesVenue, settleDemoFutures, tradeKind, virtualKey } from '@/bot/services/demo';
 
 const TOTAL_COMMISSION_RATE = 15;
 const REFERRER_RATE         = 10;
@@ -64,7 +64,8 @@ export async function POST(req) {
 
   // A demo trade is always closed on the demo exchange, whatever the current mode.
   const demo = trade.demo === true;
-  let exchange = 'demo', isTestnet = false, apiKey = String(user._id), apiSecret = '';
+  const vkind = demo ? tradeKind(trade) : null;
+  let exchange = 'demo', isTestnet = false, apiKey = demo ? virtualKey(user._id, vkind) : '', apiSecret = '';
   if (!demo) {
     const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
     if (!keyDoc) return NextResponse.json({ error: 'No active API key' }, { status: 400 });
@@ -84,7 +85,7 @@ export async function POST(req) {
     if (!demo && exchange !== 'binance')
       return NextResponse.json({ error: 'This futures position was opened on Binance — reconnect your Binance key to close it' }, { status: 400 });
     const direction = trade.positionSide || (trade.side === 'BUY' ? 'LONG' : 'SHORT');
-    const venue = demo ? demoFuturesVenue(user._id) : fx.liveFuturesVenue(apiKey, apiSecret, isTestnet);
+    const venue = demo ? demoFuturesVenue(user._id, vkind) : fx.liveFuturesVenue(apiKey, apiSecret, isTestnet);
     try {
       const res = await venue.closeMarket(trade.symbol, direction, trade.qty);
       await venue.cancelAllOrders(trade.symbol);

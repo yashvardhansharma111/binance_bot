@@ -7,6 +7,7 @@ import Trade from '@/lib/models/Trade';
 import User from '@/lib/models/User';
 import { decrypt } from '@/lib/encryption';
 import { getExchange } from '@/bot/services/exchange';
+import { virtualKindOf, virtualKey, tradeScope } from '@/bot/services/demo';
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -27,11 +28,12 @@ export async function POST(req) {
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const demo = user.tradingAccount === 'demo';
+  const vkind = virtualKindOf(user);
+  const demo = vkind !== null;
   if (!demo && (user.assetBalance ?? 0) < 10)
     return NextResponse.json({ error: 'You need at least $10 in Asset Balance to trade. Please deposit first.' }, { status: 400 });
 
-  let exchange = 'demo', isTestnet = false, apiKey = String(user._id), apiSecret = '';
+  let exchange = 'demo', isTestnet = false, apiKey = virtualKey(user._id, vkind), apiSecret = '';
   if (!demo) {
     const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
     if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
@@ -59,7 +61,7 @@ export async function POST(req) {
       if (qty) {
         order = await placeMarketSell(apiKey, apiSecret, symbol, parseFloat(qty), isTestnet);
       } else {
-        const openTrade = await Trade.findOne({ userId: user._id, symbol, side: 'BUY', status: 'open', market: { $ne: 'futures' }, demo: demo ? true : { $ne: true } });
+        const openTrade = await Trade.findOne({ userId: user._id, symbol, side: 'BUY', status: 'open', market: { $ne: 'futures' }, ...tradeScope(user) });
         if (!openTrade) return NextResponse.json({ error: 'No open position to sell' }, { status: 400 });
         order = await placeMarketSell(apiKey, apiSecret, symbol, openTrade.qty, isTestnet);
         const profit = parseFloat(((order.price - openTrade.price) * openTrade.qty).toFixed(6));
@@ -83,7 +85,8 @@ export async function POST(req) {
       status:     side === 'BUY' ? 'open' : 'closed',
       source:     'manual',
       demo,
-      reason:     demo ? 'Manual trade (demo)' : 'Manual trade',
+      virtualAccount: vkind,
+      reason:     demo ? `Manual trade (${vkind})` : 'Manual trade',
     });
 
     return NextResponse.json({ trade, order });

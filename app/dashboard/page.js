@@ -523,7 +523,7 @@ export default function DashboardPage() {
 
   async function toggleBot() {
     // Demo accounts can run the bot without a subscription.
-    if (!sub?.active && user?.tradingAccount !== 'demo') { router.push('/dashboard/subscribe'); return; }
+    if (!sub?.active && !['demo', 'wallet'].includes(user?.tradingAccount)) { router.push('/dashboard/subscribe'); return; }
     setBotLoading(true);
     const action = user?.botActive ? 'stop' : 'start';
     await fetch(`/api/bot/${action}`, { method: 'POST' });
@@ -567,7 +567,7 @@ export default function DashboardPage() {
           }`}>
           {botLoading
             ? <RefreshCw size={15} className="animate-spin" />
-            : user?.botActive ? <Square size={15} /> : (!sub?.active && user?.tradingAccount !== 'demo') ? <Lock size={15} /> : <Play size={15} />}
+            : user?.botActive ? <Square size={15} /> : (!sub?.active && !['demo', 'wallet'].includes(user?.tradingAccount)) ? <Lock size={15} /> : <Play size={15} />}
           {user?.botActive ? 'Stop' : 'Start Bot'}
         </button>
       </div>

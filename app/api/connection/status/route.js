@@ -17,11 +17,12 @@ export async function GET() {
 
   const isSubscribed = !!(user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date());
 
-  if (user.tradingAccount === 'demo') {
-    const lastDemo = await Trade.findOne({ userId: user._id, demo: true }).sort({ createdAt: -1 }).select('createdAt');
+  if (['demo', 'wallet'].includes(user.tradingAccount)) {
+    const lastDemo = await Trade.findOne({ userId: user._id, ...tradeScope(user) }).sort({ createdAt: -1 }).select('createdAt');
     return NextResponse.json({
       connected: true, demo: true, botActive: user.botActive, isSubscribed, networkOk: true,
-      exchange: 'demo', accountType: 'demo', label: 'Demo account',
+      exchange: user.tradingAccount, accountType: user.tradingAccount,
+      label: user.tradingAccount === 'wallet' ? 'Wallet (credits)' : 'Demo account',
       lastTradeAt: lastDemo ? lastDemo.createdAt : null,
       permissions: { spot: true, futures: true, withdrawal: false },
     });
