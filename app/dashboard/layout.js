@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { DesktopSidebar, MobileTopBar, MobileTabBar } from '@/components/Sidebar';
 import SessionGuard from '@/components/SessionGuard';
 import ChatBot from '@/components/ChatBot';
+import DemoBanner from '@/components/DemoBanner';
 
 export default function DashboardLayout({ children }) {
   return (
@@ -21,6 +22,7 @@ export default function DashboardLayout({ children }) {
         p-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))]
         mt-14
         lg:mt-0 lg:p-8 lg:pb-8">
+        <DemoBanner />
         {children}
       </main>
 

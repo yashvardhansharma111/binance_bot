@@ -16,6 +16,9 @@ import { calculateIndicators, detectSignal } from '../services/indicators.js';
 import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/sentiment.js';
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
 import { openPosition, closePosition } from './executor.js';
+import { manageFuturesPositions, runFuturesEntries } from './futures.js';
+import { demoFuturesVenue, tradeScope } from '../services/demo.js';
+import { liveFuturesVenue } from '../services/binanceFutures.js';
 import { decrypt } from '../../lib/encryption.js';
 import ApiKey from '../../lib/models/ApiKey.js';
 import BotSettings from '../../lib/models/BotSettings.js';
@@ -50,12 +53,17 @@ export async function runBotForUser(user) {
   ).catch(() => {});
 
   try {
-    // 1. API keys — needed for both exit management and new entries
-    const keyDoc = await ApiKey.findOne({ userId, isActive: true });
-    if (!keyDoc) return await log(userId, 'warn', 'No active API key — skipped');
+    // 1. Account: demo (virtual exchange, no key) or live (API key).
+    const demo  = user.tradingAccount === 'demo';
+    const scope = tradeScope(user);
+    let keyDoc = null;
+    if (!demo) {
+      keyDoc = await ApiKey.findOne({ userId, isActive: true });
+      if (!keyDoc) return await log(userId, 'warn', 'No active API key — skipped');
+    }
 
-    const isTestnet = keyDoc.accountType === 'testnet';
-    const exchangeName = keyDoc.exchange || 'binance';
+    const isTestnet = !demo && keyDoc.accountType === 'testnet';
+    const exchangeName = demo ? 'demo' : (keyDoc.exchange || 'binance');
 
     // On-chain venues cannot be traded from the server — the signing key lives
     // in the user's wallet. Skip cleanly rather than failing mid-tick.
@@ -68,11 +76,15 @@ export async function runBotForUser(user) {
     }
 
     let apiKey, apiSecret;
-    try {
-      apiKey    = decrypt(keyDoc.encryptedKey);
-      apiSecret = decrypt(keyDoc.encryptedSecret);
-    } catch {
-      return await log(userId, 'error', 'Failed to decrypt API keys');
+    if (demo) {
+      apiKey = String(userId); apiSecret = '';      // the demo exchange is keyed by userId
+    } else {
+      try {
+        apiKey    = decrypt(keyDoc.encryptedKey);
+        apiSecret = decrypt(keyDoc.encryptedSecret);
+      } catch {
+        return await log(userId, 'error', 'Failed to decrypt API keys');
+      }
     }
 
     const svc = getExchange(exchangeName);
@@ -91,7 +103,7 @@ export async function runBotForUser(user) {
     //    regardless of subscription or balance status.
     // Use $ne:'manual' (not source:'bot') so legacy trades without the source field
     // are still managed — $ne matches missing fields, strict equality does not.
-    const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY', source: { $ne: 'manual' } });
+    const openTrades = await Trade.find({ userId, status: 'open', side: 'BUY', source: { $ne: 'manual' }, market: { $ne: 'futures' }, ...scope });
 
     for (const openTrade of openTrades) {
       // Ghost trade guard — order was never filled (qty=0 or price=0)
@@ -231,15 +243,30 @@ export async function runBotForUser(user) {
       );
     }
 
+    // 3b. Futures positions — managed every tick whatever the current mode.
+    const fut  = demo ? demoFuturesVenue(userId) : liveFuturesVenue(apiKey, apiSecret, isTestnet);
+    const fctx = { user, userId, settings, exchangeName, log, symCfg, demo, scope, fut };
+    try {
+      await manageFuturesPositions(fctx);
+    } catch (e) {
+      await log(userId, 'error', `Futures position management failed: ${e.message}`);
+    }
+
     // 4. Gate new entries — subscription and balance checks only block opening new trades,
     //    never the exit loop above.
-    const subActive = user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date();
+    // Demo is for trying the bot before paying/depositing — no subscription or asset-balance gate.
+    const subActive = demo || (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date());
     if (!subActive) {
       await log(userId, 'warn', 'No active subscription — skipping new entries');
       return;
     }
-    if ((user.assetBalance ?? 0) < 10) {
+    if (!demo && (user.assetBalance ?? 0) < 10) {
       await log(userId, 'warn', `Low asset balance $${(user.assetBalance ?? 0).toFixed(2)} — skipping new entries`);
+      return;
+    }
+
+    if (settings.tradingMode === 'futures') {
+      await runFuturesEntries(fctx);
       return;
     }
 
@@ -313,7 +340,7 @@ export async function runBotForUser(user) {
         }
 
         // Guard 3: Consecutive loss circuit breaker — 2 losses → 6h cooldown
-        const lastSells = await Trade.find({ userId, symbol: sym, status: 'closed', side: 'SELL' })
+        const lastSells = await Trade.find({ userId, symbol: sym, status: 'closed', side: 'SELL', market: { $ne: 'futures' }, ...scope })
           .sort({ createdAt: -1 }).limit(2);
         if (lastSells.length >= 2 && lastSells.every(t => (t.profit || 0) < 0)) {
           const lastLossAt     = new Date(lastSells[0].closedAt || lastSells[0].createdAt);
@@ -322,7 +349,7 @@ export async function runBotForUser(user) {
             // If user manually exited a trade in profit AFTER the last bot loss,
             // treat it as a streak reset and allow re-entry
             const manualProfit = await Trade.findOne({
-              userId, symbol: sym, status: 'closed',
+              userId, symbol: sym, status: 'closed', ...scope,
               reason: 'Manual exit', profit: { $gt: 0 },
               closedAt: { $gte: lastLossAt },
             });
@@ -394,7 +421,7 @@ export async function runBotForUser(user) {
       }
 
       // Risk checks
-      const risk = await canTrade(userId, settings, usdtBalance, aggressiveMode);
+      const risk = await canTrade(userId, settings, usdtBalance, aggressiveMode, scope);
       if (!risk.allowed) {
         tickResults.skipped.push(`${sym}(risk:${risk.reason})`);
         await log(userId, 'info', `[${sym}] ⚠️ BUY skipped — risk check: ${risk.reason}`);

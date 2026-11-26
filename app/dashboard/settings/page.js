@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Plus, X, Activity, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
+import { AccountModeCard } from '@/components/DemoBanner';
 
 const TIMEFRAMES = ['1m','5m','15m','1h','4h'];
 
@@ -154,6 +155,64 @@ export default function SettingsPage() {
         ) : (
           <p className="text-xs text-slate-400">Click Fetch to load your Binance balance</p>
         )}
+      </div>
+
+      <AccountModeCard />
+
+      {/* Trading mode */}
+      <div className="card glow-border px-5 py-2 mb-5">
+        <Row label="Trading Mode" hint="Applies to NEW trades. Open positions keep being managed either way.">
+          <div className="inline-flex rounded-lg bg-slate-100 p-1">
+            {[['spot', 'Spot'], ['futures', 'Futures']].map(([val, label]) => (
+              <button key={val} onClick={() => set('tradingMode', val)}
+                className="px-4 py-1.5 rounded-md text-sm font-semibold transition-all"
+                style={{
+                  background: (form.tradingMode || 'spot') === val ? 'white' : 'transparent',
+                  color: (form.tradingMode || 'spot') === val ? (val === 'futures' ? '#d97706' : '#2563eb') : '#64748b',
+                  boxShadow: (form.tradingMode || 'spot') === val ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </Row>
+
+        {form.tradingMode === 'futures' && (() => {
+          const lev   = form.futuresLeverage || 3;
+          const maxSl = parseFloat(((100 / lev - 0.5) * 0.8).toFixed(2));
+          const slBad = !(form.stopLossPercent > 0 && form.stopLossPercent <= maxSl);
+          return (
+            <>
+              <Row label="Leverage" hint={`Isolated margin · max ${20}x. Higher leverage = closer liquidation.`}>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={1} max={20} step={1} value={lev}
+                    onChange={e => set('futuresLeverage', parseInt(e.target.value, 10))}
+                    className="w-40 accent-amber-500" />
+                  <span className="w-12 text-center font-mono text-sm font-bold text-amber-600">{lev}x</span>
+                </div>
+              </Row>
+              <Row label="Allow Shorts" hint="Open a SHORT on a SELL signal (only in a downtrend)">
+                <button onClick={() => set('futuresAllowShort', form.futuresAllowShort === false)}
+                  className="relative inline-flex items-center gap-3 cursor-pointer select-none">
+                  <div className="relative w-11 h-6 rounded-full transition-colors duration-200"
+                    style={{ background: form.futuresAllowShort !== false ? '#d97706' : '#cbd5e1' }}>
+                    <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                      style={{ transform: form.futuresAllowShort !== false ? 'translateX(20px)' : 'translateX(0)' }} />
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: form.futuresAllowShort !== false ? '#d97706' : '#94a3b8' }}>
+                    {form.futuresAllowShort !== false ? 'Long + Short' : 'Long only'}
+                  </span>
+                </button>
+              </Row>
+              <div className={`my-3 rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${slBad ? 'border-red-200 bg-red-50 text-red-600' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                <strong>⚠ Futures risk:</strong> at {lev}x a {(100 / lev).toFixed(1)}% move against you liquidates the position.
+                Stop loss must be <strong>≤ {maxSl}%</strong> (now {form.stopLossPercent}%{slBad ? ' — too wide, lower it before saving' : ''}).
+                Stop loss is always ON in futures. &quot;Trade Size&quot; is the margin per trade
+                (position = margin × {lev}). Needs a Binance key with <strong>Futures</strong> enabled, One-way mode, and USDT in the USDⓈ-M Futures wallet.
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* Settings */}

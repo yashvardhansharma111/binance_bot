@@ -27,7 +27,7 @@ export async function GET(req) {
 
   const userId = searchParams.get('userId')?.trim() || '';
 
-  const filter = {};
+  const filter = { demo: { $ne: true } };
   if (userId) filter.userId = userId;
   if (symbol) filter.symbol = { $regex: symbol, $options: 'i' };
   if (side && ['BUY', 'SELL'].includes(side)) filter.side = side;

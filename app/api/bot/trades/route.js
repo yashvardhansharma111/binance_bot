@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import { tradeScope } from '@/bot/services/demo';
 import ApiKey from '@/lib/models/ApiKey';
 import Trade from '@/lib/models/Trade';
 import BotSettings from '@/lib/models/BotSettings';
@@ -23,13 +24,13 @@ export async function GET() {
   today.setHours(0, 0, 0, 0);
 
   // Our DB trades for today
-  const dbTrades = await Trade.find({ userId: user._id, createdAt: { $gte: today } })
+  const dbTrades = await Trade.find({ userId: user._id, createdAt: { $gte: today }, ...tradeScope(user) })
     .sort({ createdAt: -1 });
 
   // Binance trades fetched directly from exchange
   let binanceTrades = [];
   const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
-  if (keyDoc) {
+  if (keyDoc && user.tradingAccount !== 'demo') {
     try {
       const apiKey    = decrypt(keyDoc.encryptedKey);
       const apiSecret = decrypt(keyDoc.encryptedSecret);

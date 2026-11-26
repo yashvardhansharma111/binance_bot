@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import { tradeScope } from '@/bot/services/demo';
 import ApiKey from '@/lib/models/ApiKey';
 import Trade from '@/lib/models/Trade';
 
@@ -16,6 +17,16 @@ export async function GET() {
 
   const isSubscribed = !!(user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date());
 
+  if (user.tradingAccount === 'demo') {
+    const lastDemo = await Trade.findOne({ userId: user._id, demo: true }).sort({ createdAt: -1 }).select('createdAt');
+    return NextResponse.json({
+      connected: true, demo: true, botActive: user.botActive, isSubscribed, networkOk: true,
+      exchange: 'demo', accountType: 'demo', label: 'Demo account',
+      lastTradeAt: lastDemo ? lastDemo.createdAt : null,
+      permissions: { spot: true, futures: true, withdrawal: false },
+    });
+  }
+
   const apiKey = await ApiKey.findOne({ userId: user._id, isActive: true });
 
   if (!apiKey) {
@@ -28,7 +39,7 @@ export async function GET() {
   }
 
   // Last trade
-  const lastTrade = await Trade.findOne({ userId: user._id })
+  const lastTrade = await Trade.findOne({ userId: user._id, ...tradeScope(user) })
     .sort({ createdAt: -1 })
     .select('createdAt');
 

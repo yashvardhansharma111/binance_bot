@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity, RefreshCw, TrendingUp, TrendingDown, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
 import WalletSwap from '@/components/WalletSwap';
+import { fetchLivePrices as getLivePrices, priceKey, unrealized, sideBadge } from '@/lib/tradeDisplay';
 
 export default function TradePage() {
   const [trades,      setTrades]      = useState([]);
@@ -24,18 +25,8 @@ export default function TradePage() {
   }
 
   async function fetchLivePrices(list) {
-    const symbols = [...new Set(list.map(t => t.symbol))];
-    if (!symbols.length) return;
-    const pairs = await Promise.all(
-      symbols.map(async sym => {
-        try {
-          const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`);
-          const d = await r.json();
-          return [sym, parseFloat(d.price)];
-        } catch { return [sym, null]; }
-      })
-    );
-    setLivePrices(Object.fromEntries(pairs));
+    if (!list.length) return;
+    setLivePrices(await getLivePrices(list));
   }
 
   useEffect(() => {
@@ -106,10 +97,10 @@ export default function TradePage() {
       ) : (
         <div className="space-y-3">
           {trades.map(t => {
-            const live   = livePrices[t.symbol];
-            const pnl    = live ? parseFloat(((live - t.price) * t.qty).toFixed(4)) : null;
-            const pnlPct = live ? ((live - t.price) / t.price * 100).toFixed(2) : null;
+            const live   = livePrices[priceKey(t)];
+            const { pnl, pnlPct } = unrealized(t, live);
             const profit = pnl !== null && pnl >= 0;
+            const badge  = sideBadge(t);
 
             return (
               <div key={t._id} className="card glow-border p-5">
@@ -117,7 +108,7 @@ export default function TradePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-3">
                       <span className="font-bold text-slate-900">{t.symbol}</span>
-                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700">BUY</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${badge.className}`}>{badge.label}</span>
                       {t.source === 'manual' && (
                         <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-600">Manual</span>
                       )}

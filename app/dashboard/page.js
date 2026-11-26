@@ -9,6 +9,7 @@ import {
   Zap, AlertTriangle, LogOut,
 } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
+import { fetchLivePrices, priceKey, unrealized, sideBadge } from '@/lib/tradeDisplay';
 import { motion } from 'motion/react';
 
 const LEVERAGES = [1, 2, 3, 5, 10, 20, 50, 75, 100, 125];
@@ -113,16 +114,8 @@ function QuickTrade({ balances, onTradeComplete }) {
   }
 
   async function refreshPricesFor(list) {
-    const syms = [...new Set(list.map(t => t.symbol))];
-    if (!syms.length) return;
-    const pairs = await Promise.all(syms.map(async sym => {
-      try {
-        const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`);
-        const d = await r.json();
-        return [sym, parseFloat(d.price)];
-      } catch { return [sym, null]; }
-    }));
-    setLivePrices(Object.fromEntries(pairs));
+    if (!list.length) return;
+    setLivePrices(await fetchLivePrices(list));
   }
 
   async function placeSpot() {
@@ -443,16 +436,16 @@ function QuickTrade({ balances, onTradeComplete }) {
 
           <div className="space-y-2">
             {openTrades.map(t => {
-              const live   = livePrices[t.symbol];
-              const pnl    = live ? parseFloat(((live - t.price) * t.qty).toFixed(4)) : null;
-              const pnlPct = live ? ((live - t.price) / t.price * 100).toFixed(2) : null;
+              const live   = livePrices[priceKey(t)];
+              const { pnl, pnlPct } = unrealized(t, live);
               const up     = pnl !== null && pnl >= 0;
+              const badge  = sideBadge(t);
               return (
                 <div key={t._id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-slate-100 bg-slate-50">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-xs font-bold text-slate-900">{t.symbol}</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">BUY</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${badge.className}`}>{badge.label}</span>
                       {t.source === 'bot' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-50 text-violet-600">Bot</span>}
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-[11px]">
@@ -529,7 +522,8 @@ export default function DashboardPage() {
   }, [session]);
 
   async function toggleBot() {
-    if (!sub?.active) { router.push('/dashboard/subscribe'); return; }
+    // Demo accounts can run the bot without a subscription.
+    if (!sub?.active && user?.tradingAccount !== 'demo') { router.push('/dashboard/subscribe'); return; }
     setBotLoading(true);
     const action = user?.botActive ? 'stop' : 'start';
     await fetch(`/api/bot/${action}`, { method: 'POST' });
@@ -573,7 +567,7 @@ export default function DashboardPage() {
           }`}>
           {botLoading
             ? <RefreshCw size={15} className="animate-spin" />
-            : user?.botActive ? <Square size={15} /> : !sub?.active ? <Lock size={15} /> : <Play size={15} />}
+            : user?.botActive ? <Square size={15} /> : (!sub?.active && user?.tradingAccount !== 'demo') ? <Lock size={15} /> : <Play size={15} />}
           {user?.botActive ? 'Stop' : 'Start Bot'}
         </button>
       </div>

@@ -1,7 +1,7 @@
 import BotSettings from '../../lib/models/BotSettings.js';
 import Trade from '../../lib/models/Trade.js';
 
-export async function canTrade(userId, settings, usdtBalance, aggressive = false) {
+export async function canTrade(userId, settings, usdtBalance, aggressive = false, scope = {}) {
   if (usdtBalance < 10)
     return { allowed: false, reason: `Low balance: $${usdtBalance.toFixed(2)}` };
 
@@ -17,7 +17,7 @@ export async function canTrade(userId, settings, usdtBalance, aggressive = false
     return { allowed: false, reason: `Daily limit reached (${settings.maxDailyTrades})` };
 
   const max       = settings.maxConcurrentTrades ?? 1;
-  const openCount = await Trade.countDocuments({ userId, status: 'open', side: 'BUY', symbol: settings.symbol });
+  const openCount = await Trade.countDocuments({ userId, status: 'open', side: 'BUY', symbol: settings.symbol, market: { $ne: 'futures' }, ...scope });
   if (openCount >= max)
     return { allowed: false, reason: `Max concurrent positions reached (${openCount}/${max}) on ${settings.symbol}` };
 

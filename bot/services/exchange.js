@@ -1,8 +1,10 @@
 import * as binance  from './binance.js';
 import * as bingx    from './bingx.js';
 import * as metamask from './metamask.js';
+import * as demo     from './demo.js';
 
-const REGISTRY = { binance, bingx, metamask };
+// 'demo' is the virtual exchange — its "apiKey" argument is the userId.
+const REGISTRY = { binance, bingx, metamask, demo };
 
 export function getExchange(name) {
   return REGISTRY[name] ?? binance;

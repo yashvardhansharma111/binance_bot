@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import { tradeScope } from '@/bot/services/demo';
 import Trade from '@/lib/models/Trade';
 
 export async function GET(req) {
@@ -22,6 +23,7 @@ export async function GET(req) {
 
   const trades = await Trade.find({
     userId: user._id,
+    ...tradeScope(user),
     status: 'closed',
     closedAt: { $gte: startDate },
   });

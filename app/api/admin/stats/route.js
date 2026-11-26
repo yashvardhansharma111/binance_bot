@@ -29,9 +29,9 @@ export async function GET() {
     User.countDocuments({ status: 'blocked' }),
     User.countDocuments({ botActive: true }),
     User.countDocuments({ botStoppedByAdmin: true, botActive: false }),
-    Trade.countDocuments({}),
-    Trade.countDocuments({ status: 'closed' }),
-    Trade.find({}).sort({ createdAt: -1 }).limit(10).populate('userId', 'name email'),
+    Trade.countDocuments({ demo: { $ne: true } }),
+    Trade.countDocuments({ status: 'closed', demo: { $ne: true } }),
+    Trade.find({ demo: { $ne: true } }).sort({ createdAt: -1 }).limit(10).populate('userId', 'name email'),
     Subscription.countDocuments({ status: 'finished' }),
     User.countDocuments({ subscriptionExpiry: { $gt: now } }),
     Commission.find({}).select('platformAmount referrerAmount totalAmount createdAt'),
@@ -42,7 +42,7 @@ export async function GET() {
   const totalReferrerPaid    = commissions.reduce((s, c) => s + c.referrerAmount, 0);
   const totalCommission      = commissions.reduce((s, c) => s + c.totalAmount, 0);
   const totalProfit          = await Trade.aggregate([
-    { $match: { status: 'closed', profit: { $gt: 0 } } },
+    { $match: { status: 'closed', profit: { $gt: 0 }, demo: { $ne: true } } },
     { $group: { _id: null, total: { $sum: '$profit' } } },
   ]);
 

@@ -41,6 +41,7 @@ export async function POST(req) {
       phone: phone?.trim() || null,
       referralCode: code,
       referredBy,
+      tradingAccount: 'demo',   // new users try the bot with virtual funds first
     });
 
     deleteOtp('signup', email);

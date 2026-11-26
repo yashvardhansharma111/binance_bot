@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import { tradeScope } from '@/bot/services/demo';
 import Trade from '@/lib/models/Trade';
 
 export async function GET(req) {
@@ -16,7 +17,7 @@ export async function GET(req) {
 
   await connectDB();
   const user   = await User.findOne({ email: session.user.email });
-  const filter = { userId: user._id };
+  const filter = { userId: user._id, ...tradeScope(user) };
   if (symbol) filter.symbol = symbol;
   if (status) filter.status = status;
 

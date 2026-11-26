@@ -27,24 +27,25 @@ export async function POST(req) {
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  if ((user.assetBalance ?? 0) < 10)
+  const demo = user.tradingAccount === 'demo';
+  if (!demo && (user.assetBalance ?? 0) < 10)
     return NextResponse.json({ error: 'You need at least $10 in Asset Balance to trade. Please deposit first.' }, { status: 400 });
 
-  const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
-  if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
-
-  const exchange   = keyDoc.exchange || 'binance';
-  const isTestnet  = keyDoc.accountType === 'testnet';
-  const { placeMarketBuy, placeMarketSell } = getExchange(exchange);
-
-  let apiKey, apiSecret;
-  try {
-    apiKey    = decrypt(keyDoc.encryptedKey);
-    apiSecret = decrypt(keyDoc.encryptedSecret);
-  } catch (e) {
-    console.error(`[manual-trade] Key decrypt failed`);
-    return NextResponse.json({ error: 'Failed to decrypt API keys' }, { status: 500 });
+  let exchange = 'demo', isTestnet = false, apiKey = String(user._id), apiSecret = '';
+  if (!demo) {
+    const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
+    if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
+    exchange  = keyDoc.exchange || 'binance';
+    isTestnet = keyDoc.accountType === 'testnet';
+    try {
+      apiKey    = decrypt(keyDoc.encryptedKey);
+      apiSecret = decrypt(keyDoc.encryptedSecret);
+    } catch (e) {
+      console.error(`[manual-trade] Key decrypt failed`);
+      return NextResponse.json({ error: 'Failed to decrypt API keys' }, { status: 500 });
+    }
   }
+  const { placeMarketBuy, placeMarketSell } = getExchange(exchange);
 
   try {
     let order;
@@ -58,7 +59,7 @@ export async function POST(req) {
       if (qty) {
         order = await placeMarketSell(apiKey, apiSecret, symbol, parseFloat(qty), isTestnet);
       } else {
-        const openTrade = await Trade.findOne({ userId: user._id, symbol, side: 'BUY', status: 'open' });
+        const openTrade = await Trade.findOne({ userId: user._id, symbol, side: 'BUY', status: 'open', market: { $ne: 'futures' }, demo: demo ? true : { $ne: true } });
         if (!openTrade) return NextResponse.json({ error: 'No open position to sell' }, { status: 400 });
         order = await placeMarketSell(apiKey, apiSecret, symbol, openTrade.qty, isTestnet);
         const profit = parseFloat(((order.price - openTrade.price) * openTrade.qty).toFixed(6));
@@ -81,7 +82,8 @@ export async function POST(req) {
       orderId:    order.orderId,
       status:     side === 'BUY' ? 'open' : 'closed',
       source:     'manual',
-      reason:     'Manual trade',
+      demo,
+      reason:     demo ? 'Manual trade (demo)' : 'Manual trade',
     });
 
     return NextResponse.json({ trade, order });

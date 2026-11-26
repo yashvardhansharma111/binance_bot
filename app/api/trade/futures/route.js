@@ -6,93 +6,10 @@ import ApiKey from '@/lib/models/ApiKey';
 import Trade from '@/lib/models/Trade';
 import User from '@/lib/models/User';
 import { decrypt } from '@/lib/encryption';
-import { getCurrentPrice } from '@/bot/services/binance';
-import { createHmac } from 'crypto';
-import axios from 'axios';
+import * as fx from '@/bot/services/binanceFutures';
+import { demoFuturesVenue } from '@/bot/services/demo';
 
-const FAPI_LIVE    = 'https://fapi.binance.com';
-const FAPI_TESTNET = 'https://testnet.binancefuture.com';
-
-function fapiBase(isTestnet) {
-  return isTestnet ? FAPI_TESTNET : FAPI_LIVE;
-}
-
-function signedParams(apiSecret, params) {
-  const p   = { ...params, timestamp: Date.now(), recvWindow: 60000 };
-  const qs  = new URLSearchParams(p).toString();
-  const sig = createHmac('sha256', apiSecret).update(qs).digest('hex');
-  return `${qs}&signature=${sig}`;
-}
-
-function fapiHeaders(apiKey) {
-  return { 'X-MBX-APIKEY': apiKey };
-}
-
-function fapiError(e) {
-  const status = e.response?.status;
-  const code   = e.response?.data?.code;
-  const msg    = e.response?.data?.msg || e.message;
-  if (status === 401 || code === -2015)
-    return new Error('Binance API key rejected — enable "Futures Trading" permission on your API key at binance.com/en/my/api-management');
-  if (code === -4061) return new Error('Order side must match position side — disable Hedge Mode in Binance Futures settings');
-  if (code === -1021) return new Error('Timestamp out of sync — check your server clock');
-  if (code === -1013 || code === -4003) return new Error(`Order too small — increase margin or use a lower-price pair (${msg})`);
-  return new Error(code ? `Binance Futures error ${code}: ${msg}` : msg);
-}
-
-async function setLeverage(apiKey, apiSecret, symbol, leverage, isTestnet) {
-  const base = fapiBase(isTestnet);
-  const qs   = signedParams(apiSecret, { symbol, leverage });
-  await axios.post(`${base}/fapi/v1/leverage?${qs}`, null, {
-    headers: fapiHeaders(apiKey), timeout: 8000,
-  });
-}
-
-async function placeFuturesMarket(apiKey, apiSecret, symbol, side, qty, isTestnet) {
-  const base = fapiBase(isTestnet);
-  const qs   = signedParams(apiSecret, { symbol, side, type: 'MARKET', quantity: qty });
-  const { data } = await axios.post(`${base}/fapi/v1/order?${qs}`, null, {
-    headers: fapiHeaders(apiKey), timeout: 15000,
-  });
-  return data;
-}
-
-// Cache exchange info so we don't fetch on every order
-const symbolInfoCache = {};
-async function getFuturesStepSize(symbol, isTestnet) {
-  const key = `${symbol}:${isTestnet}`;
-  if (symbolInfoCache[key]) return symbolInfoCache[key];
-  const base = fapiBase(isTestnet);
-  const { data } = await axios.get(`${base}/fapi/v1/exchangeInfo`, { params: { symbol }, timeout: 8000 });
-  const sym = data.symbols?.[0];
-  if (!sym) throw new Error(`Symbol ${symbol} not found on Binance Futures`);
-  const lot = sym.filters.find(f => f.filterType === 'LOT_SIZE');
-  const info = { stepSize: parseFloat(lot.stepSize), minQty: parseFloat(lot.minQty) };
-  symbolInfoCache[key] = info;
-  return info;
-}
-
-function roundStep(qty, step) {
-  const precision = Math.max(0, Math.round(-Math.log10(step)));
-  return parseFloat((Math.floor(qty / step) * step).toFixed(precision));
-}
-
-async function placeFuturesStopOrder(apiKey, apiSecret, symbol, side, type, stopPrice, isTestnet) {
-  const base = fapiBase(isTestnet);
-  const qs   = signedParams(apiSecret, {
-    symbol, side, type,
-    stopPrice: stopPrice.toFixed(2),
-    closePosition: 'true',
-    timeInForce: 'GTE_GTC',
-  });
-  await axios.post(`${base}/fapi/v1/order?${qs}`, null, {
-    headers: fapiHeaders(apiKey), timeout: 8000,
-  }).catch(e => {
-    // Log but don't fail the whole trade if SL/TP order fails
-    console.warn(`[futures] ${type} order failed: ${e.response?.data?.msg || e.message}`);
-  });
-}
-
+/** Manual futures order (user-initiated). The bot never manages these. */
 export async function POST(req) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -105,96 +22,89 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Side must be BUY or SELL' }, { status: 400 });
   if (!usdtMargin || usdtMargin < 5)
     return NextResponse.json({ error: 'Minimum margin is $5' }, { status: 400 });
-  if (leverage < 1 || leverage > 125)
+  if (!Number.isInteger(Number(leverage)) || leverage < 1 || leverage > 125)
     return NextResponse.json({ error: 'Leverage must be 1–125' }, { status: 400 });
   if (stopLossPercent !== undefined && (stopLossPercent < 0.1 || stopLossPercent > 50))
     return NextResponse.json({ error: 'Stop loss must be 0.1–50%' }, { status: 400 });
   if (takeProfitPercent !== undefined && (takeProfitPercent < 0.1 || takeProfitPercent > 500))
     return NextResponse.json({ error: 'Take profit must be 0.1–500%' }, { status: 400 });
+  if (stopLossPercent && stopLossPercent >= fx.liquidationDistancePct(leverage))
+    return NextResponse.json({
+      error: `Stop loss ${stopLossPercent}% is beyond the ~${fx.liquidationDistancePct(leverage).toFixed(1)}% liquidation distance at ${leverage}x — it would never trigger`,
+    }, { status: 400 });
 
   await connectDB();
   const user = await User.findOne({ email: session.user.email });
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
-  if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
-
-  const isTestnet = keyDoc.accountType === 'testnet';
-  if (isTestnet)
-    return NextResponse.json({
-      error: 'Futures trading requires a live Binance account. Testnet API keys only support spot trading — switch to a real Binance API key in API Keys settings.',
-    }, { status: 400 });
-
-  let apiKey, apiSecret;
-  try {
-    apiKey    = decrypt(keyDoc.encryptedKey);
-    apiSecret = decrypt(keyDoc.encryptedSecret);
-  } catch {
-    return NextResponse.json({ error: 'Failed to decrypt API keys' }, { status: 500 });
+  const demo = user.tradingAccount === 'demo';
+  const dryRun = process.env.DRY_RUN === 'true';
+  let venue;
+  if (demo) {
+    venue = demoFuturesVenue(user._id);
+  } else {
+    const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
+    if (!keyDoc) return NextResponse.json({ error: 'No active API key. Add one in API Keys.' }, { status: 400 });
+    if ((keyDoc.exchange || 'binance') !== 'binance')
+      return NextResponse.json({ error: 'Futures trading is available with a Binance API key only.' }, { status: 400 });
+    const isTestnet = keyDoc.accountType === 'testnet';
+    if (isTestnet && !dryRun)
+      return NextResponse.json({
+        error: 'Futures trading requires a live Binance account. Testnet API keys only support spot trading — switch to a real Binance API key in API Keys settings.',
+      }, { status: 400 });
+    try {
+      venue = fx.liveFuturesVenue(decrypt(keyDoc.encryptedKey), decrypt(keyDoc.encryptedSecret), isTestnet);
+    } catch {
+      return NextResponse.json({ error: 'Failed to decrypt API keys' }, { status: 500 });
+    }
   }
 
   try {
-    // Get current price + symbol lot-size rules
-    const [entryPrice, { stepSize, minQty }] = await Promise.all([
-      getCurrentPrice(symbol),
-      getFuturesStepSize(symbol, isTestnet),
-    ]);
-    const positionSize = usdtMargin * leverage;
-    const rawQty = positionSize / entryPrice;
-    const qty    = roundStep(rawQty, stepSize);
+    const direction = side === 'BUY' ? 'LONG' : 'SHORT';
+    const rules = await fx.getSymbolRules(symbol);
+    if (!rules) return NextResponse.json({ error: `${symbol} is not a Binance USDⓈ-M perpetual` }, { status: 400 });
 
-    if (qty < minQty) {
-      const minMargin = (minQty * entryPrice / leverage).toFixed(2);
-      return NextResponse.json({
-        error: `Position too small — minimum ${minQty} ${symbol.replace('USDT','')} requires $${minMargin} margin at ${leverage}x`,
-      }, { status: 400 });
-    }
+    const mark = await fx.getMarkPrice(symbol);
+    let qty;
+    try { qty = fx.sizePosition(rules, mark, usdtMargin, leverage); }
+    catch (e) { return NextResponse.json({ error: e.message }, { status: 400 }); }
 
-    // Set leverage
-    try {
-      await setLeverage(apiKey, apiSecret, symbol, leverage, isTestnet);
-    } catch (e) { throw fapiError(e); }
+    await venue.prepareSymbol(symbol, leverage);
+    const order = await venue.openMarket(symbol, direction, qty);
 
-    // Place market order
-    let order;
-    try {
-      order = await placeFuturesMarket(apiKey, apiSecret, symbol, side, qty, isTestnet);
-    } catch (e) { throw fapiError(e); }
+    const lv = fx.futuresLevels(order.price, direction, stopLossPercent, takeProfitPercent);
+    const stopLoss   = lv.stopLoss   ? fx.roundPrice(lv.stopLoss, rules.tickSize)   : null;
+    const takeProfit = lv.takeProfit ? fx.roundPrice(lv.takeProfit, rules.tickSize) : null;
+    const prot = await venue.placeProtection(symbol, direction, { stopLoss, takeProfit }, rules.tickSize);
+    if (prot.errors.length) console.warn(`[futures] protection failed for ${user.email} ${symbol}: ${prot.errors.join('; ')}`);
+    const pos = await venue.getPosition(symbol).catch(() => null);
 
-    const fillPrice = parseFloat(order.avgPrice) || entryPrice;
-    const filledQty = parseFloat(order.executedQty) || qty;
-
-    // Calculate SL/TP price levels
-    const isLong = side === 'BUY';
-    const sl = stopLossPercent
-      ? parseFloat((fillPrice * (isLong ? 1 - stopLossPercent / 100 : 1 + stopLossPercent / 100)).toFixed(2))
-      : null;
-    const tp = takeProfitPercent
-      ? parseFloat((fillPrice * (isLong ? 1 + takeProfitPercent / 100 : 1 - takeProfitPercent / 100)).toFixed(2))
-      : null;
-
-    // Place SL/TP stop orders on the exchange (non-blocking failures)
-    const closeSide = isLong ? 'SELL' : 'BUY';
-    if (sl) await placeFuturesStopOrder(apiKey, apiSecret, symbol, closeSide, 'STOP_MARKET', sl, isTestnet);
-    if (tp) await placeFuturesStopOrder(apiKey, apiSecret, symbol, closeSide, 'TAKE_PROFIT_MARKET', tp, isTestnet);
-
-    // Record the trade
     const trade = await Trade.create({
       userId:     user._id,
       symbol,
       side,
-      price:      fillPrice,
-      qty:        filledQty,
-      total:      fillPrice * filledQty,
-      stopLoss:   sl,
-      takeProfit: tp,
-      orderId:    String(order.orderId),
+      price:      order.price,
+      qty:        order.qty,
+      total:      order.price * order.qty,
+      stopLoss,
+      takeProfit,
+      orderId:    order.orderId,
       status:     'open',
       source:     'manual',
-      reason:     `Futures ${isLong ? 'LONG' : 'SHORT'} ${leverage}x`,
+      market:     'futures',
+      positionSide: direction,
+      leverage,
+      margin:     parseFloat(((order.price * order.qty) / leverage).toFixed(4)),
+      liquidationPrice: order.liquidationPrice ?? pos?.liquidationPrice ?? null,
+      demo,
+      protectionIds: { stopLossId: prot.stopLossId, takeProfitId: prot.takeProfitId },
+      reason:     `Futures ${direction} ${leverage}x`,
     });
 
-    return NextResponse.json({ trade, leverage, margin: usdtMargin });
+    return NextResponse.json({
+      trade, leverage, margin: usdtMargin, dryRun,
+      ...(prot.errors.length ? { warning: `Position opened but exchange SL/TP failed: ${prot.errors.join('; ')}` } : {}),
+    });
   } catch (err) {
     console.error('[futures] Order failed:', err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

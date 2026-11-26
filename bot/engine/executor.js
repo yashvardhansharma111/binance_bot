@@ -14,7 +14,7 @@ async function log(userId, level, message, data = null) {
   await BotLog.create({ userId, level, message, data }).catch(() => {});
 }
 
-async function applyCommission(userId, tradeId, profit) {
+export async function applyCommission(userId, tradeId, profit) {
   if (profit <= 0) return;
 
   const totalCut     = parseFloat((profit * TOTAL_COMMISSION_RATE / 100).toFixed(8));
@@ -67,17 +67,19 @@ export async function openPosition(userId, apiKey, apiSecret, settings, usdtAmou
   // Respect useStopLoss setting — null means bot will only exit on TP or signal
   const stopLoss = useStopLoss === false ? null : sl;
 
+  const demo = exchange === 'demo';
   await Trade.create({
     userId, symbol, side: 'BUY',
     price: order.price, qty: order.qty, total: order.total,
     stopLoss, takeProfit, orderId: order.orderId,
-    status: 'open', source: 'bot',
+    status: 'open', source: 'bot', demo,
     reason: `RSI:${indicators.rsi} sentiment:${sentiment?.sentiment}`,
   });
 
   await recordTrade(userId);
-  await log(userId, 'info', `✅ BUY @ $${order.price} | SL:${stopLoss ? '$' + stopLoss : 'OFF'} TP:$${takeProfit}`);
+  await log(userId, 'info', `${demo ? '[DEMO] ' : ''}✅ BUY @ $${order.price} | SL:${stopLoss ? '$' + stopLoss : 'OFF'} TP:$${takeProfit}`);
 
+  if (demo) return;
   const user = await User.findById(userId);
   sendTradeEmail(user.email, user.name, 'BUY', {
     symbol, price: order.price, qty: order.qty, total: order.total,
@@ -154,6 +156,7 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
   }
 
   const profit = parseFloat(((order.price - entry) * order.qty).toFixed(6));
+  const demo = exchange === 'demo' || openTrade.demo === true;
 
   const closedTrade = await Trade.findByIdAndUpdate(openTrade._id, {
     status: 'closed', closedAt: new Date(), profit,
@@ -164,17 +167,17 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
     userId, symbol, side: 'SELL',
     price: order.price, qty: order.qty, total: order.total,
     profit, orderId: order.orderId,
-    status: 'closed', source: 'bot', closedAt: new Date(), reason,
+    status: 'closed', source: 'bot', closedAt: new Date(), reason, demo,
   });
 
   await recordTrade(userId);
 
   // Apply 15% commission on profit
-  if (profit > 0) {
+  if (profit > 0 && !demo) {
     await applyCommission(userId, closedTrade._id, profit);
   }
 
-  const commissionNote = profit > 0
+  const commissionNote = profit > 0 && !demo
     ? ` | Commission: ${TOTAL_COMMISSION_RATE}% = $${(profit * TOTAL_COMMISSION_RATE / 100).toFixed(4)}`
     : '';
 
@@ -182,6 +185,7 @@ export async function closePosition(userId, apiKey, apiSecret, openTrade, reason
     `${profit >= 0 ? '✅' : '❌'} SELL @ $${order.price} | P&L: ${profit >= 0 ? '+' : ''}$${profit}${commissionNote}`
   );
 
+  if (demo) return;
   const sellUser = await User.findById(userId);
   sendTradeEmail(sellUser.email, sellUser.name, 'SELL', {
     symbol, price: order.price, qty: order.qty,

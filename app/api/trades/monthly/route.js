@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import { tradeScope } from '@/bot/services/demo';
 import Trade from '@/lib/models/Trade';
 
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   const monthly = await Trade.aggregate([
-    { $match: { userId: user._id, status: 'closed', profit: { $ne: null }, closedAt: { $ne: null } } },
+    { $match: { userId: user._id, ...tradeScope(user), status: 'closed', profit: { $ne: null }, closedAt: { $ne: null } } },
     {
       $group: {
         _id:         { year: { $year: '$closedAt' }, month: { $month: '$closedAt' } },

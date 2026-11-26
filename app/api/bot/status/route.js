@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import User from '@/lib/models/User';
+import { tradeScope } from '@/bot/services/demo';
 import ApiKey from '@/lib/models/ApiKey';
 import Trade from '@/lib/models/Trade';
 import BotLog from '@/lib/models/BotLog';
@@ -15,6 +16,8 @@ export async function GET() {
   await connectDB();
   const user = await User.findOne({ email: session.user.email });
   const uid  = user._id;
+  const scope = tradeScope(user);
+  const demo  = user.tradingAccount === 'demo';
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -22,10 +25,10 @@ export async function GET() {
   const [apiKey, settings, openTrade, recentLogs, todayTrades, allTrades] = await Promise.all([
     ApiKey.findOne({ userId: uid }),
     BotSettings.findOne({ userId: uid }),
-    Trade.findOne({ userId: uid, status: 'open', side: 'BUY' }),
+    Trade.findOne({ userId: uid, status: 'open', side: 'BUY', ...scope }),
     BotLog.find({ userId: uid }).sort({ createdAt: -1 }).limit(60),
-    Trade.find({ userId: uid, createdAt: { $gte: today } }).sort({ createdAt: -1 }),
-    Trade.find({ userId: uid, status: 'closed' }),
+    Trade.find({ userId: uid, createdAt: { $gte: today }, ...scope }).sort({ createdAt: -1 }),
+    Trade.find({ userId: uid, status: 'closed', ...scope }),
   ]);
 
   const totalProfit = allTrades.reduce((s, t) => s + (t.profit || 0), 0);
@@ -39,7 +42,8 @@ export async function GET() {
 
   return NextResponse.json({
     botActive:    user.botActive,
-    hasApiKey:    !!apiKey,
+    hasApiKey:    demo || !!apiKey,
+    demo,
     testnet:      process.env.BINANCE_TESTNET === 'true',
     dryRun:       process.env.DRY_RUN === 'true',
     settings:     settings || {},

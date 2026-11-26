@@ -8,6 +8,8 @@ import User from '@/lib/models/User';
 import Commission from '@/lib/models/Commission';
 import { decrypt } from '@/lib/encryption';
 import { getExchange } from '@/bot/services/exchange';
+import * as fx from '@/bot/services/binanceFutures';
+import { demoFuturesVenue, settleDemoFutures } from '@/bot/services/demo';
 
 const TOTAL_COMMISSION_RATE = 15;
 const REFERRER_RATE         = 10;
@@ -60,17 +62,40 @@ export async function POST(req) {
   const trade = await Trade.findOne({ _id: tradeId, userId: user._id, status: 'open' });
   if (!trade) return NextResponse.json({ error: 'Open trade not found' }, { status: 404 });
 
-  const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
-  if (!keyDoc) return NextResponse.json({ error: 'No active API key' }, { status: 400 });
-
-  const exchange   = keyDoc.exchange || 'binance';
-  const isTestnet  = keyDoc.accountType === 'testnet';
-  const apiKey     = decrypt(keyDoc.encryptedKey);
-  const apiSecret  = decrypt(keyDoc.encryptedSecret);
+  // A demo trade is always closed on the demo exchange, whatever the current mode.
+  const demo = trade.demo === true;
+  let exchange = 'demo', isTestnet = false, apiKey = String(user._id), apiSecret = '';
+  if (!demo) {
+    const keyDoc = await ApiKey.findOne({ userId: user._id, isActive: true });
+    if (!keyDoc) return NextResponse.json({ error: 'No active API key' }, { status: 400 });
+    exchange  = keyDoc.exchange || 'binance';
+    isTestnet = keyDoc.accountType === 'testnet';
+    apiKey    = decrypt(keyDoc.encryptedKey);
+    apiSecret = decrypt(keyDoc.encryptedSecret);
+  }
   const { placeMarketSell } = getExchange(exchange);
 
   let order, profit;
-  try {
+
+  // Futures positions are closed with a reduce-only futures order — never a spot sell.
+  // Legacy manual futures trades have no `market` field but a "Futures LONG/SHORT" reason.
+  const isFutures = trade.market === 'futures' || /^Futures (LONG|SHORT)/.test(trade.reason || '');
+  if (isFutures) {
+    if (!demo && exchange !== 'binance')
+      return NextResponse.json({ error: 'This futures position was opened on Binance — reconnect your Binance key to close it' }, { status: 400 });
+    const direction = trade.positionSide || (trade.side === 'BUY' ? 'LONG' : 'SHORT');
+    const venue = demo ? demoFuturesVenue(user._id) : fx.liveFuturesVenue(apiKey, apiSecret, isTestnet);
+    try {
+      const res = await venue.closeMarket(trade.symbol, direction, trade.qty);
+      await venue.cancelAllOrders(trade.symbol);
+      const qty = res.qty || trade.qty;
+      profit = fx.futuresPnl(direction, trade.price, res.price, qty);
+      if (demo) profit = parseFloat((await settleDemoFutures(user._id, trade, profit, res.price, qty)).toFixed(6));
+      order  = { price: res.price, qty, alreadyClosed: !!res.alreadyFlat };
+    } catch (e) {
+      return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+  } else try {
     order  = await placeMarketSell(apiKey, apiSecret, trade.symbol, trade.qty, isTestnet);
     profit = parseFloat(((order.price - trade.price) * order.qty).toFixed(6));
   } catch (e) {
@@ -113,7 +138,7 @@ export async function POST(req) {
     status: 'closed', closedAt: new Date(), profit, reason: 'Manual exit',
   }, { new: true });
 
-  await applyCommission(user, closedTrade._id, profit);
+  if (!demo) await applyCommission(user, closedTrade._id, profit);
 
   try {
     const { sendPush } = await import('@/lib/fcm.js');

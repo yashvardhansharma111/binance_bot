@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/db';
 import BotSettings from '@/lib/models/BotSettings';
 import User from '@/lib/models/User';
+import { maxFuturesStopLoss, MAX_FUTURES_LEVERAGE } from '@/bot/services/binanceFutures';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -22,7 +23,8 @@ export async function PUT(req) {
   const body = await req.json();
   const allowed = ['symbol','symbols','timeframe','tradeUSDT','stopLossPercent','takeProfitPercent',
                    'cooldownMinutes','maxDailyTrades','maxConcurrentTrades','useGroqFilter','aggressiveMode',
-                   'trailingStopPercent','symbolConfigs','useStopLoss'];
+                   'trailingStopPercent','symbolConfigs','useStopLoss',
+                   'tradingMode','futuresLeverage','futuresAllowShort'];
   const update = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
@@ -58,8 +60,36 @@ export async function PUT(req) {
       }));
   }
 
+  if (update.tradingMode !== undefined && !['spot', 'futures'].includes(update.tradingMode))
+    return NextResponse.json({ error: 'tradingMode must be spot or futures' }, { status: 400 });
+  if (update.futuresLeverage !== undefined) {
+    const lev = Number(update.futuresLeverage);
+    if (!Number.isInteger(lev) || lev < 1 || lev > MAX_FUTURES_LEVERAGE)
+      return NextResponse.json({ error: `Leverage must be a whole number 1–${MAX_FUTURES_LEVERAGE}` }, { status: 400 });
+    update.futuresLeverage = lev;
+  }
+  if (update.futuresAllowShort !== undefined) update.futuresAllowShort = !!update.futuresAllowShort;
+
   await connectDB();
   const user = await User.findOne({ email: session.user.email });
+
+  // Futures: every stop loss must sit well inside the liquidation distance.
+  const current = (await BotSettings.findOne({ userId: user._id }).lean()) || {};
+  const merged  = { ...current, ...update };
+  if (merged.tradingMode === 'futures') {
+    const lev   = merged.futuresLeverage || 3;
+    const maxSl = maxFuturesStopLoss(lev);
+    const sls = [
+      { sym: 'default', sl: merged.stopLossPercent ?? 2 },
+      ...(merged.symbolConfigs || []).filter(c => c.stopLossPercent != null).map(c => ({ sym: c.symbol, sl: c.stopLossPercent })),
+    ];
+    const bad = sls.find(x => !(x.sl > 0 && x.sl <= maxSl));
+    if (bad)
+      return NextResponse.json({
+        error: `Futures at ${lev}x: stop loss (${bad.sym}: ${bad.sl}%) must be between 0.1% and ${maxSl}% so it triggers before liquidation. Lower the stop loss or the leverage.`,
+      }, { status: 400 });
+  }
+
   const settings = await BotSettings.findOneAndUpdate(
     { userId: user._id },
     { $set: update },
