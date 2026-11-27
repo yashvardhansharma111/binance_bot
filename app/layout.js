@@ -1,17 +1,21 @@
 import './globals.css';
 import { Providers } from './providers';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 
-const inter = Inter({
-  subsets: ['latin'],
+// Self-hosted (latin, variable) so `next build` never needs to reach Google Fonts —
+// the production server failed builds when that download was unreachable.
+// Both fonts are SIL Open Font License.
+const inter = localFont({
+  src: './fonts/inter-latin-var.woff2',
   variable: '--font-sans',
+  weight: '100 900',
   display: 'swap',
 });
 
-const mono = JetBrains_Mono({
-  subsets: ['latin'],
+const mono = localFont({
+  src: './fonts/jetbrains-mono-latin-var.woff2',
   variable: '--font-mono',
-  weight: ['400', '500', '600', '700'],
+  weight: '400 700',
   display: 'swap',
 });
 
