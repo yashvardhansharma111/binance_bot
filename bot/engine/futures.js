@@ -2,9 +2,10 @@
  * Futures leg of the bot (Binance USDⓈ-M, isolated, one-way mode).
  *
  * - manageFuturesPositions(): runs every tick for every user that has open
- *   futures bot trades, whatever the current tradingMode — so switching back to
+ *   futures bot trades, even when futures is switched off — so turning it off
  *   spot never orphans a leveraged position.
- * - runFuturesEntries(): new entries, only when tradingMode === 'futures'.
+ * - runFuturesEntries(): new entries, only when the futures config is enabled.
+ *   ctx.settings is futuresView(settings) from lib/marketSettings.js.
  *
  * Signals reuse the spot indicator logic: BUY → LONG, SELL → SHORT.
  * Every position gets a stop-loss (futures never runs without one), placed on the

@@ -17,6 +17,7 @@ import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/se
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
 import { openPosition, closePosition } from './executor.js';
 import { manageFuturesPositions, runFuturesEntries } from './futures.js';
+import { spotEnabled, futuresConfig, futuresView } from '../../lib/marketSettings.js';
 import { runChecklist, checklistIndicators, checklistSummary } from './checklist.js';
 import { demoFuturesVenue, tradeScope, virtualKindOf, virtualKey } from '../services/demo.js';
 import { liveFuturesVenue } from '../services/binanceFutures.js';
@@ -274,7 +275,8 @@ export async function runBotForUser(user) {
 
     // 3b. Futures positions — managed every tick whatever the current mode.
     const fut  = demo ? demoFuturesVenue(userId, vkind) : liveFuturesVenue(apiKey, apiSecret, isTestnet);
-    const fctx = { user, userId, settings, exchangeName, log, symCfg, demo, kind: vkind, scope, fut };
+    // Futures runs on its own config (lib/marketSettings.js), alongside spot.
+    const fctx = { user, userId, settings: futuresView(settings), exchangeName, log, symCfg, demo, kind: vkind, scope, fut };
     try {
       await manageFuturesPositions(fctx);
     } catch (e) {
@@ -294,10 +296,11 @@ export async function runBotForUser(user) {
       return;
     }
 
-    if (settings.tradingMode === 'futures') {
-      await runFuturesEntries(fctx);
-      return;
+    if (futuresConfig(settings).enabled) {
+      try { await runFuturesEntries(fctx); }
+      catch (e) { await log(userId, 'error', `Futures entries failed: ${e.message}`); }
     }
+    if (!spotEnabled(settings)) return;
 
     // 5. Fetch USDT balance once — shared across all symbol iterations
     const usdtBalance = await getUSDTBalance(apiKey, apiSecret, isTestnet, exchangeName);

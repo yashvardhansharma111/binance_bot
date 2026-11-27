@@ -485,6 +485,11 @@ export default function ChartPage() {
                 </span>
                 <span className="text-xs text-slate-500">RSI {bot.rsi} · {bot.uptrend ? 'uptrend' : 'downtrend'} · {bot.macroUptrend ? 'above' : 'below'} EMA100</span>
               </div>
+              {bot.marketOn === false && (
+                <div className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  ⚠ {market === 'futures' ? 'Futures' : 'Spot'} trading is OFF in Bot Config — the bot will not open {market} trades.
+                </div>
+              )}
               <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-semibold ${bot.wouldTrade ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                 {bot.signal === 'HOLD' ? 'No trade: there is no signal right now.'
                   : !bot.checklistOn ? `Checklist is off — the bot would act on this ${bot.signal}.`

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Activity, RefreshCw, TrendingUp, TrendingDown, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { fetchLivePrices as getLivePrices, priceKey, unrealized, sideBadge } from '@/lib/tradeDisplay';
+import { fetchLivePrices as getLivePrices, priceKey, unrealized, sideBadge, marketBadge } from '@/lib/tradeDisplay';
 
 export default function TradePage() {
   const [trades,      setTrades]      = useState([]);
@@ -95,6 +95,7 @@ export default function TradePage() {
             const { pnl, pnlPct } = unrealized(t, live);
             const profit = pnl !== null && pnl >= 0;
             const badge  = sideBadge(t);
+            const mkt    = marketBadge(t);
 
             return (
               <div key={t._id} className="card glow-border p-5">
@@ -102,6 +103,7 @@ export default function TradePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-3">
                       <span className="font-bold text-slate-900">{t.symbol}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${mkt.className}`}>{mkt.label}</span>
                       <span className={`px-2 py-0.5 rounded text-xs font-bold ${badge.className}`}>{badge.label}</span>
                       {t.source === 'manual' && (
                         <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-600">Manual</span>

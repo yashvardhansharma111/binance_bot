@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, RefreshCw, BarChart2, Filter, Calendar } from 'lucide-react';
+import { marketBadge } from '@/lib/tradeDisplay';
 
 const SIDES = ['ALL', 'BUY', 'SELL'];
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -158,9 +159,12 @@ export default function TradesPage() {
                   <tr key={trade._id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-4 font-mono font-semibold text-slate-900">{trade.symbol}</td>
                     <td className="px-5 py-4">
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        trade.side === 'BUY' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
-                      }`}>{trade.side}</span>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${marketBadge(trade).className}`}>{marketBadge(trade).label}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          trade.side === 'BUY' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'
+                        }`}>{trade.market === 'futures' && trade.positionSide ? `${trade.side} · ${trade.positionSide}${trade.leverage ? ` ${trade.leverage}x` : ''}` : trade.side}</span>
+                      </div>
                     </td>
                     <td className="px-5 py-4 text-slate-800">${trade.price?.toFixed(4)}</td>
                     <td className="px-5 py-4 text-slate-600">{trade.qty}</td>

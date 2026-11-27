@@ -29,6 +29,137 @@ function NumberInput({ value, onChange, min, max, step = 0.1, suffix }) {
   );
 }
 
+const FUT_TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h'];
+
+function Switch({ on, onClick, color = '#2563eb', label }) {
+  return (
+    <button onClick={onClick} className="relative inline-flex items-center gap-3 cursor-pointer select-none">
+      <div className="relative w-11 h-6 rounded-full transition-colors duration-200" style={{ background: on ? color : '#cbd5e1' }}>
+        <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+          style={{ transform: on ? 'translateX(20px)' : 'translateX(0)' }} />
+      </div>
+      <span className="text-sm font-semibold" style={{ color: on ? color : '#94a3b8' }}>{label}</span>
+    </button>
+  );
+}
+
+/** Futures has its own config (Binance USDⓈ-M, isolated, one-way) — independent of the Spot tab. */
+function FuturesPanel({ f, setF, addFut, setAddFut }) {
+  if (!f) return null;
+  const lev   = f.leverage || 3;
+  const maxSl = parseFloat(((100 / lev - 0.5) * 0.8).toFixed(2));
+  const slBad = !(f.stopLossPercent > 0 && f.stopLossPercent <= maxSl);
+  const AMBER = '#d97706';
+  return (
+    <>
+      <div className="card glow-border px-5 py-2">
+        <Row label="Futures trading" hint="Binance USDⓈ-M · isolated margin · one-way mode">
+          <Switch on={f.enabled} onClick={() => setF('enabled', !f.enabled)} color={AMBER}
+            label={f.enabled ? 'ON — bot opens futures trades' : 'OFF'} />
+        </Row>
+
+        <Row label="Futures pairs" hint="Max 10. Separate from your spot pairs.">
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {f.symbols.length === 0 && <span className="text-xs text-slate-400">No futures pairs yet</span>}
+              {f.symbols.map(sym => (
+                <span key={sym} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-mono font-semibold"
+                  style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309' }}>
+                  {sym}
+                  <button onClick={() => setF('symbols', f.symbols.filter(s => s !== sym))} className="hover:text-red-500 transition-colors ml-0.5">
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            {f.symbols.length < 10 && (
+              <div className="flex items-center gap-2">
+                <SymbolSearch value={addFut} onChange={setAddFut} size="sm" />
+                <button onClick={() => {
+                    const sym = (addFut || '').trim().toUpperCase();
+                    if (sym && !f.symbols.includes(sym)) setF('symbols', [...f.symbols, sym]);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold" style={{ background: AMBER, color: '#fff' }}>
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+            )}
+          </div>
+        </Row>
+
+        <Row label="Timeframe" hint="Candles the futures bot reads">
+          <div className="flex flex-wrap gap-1">
+            {FUT_TIMEFRAMES.map(tf => (
+              <button key={tf} onClick={() => setF('timeframe', tf)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                style={{ background: f.timeframe === tf ? '#fffbeb' : '#f8fafc', color: f.timeframe === tf ? AMBER : '#64748b',
+                  border: `1px solid ${f.timeframe === tf ? '#fde68a' : '#e2e8f0'}` }}>
+                {tf}
+              </button>
+            ))}
+          </div>
+        </Row>
+
+        <Row label="Margin per trade" hint={`Position size = margin × leverage (now $${(f.tradeUSDT * lev).toLocaleString()})`}>
+          <NumberInput value={f.tradeUSDT} onChange={v => setF('tradeUSDT', v)} min={5} max={100000} step={5} suffix="USDT" />
+        </Row>
+
+        <Row label="Leverage" hint="Isolated margin · max 20x. Higher leverage = closer liquidation.">
+          <div className="flex items-center gap-3">
+            <input type="range" min={1} max={20} step={1} value={lev}
+              onChange={e => setF('leverage', parseInt(e.target.value, 10))} className="w-40 accent-amber-500" />
+            <span className="w-12 text-center font-mono text-sm font-bold text-amber-600">{lev}x</span>
+          </div>
+        </Row>
+
+        <Row label="Allow shorts" hint="Open a SHORT on a SELL signal (only in a downtrend)">
+          <Switch on={f.allowShort} onClick={() => setF('allowShort', !f.allowShort)} color={AMBER} label={f.allowShort ? 'Long + Short' : 'Long only'} />
+        </Row>
+
+        <Row label="Stop loss" hint={`Always on in futures · max ${maxSl}% at ${lev}x`}>
+          <NumberInput value={f.stopLossPercent} onChange={v => setF('stopLossPercent', v)} min={0.1} max={maxSl} step={0.1} suffix="%" />
+        </Row>
+        <Row label="Take profit">
+          <NumberInput value={f.takeProfitPercent} onChange={v => setF('takeProfitPercent', v)} min={0.1} max={100} step={0.1} suffix="%" />
+        </Row>
+        <Row label="Trailing stop" hint="0 = off · only exits a trade that is in profit">
+          <NumberInput value={f.trailingStopPercent} onChange={v => setF('trailingStopPercent', v || 0)} min={0} max={20} step={0.1} suffix="%" />
+        </Row>
+        <Row label="Max loss" hint="0 = off · closes a position this far against you (price move)">
+          <NumberInput value={f.maxLossPercent} onChange={v => setF('maxLossPercent', v || 0)} min={0} max={100} step={0.5} suffix="%" />
+        </Row>
+
+        <Row label="Aggressive mode" hint="More entries, fewer filters — higher risk">
+          <Switch on={f.aggressiveMode} onClick={() => setF('aggressiveMode', !f.aggressiveMode)} color="#dc2626" label={f.aggressiveMode ? 'ON' : 'OFF'} />
+        </Row>
+        <Row label="AI sentiment filter" hint="Skip trades the AI reads as going the other way">
+          <Switch on={f.useGroqFilter} onClick={() => setF('useGroqFilter', !f.useGroqFilter)} label={f.useGroqFilter ? 'Enabled' : 'Disabled'} />
+        </Row>
+        <Row label="Pre-trade checklist" hint="10 cross-checks before every futures entry">
+          <div className="flex flex-wrap items-center gap-3">
+            <Switch on={f.entryChecklist} onClick={() => setF('entryChecklist', !f.entryChecklist)} color="#16a34a" label={f.entryChecklist ? 'On' : 'Off'} />
+            {f.entryChecklist && (
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                Must pass
+                <select value={f.checklistMinPass} onChange={e => setF('checklistMinPass', parseInt(e.target.value, 10))}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-sm">
+                  {[10, 9, 8, 7, 6].map(n => <option key={n} value={n}>{n}/10</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+        </Row>
+      </div>
+
+      <div className={`mt-4 rounded-xl border px-4 py-3 text-xs leading-relaxed ${slBad ? 'border-red-200 bg-red-50 text-red-600' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+        <strong>⚠ Futures risk:</strong> at {lev}x a {(100 / lev).toFixed(1)}% move against you liquidates the position.
+        Stop loss must be <strong>≤ {maxSl}%</strong> (now {f.stopLossPercent}%{slBad ? ' — too wide, lower it before saving' : ''}).
+        Needs a Binance key with <strong>Futures</strong> enabled, One-way mode, and USDT in the USDⓈ-M Futures wallet.
+      </div>
+    </>
+  );
+}
+
 export default function SettingsPage() {
   const [form,       setForm]       = useState(null);
   const [loading,    setLoading]    = useState(true);
@@ -39,6 +170,8 @@ export default function SettingsPage() {
   const [balLoading, setBalLoading] = useState(false);
   const [addSymbol,  setAddSymbol]  = useState('ETHUSDT');
   const [expandedSym, setExpandedSym] = useState(null);
+  const [tab,        setTab]        = useState('spot');
+  const [addFut,     setAddFut]     = useState('BTCUSDT');
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => { setForm(d); setLoading(false); });
@@ -68,6 +201,7 @@ export default function SettingsPage() {
   }
 
   function set(key, val) { setForm(f => ({ ...f, [key]: val })); }
+  function setF(key, val) { setForm(f => ({ ...f, futures: { ...f.futures, [key]: val } })); }
 
   function getSymCfg(sym) {
     return form.symbolConfigs?.find(c => c.symbol === sym) || {};
@@ -159,64 +293,44 @@ export default function SettingsPage() {
 
       <AccountModeCard />
 
-      {/* Trading mode */}
-      <div className="card glow-border px-5 py-2 mb-5">
-        <Row label="Trading Mode" hint="Applies to NEW trades. Open positions keep being managed either way.">
-          <div className="inline-flex rounded-lg bg-slate-100 p-1">
-            {[['spot', 'Spot'], ['futures', 'Futures']].map(([val, label]) => (
-              <button key={val} onClick={() => set('tradingMode', val)}
-                className="px-4 py-1.5 rounded-md text-sm font-semibold transition-all"
+      {/* Market tabs — Spot and Futures have separate configs and can run together */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg bg-slate-100 p-1">
+          {[['spot', 'Spot'], ['futures', 'Futures']].map(([val, label]) => {
+            const on = val === 'spot' ? form.spotEnabled !== false : !!form.futures?.enabled;
+            return (
+              <button key={val} onClick={() => setTab(val)}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-semibold transition-all"
                 style={{
-                  background: (form.tradingMode || 'spot') === val ? 'white' : 'transparent',
-                  color: (form.tradingMode || 'spot') === val ? (val === 'futures' ? '#d97706' : '#2563eb') : '#64748b',
-                  boxShadow: (form.tradingMode || 'spot') === val ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  background: tab === val ? 'white' : 'transparent',
+                  color: tab === val ? (val === 'futures' ? '#d97706' : '#2563eb') : '#64748b',
+                  boxShadow: tab === val ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                 }}>
                 {label}
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${on ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                  {on ? 'ON' : 'OFF'}
+                </span>
               </button>
-            ))}
-          </div>
-        </Row>
-
-        {form.tradingMode === 'futures' && (() => {
-          const lev   = form.futuresLeverage || 3;
-          const maxSl = parseFloat(((100 / lev - 0.5) * 0.8).toFixed(2));
-          const slBad = !(form.stopLossPercent > 0 && form.stopLossPercent <= maxSl);
-          return (
-            <>
-              <Row label="Leverage" hint={`Isolated margin · max ${20}x. Higher leverage = closer liquidation.`}>
-                <div className="flex items-center gap-3">
-                  <input type="range" min={1} max={20} step={1} value={lev}
-                    onChange={e => set('futuresLeverage', parseInt(e.target.value, 10))}
-                    className="w-40 accent-amber-500" />
-                  <span className="w-12 text-center font-mono text-sm font-bold text-amber-600">{lev}x</span>
-                </div>
-              </Row>
-              <Row label="Allow Shorts" hint="Open a SHORT on a SELL signal (only in a downtrend)">
-                <button onClick={() => set('futuresAllowShort', form.futuresAllowShort === false)}
-                  className="relative inline-flex items-center gap-3 cursor-pointer select-none">
-                  <div className="relative w-11 h-6 rounded-full transition-colors duration-200"
-                    style={{ background: form.futuresAllowShort !== false ? '#d97706' : '#cbd5e1' }}>
-                    <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
-                      style={{ transform: form.futuresAllowShort !== false ? 'translateX(20px)' : 'translateX(0)' }} />
-                  </div>
-                  <span className="text-sm font-semibold" style={{ color: form.futuresAllowShort !== false ? '#d97706' : '#94a3b8' }}>
-                    {form.futuresAllowShort !== false ? 'Long + Short' : 'Long only'}
-                  </span>
-                </button>
-              </Row>
-              <div className={`my-3 rounded-lg border px-3 py-2.5 text-xs leading-relaxed ${slBad ? 'border-red-200 bg-red-50 text-red-600' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                <strong>⚠ Futures risk:</strong> at {lev}x a {(100 / lev).toFixed(1)}% move against you liquidates the position.
-                Stop loss must be <strong>≤ {maxSl}%</strong> (now {form.stopLossPercent}%{slBad ? ' — too wide, lower it before saving' : ''}).
-                Stop loss is always ON in futures. &quot;Trade Size&quot; is the margin per trade
-                (position = margin × {lev}). Needs a Binance key with <strong>Futures</strong> enabled, One-way mode, and USDT in the USDⓈ-M Futures wallet.
-              </div>
-            </>
-          );
-        })()}
+            );
+          })}
+        </div>
+        <span className="text-xs text-slate-500">
+          {form.spotEnabled === false && !form.futures?.enabled
+            ? '⚠ Both are OFF — the bot will not open new trades.'
+            : 'Each market has its own settings. When both are ON the bot trades both.'}
+        </span>
       </div>
 
+      {tab === 'futures' && <FuturesPanel f={form.futures} setF={setF} addFut={addFut} setAddFut={setAddFut} />}
+
+      {tab === 'spot' && (<>
       {/* Settings */}
       <div className="card glow-border px-5 py-2">
+        <Row label="Spot trading" hint="Buy and sell coins on spot with the settings below">
+          <Switch on={form.spotEnabled !== false} onClick={() => set('spotEnabled', form.spotEnabled === false)}
+            label={form.spotEnabled !== false ? 'ON — bot opens spot trades' : 'OFF'} />
+        </Row>
+
         <Row label="Trading Pairs" hint={`Bot trades all listed pairs (max 10). Each pair runs independently.`}>
           <div className="space-y-2">
             {/* Active symbol chips */}
@@ -526,6 +640,7 @@ export default function SettingsPage() {
           SL <strong>{form.stopLossPercent}%</strong> · TP <strong>{form.takeProfitPercent}%</strong> · <strong>${form.tradeUSDT ?? 50}</strong> per trade · <strong>{form.symbols?.length || 1}</strong> pair{(form.symbols?.length || 1) !== 1 ? 's' : ''}.
         </span>
       </div>
+      </>)}
     </div>
   );
 }

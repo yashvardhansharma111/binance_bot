@@ -12,6 +12,7 @@ import * as fx from '@/bot/services/binanceFutures';
 import { calculateIndicators, detectSignal } from '@/bot/services/indicators';
 import { getSentiment } from '@/bot/services/sentiment';
 import { runChecklist, checklistIndicators } from '@/bot/engine/checklist';
+import { spotEnabled, futuresConfig, futuresView } from '@/lib/marketSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,10 @@ export async function GET(req) {
   if (!/^[A-Z0-9]{2,20}$/.test(symbol)) return NextResponse.json({ error: 'Invalid symbol' }, { status: 400 });
 
   const marketFilter = futures ? { market: 'futures' } : { market: { $ne: 'futures' } };
-  const settings = (await BotSettings.findOne({ userId: user._id }).lean()) || {};
+  const raw = (await BotSettings.findOne({ userId: user._id }).lean()) || {};
+  // Bot view uses the config of the market being charted (Spot and Futures are separate).
+  const settings = futures ? futuresView(raw) : raw;
+  const marketOn = futures ? futuresConfig(raw).enabled : spotEnabled(raw);
 
   const tradeDocs = await Trade.find({ userId: user._id, symbol, ...marketFilter, ...tradeScope(user) })
     .sort({ createdAt: -1 }).limit(150)
@@ -89,7 +93,7 @@ export async function GET(req) {
         checklistOn: settings.entryChecklist === true, minPass: settings.checklistMinPass ?? 10,
         checklist: checklist.checks, passed: checklist.passed, total: checklist.total, wouldTrade: checklist.ok && signal !== 'HOLD',
         sentiment: sentiment ? { sentiment: sentiment.sentiment, confidence: sentiment.confidence, reason: sentiment.reason } : null,
-        aggressive: !!settings.aggressiveMode, tradingMode: settings.tradingMode || 'spot',
+        aggressive: !!settings.aggressiveMode, marketOn,
       };
     }
   } catch (e) {

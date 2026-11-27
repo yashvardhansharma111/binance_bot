@@ -9,7 +9,7 @@ import {
   Zap, AlertTriangle, LogOut,
 } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
-import { fetchLivePrices, priceKey, unrealized, sideBadge } from '@/lib/tradeDisplay';
+import { fetchLivePrices, priceKey, unrealized, sideBadge, marketBadge } from '@/lib/tradeDisplay';
 import { motion } from 'motion/react';
 
 const LEVERAGES = [1, 2, 3, 5, 10, 20, 50, 75, 100, 125];
@@ -440,11 +440,13 @@ function QuickTrade({ balances, onTradeComplete }) {
               const { pnl, pnlPct } = unrealized(t, live);
               const up     = pnl !== null && pnl >= 0;
               const badge  = sideBadge(t);
+              const mkt    = marketBadge(t);
               return (
                 <div key={t._id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-slate-100 bg-slate-50">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-xs font-bold text-slate-900">{t.symbol}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${mkt.className}`}>{mkt.label}</span>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${badge.className}`}>{badge.label}</span>
                       {t.source === 'bot' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-50 text-violet-600">Bot</span>}
                     </div>
