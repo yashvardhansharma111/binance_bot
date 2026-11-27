@@ -76,7 +76,7 @@ export default function DemoBanner() {
       <span className="flex items-center gap-1.5 font-bold uppercase tracking-wide">
         {wallet ? <Wallet size={14} /> : <FlaskConical size={14} />} {wallet ? 'Wallet credits' : 'Demo mode'}
       </span>
-      <span>{wallet ? 'Admin-funded credits · real prices · not withdrawable' : 'Virtual funds · real prices · no real orders'}</span>
+      <span>{wallet ? 'Wallet credits · real prices · withdraw with admin approval' : 'Virtual funds · real prices · no real orders'}</span>
       <span className="font-mono font-semibold">Equity {money(d.equity)}</span>
       {(!wallet || d.startingBalance > 0) && (
         <span className="font-mono font-semibold" style={{ color: up ? '#16a34a' : '#dc2626' }}>
@@ -146,7 +146,7 @@ export function AccountModeCard() {
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <Wallet size={13} className="text-violet-500" />
           TrickyX Wallet Balance: <strong className="font-mono text-slate-700">{money(d.wallet?.usdt)}</strong>
-          <span className="text-slate-400">· {money(d.wallet?.totalCredited)} added in total · virtual, cannot be withdrawn</span>
+          <span className="text-slate-400">· {money(d.wallet?.totalCredited)} added in total · withdraw with admin approval</span>
           <Link href="/dashboard/wallet" className="ml-auto font-semibold text-violet-600 hover:text-violet-700">Open Wallet →</Link>
         </div>
         {d.wallet?.credits?.length > 0 && (

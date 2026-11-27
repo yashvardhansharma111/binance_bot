@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Wallet, RefreshCw, Gift, TrendingUp, TrendingDown, Coins, CheckCircle2, Activity } from 'lucide-react';
+import { Wallet, RefreshCw, Gift, TrendingUp, TrendingDown, Coins, CheckCircle2, Activity, ArrowDownToLine } from 'lucide-react';
 import { switchAccount } from '@/components/DemoBanner';
 
 const money = (n) => `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -22,6 +22,79 @@ function Stat({ label, value, sub, tone = 'text-slate-900', Icon }) {
 function sideLabel(t) {
   if (t.market === 'futures') return `${t.positionSide || (t.side === 'BUY' ? 'LONG' : 'SHORT')}${t.leverage ? ` ${t.leverage}x` : ''}`;
   return t.side;
+}
+
+const STATUS_STYLE = {
+  pending: 'bg-amber-50 text-amber-700',
+  approved: 'bg-emerald-50 text-emerald-700',
+  rejected: 'bg-red-50 text-red-600',
+};
+
+/** Free wallet USDT → Asset Balance, approved by the admin. */
+function WithdrawCard({ onDone }) {
+  const [p, setP] = useState(null);
+  const [amount, setAmount] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = () => fetch('/api/wallet/payout').then(r => (r.ok ? r.json() : null)).then(setP).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!p || !p.enabled) return null;
+  const amt = Math.floor((parseFloat(amount) || 0) * 100) / 100;
+  const blocked = p.hasPending || p.available < p.minPayout;
+
+  async function request() {
+    if (!window.confirm(`Withdraw $${amt.toFixed(2)} from your wallet?\n\nIt leaves your wallet now and goes to your Asset Balance once the admin approves. If it is rejected it comes back to the wallet.`)) return;
+    setBusy(true); setMsg('');
+    try {
+      const res = await fetch('/api/wallet/payout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: amt }) });
+      const r = await res.json();
+      if (!res.ok) throw new Error(r.error || 'Request failed');
+      setMsg(`✓ Requested — ${money(r.payout.creditAmount)} goes to your Asset Balance after admin approval`);
+      setAmount('');
+      await load(); await onDone();
+    } catch (e) { setMsg(`✗ ${e.message}`); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="card glow-border mb-5 px-5 py-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <ArrowDownToLine size={16} className="text-emerald-600" />
+        <h2 className="text-sm font-bold text-slate-800">Withdraw from wallet</h2>
+        <span className="ml-auto text-xs text-slate-500">Available: <strong className="font-mono text-slate-700">{money(p.available)}</strong></span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input type="number" min={p.minPayout} step="0.01" value={amount} onChange={e => setAmount(e.target.value)}
+          placeholder={`Min ${money(p.minPayout)}`} disabled={blocked}
+          className="input min-w-0 flex-1 py-1.5 font-mono text-sm disabled:opacity-50" style={{ width: 'auto', maxWidth: 200 }} />
+        <button onClick={() => setAmount(String(p.available))} disabled={blocked}
+          className="text-xs font-semibold text-emerald-700 disabled:opacity-40">Max</button>
+        <button onClick={request} disabled={busy || blocked || amt < p.minPayout || amt > p.available}
+          className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-40">
+          {busy ? <RefreshCw size={11} className="animate-spin" /> : <ArrowDownToLine size={11} />} Request withdrawal
+        </button>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+        Goes to your Asset Balance after the admin approves. From there you can withdraw to your crypto wallet on the{' '}
+        <Link href="/dashboard/referral" className="font-semibold text-blue-600">Referral → Withdraw</Link> page. Money in open positions can&apos;t be withdrawn.
+        {p.hasPending && <span className="text-amber-600"> A request is waiting for approval.</span>}
+      </p>
+      {msg && <p className="mt-1 text-xs font-medium text-slate-600">{msg}</p>}
+      {p.requests.length > 0 && (
+        <ul className="mt-2 divide-y divide-slate-100">
+          {p.requests.slice(0, 5).map(r => (
+            <li key={r._id} className="flex items-center justify-between gap-3 py-2 text-xs">
+              <div className="min-w-0">
+                <div className="font-mono text-slate-700">{money(r.amount)}</div>
+                <div className="break-words text-[11px] text-slate-400">{date(r.createdAt)}{r.note ? ` · ${r.note}` : ''}</div>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${STATUS_STYLE[r.status] || ''}`}>{r.status}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export default function WalletPage() {
@@ -58,7 +131,7 @@ export default function WalletPage() {
             <Wallet size={20} className="text-violet-500" /> Wallet
           </h1>
           <p className="mt-0.5 text-xs text-slate-500 lg:text-sm">
-            Trading credits added by the admin · real market prices · virtual, cannot be withdrawn
+            Trading credits added by the admin · real market prices · withdraw to your Asset Balance with admin approval
           </p>
         </div>
         <button onClick={load} className="btn-outline flex items-center gap-2 px-3 py-2 text-sm">
@@ -116,6 +189,8 @@ export default function WalletPage() {
             <Stat label="Credits received" value={money(d.totalCredited)}
               sub={d.totalDebited ? `${money(d.totalDebited)} deducted` : `${d.closedTrades} closed trade${d.closedTrades === 1 ? '' : 's'}`} Icon={Gift} />
           </div>
+
+          <WithdrawCard onDone={load} />
 
           <div className="grid gap-5 lg:grid-cols-2">
             {/* Credits history */}

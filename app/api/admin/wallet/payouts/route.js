@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import User from '@/lib/models/User';
 import WalletAccount from '@/lib/models/WalletAccount';
 import WalletPayout from '@/lib/models/WalletPayout';
+import Trade from '@/lib/models/Trade';
 import { getAdmin } from '@/lib/adminBots';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,31 @@ export async function GET(req) {
   const filter = status === 'all' ? {} : { status };
   const rows = await WalletPayout.find(filter).sort({ createdAt: status === 'pending' ? 1 : -1 }).limit(100)
     .populate('userId', 'name email').lean();
-  return NextResponse.json({ payouts: rows });
+
+  // Wallet history next to each request, so the admin can judge it (e.g. bonus-only farming).
+  const ids = [...new Set(rows.map(r => String(r.userId?._id)).filter(Boolean))].map(id => new mongoose.Types.ObjectId(id));
+  const [accts, tradeAgg, paidAgg] = await Promise.all([
+    WalletAccount.find({ userId: { $in: ids } }).lean(),
+    Trade.aggregate([
+      { $match: { userId: { $in: ids }, demo: true, virtualAccount: 'wallet', status: 'closed',
+        $or: [{ market: { $ne: 'futures' }, side: 'BUY' }, { market: 'futures', side: 'BUY', positionSide: 'LONG' }, { market: 'futures', side: 'SELL', positionSide: 'SHORT' }] } },
+      { $group: { _id: '$userId', trades: { $sum: 1 }, pnl: { $sum: '$profit' } } },
+    ]),
+    WalletPayout.aggregate([
+      { $match: { userId: { $in: ids }, status: 'approved' } },
+      { $group: { _id: '$userId', paid: { $sum: '$creditAmount' } } },
+    ]),
+  ]);
+  const by = (arr, key = '_id') => Object.fromEntries(arr.map(x => [String(x[key]), x]));
+  const A = by(accts, 'userId'), T = by(tradeAgg), PD = by(paidAgg);
+  const payouts = rows.map(r => {
+    const k = String(r.userId?._id);
+    return { ...r, history: {
+      credited: A[k]?.totalCredited || 0, debited: A[k]?.totalDebited || 0, walletUsdt: A[k]?.usdt || 0,
+      trades: T[k]?.trades || 0, tradingPnl: T[k]?.pnl || 0, paidBefore: PD[k]?.paid || 0,
+    } };
+  });
+  return NextResponse.json({ payouts });
 }
 
 /**

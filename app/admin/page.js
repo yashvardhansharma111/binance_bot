@@ -12,6 +12,7 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_fee_pct', label: 'Platform Fee %', value: 2 },
   { key: 'min_asset_balance', label: 'Min Asset Balance ($)', value: 100 },
   { key: 'trading_symbol', label: 'Default Trading Symbol', value: 'BTCUSDT' },
+  { key: 'wallet_payout_min', label: 'Wallet min withdrawal ($)', value: 10 },
 ];
 
 function StatCard({ label, value, icon: Icon, iconBg, iconColor, prefix = '', suffix = '' }) {
@@ -485,8 +486,8 @@ export default function AdminPage() {
     const who = p.userId?.email || 'user';
     const note = window.prompt(
       action === 'approve'
-        ? `Approve payout for ${who}?\n$${p.creditAmount.toFixed(2)} will be added to their Asset Balance (real money).\n\nNote (optional):`
-        : `Reject payout for ${who}?\n${p.amount.toFixed(2)} goes back to their wallet.\n\nReason (optional):`,
+        ? `Approve wallet withdrawal for ${who}?\n$${p.creditAmount.toFixed(2)} will be added to their Asset Balance — real money they can then withdraw.\n\nNote (optional):`
+        : `Reject wallet withdrawal for ${who}?\n$${p.amount.toFixed(2)} goes back to their wallet.\n\nReason (optional):`,
       '');
     if (note === null) return;
     setPayoutBusy(p._id);
@@ -601,12 +602,12 @@ export default function AdminPage() {
             <StatCard label="Blocked Users"  value={stats?.blockedUsers} icon={UserX}    iconBg="#fef2f2" iconColor="#dc2626" />
           </div>
 
-          {/* Wallet payout requests — payouts are switched off; shown only to decide any left from before */}
-          {isAdmin && payouts.length > 0 && (
+          {/* Wallet withdrawal requests — every one is real money from the platform, so it needs an admin decision */}
+          {isAdmin && (
             <div className="card glow-border mb-6 p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-bold text-slate-900">
-                  Wallet payout requests {payouts.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">{payouts.length} pending</span>}
+                  Wallet withdrawal requests {payouts.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">{payouts.length} pending</span>}
                 </h2>
                 <button onClick={loadPayouts} className="text-xs font-semibold text-slate-500 hover:text-slate-700">
                   <RefreshCw size={12} className="inline" /> Refresh
@@ -620,9 +621,18 @@ export default function AdminPage() {
                     <div key={p._id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold text-slate-800">{p.userId?.name || '—'} <span className="font-normal text-slate-500">{p.userId?.email}</span></div>
-                        <div className="text-xs text-slate-500">
-                          {new Date(p.createdAt).toLocaleString()} · wallet profit <span className="font-mono">{p.amount.toFixed(2)}</span> at {p.payoutPercent}%
-                        </div>
+                        <div className="text-xs text-slate-500">{new Date(p.createdAt).toLocaleString()}</div>
+                        {p.history && (
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                            <span>Credits in <strong className="font-mono text-slate-700">${p.history.credited.toFixed(2)}</strong></span>
+                            <span>Trades <strong className="text-slate-700">{p.history.trades}</strong></span>
+                            <span>Trading P&amp;L <strong className={`font-mono ${p.history.tradingPnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                              {p.history.tradingPnl >= 0 ? '+' : '−'}${Math.abs(p.history.tradingPnl).toFixed(2)}</strong></span>
+                            <span>Left in wallet <strong className="font-mono text-slate-700">${p.history.walletUsdt.toFixed(2)}</strong></span>
+                            {p.history.paidBefore > 0 && <span>Withdrawn before <strong className="font-mono text-slate-700">${p.history.paidBefore.toFixed(2)}</strong></span>}
+                            {p.history.trades === 0 && <span className="font-semibold text-amber-600">⚠ no trades — credits only</span>}
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
                         <div className="font-mono text-base font-bold text-emerald-700">${p.creditAmount.toFixed(2)}</div>
