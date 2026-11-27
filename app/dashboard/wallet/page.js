@@ -128,14 +128,16 @@ export default function WalletPage() {
             {/* Credits history */}
             <div className="card glow-border p-5">
               <h2 className="mb-3 text-sm font-bold text-slate-800">Credits history</h2>
-              <ul className="space-y-2">
+              <ul className="divide-y divide-slate-100">
                 {d.credits.map(c => (
-                  <li key={c._id} className="flex items-center gap-3 text-sm">
-                    <span className={`w-24 shrink-0 font-mono font-semibold ${c.amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <li key={c._id} className="flex items-center justify-between gap-3 py-2.5">
+                    <div className="min-w-0">
+                      <div className="break-words text-sm text-slate-700">{c.note || (c.amount > 0 ? 'Credit from admin' : 'Deducted by admin')}</div>
+                      <div className="text-xs text-slate-400">{date(c.createdAt)}</div>
+                    </div>
+                    <span className={`shrink-0 font-mono text-sm font-semibold ${c.amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                       {c.amount > 0 ? '+' : '−'}{money(Math.abs(c.amount))}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-slate-600">{c.note || (c.amount > 0 ? 'Credit from admin' : 'Deducted by admin')}</span>
-                    <span className="shrink-0 text-xs text-slate-400">{date(c.createdAt)}</span>
                   </li>
                 ))}
               </ul>
@@ -147,19 +149,24 @@ export default function WalletPage() {
               {trades.length === 0 ? (
                 <p className="py-6 text-center text-sm text-slate-400">No trades yet{active ? ' — start the bot or place a trade.' : '.'}</p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="divide-y divide-slate-100">
                   {trades.slice(0, 15).map(t => {
                     const pnl = t.profit || 0;
                     return (
-                      <li key={t._id} className="flex items-center gap-2 text-sm">
-                        <span className="w-24 shrink-0 font-semibold text-slate-800">{t.symbol.replace('USDT', '')}</span>
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                          sideLabel(t).startsWith('SHORT') ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>{sideLabel(t)}</span>
-                        <span className="min-w-0 flex-1 truncate text-xs text-slate-400">@ {t.price?.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+                      <li key={t._id} className="flex items-center justify-between gap-3 py-2.5">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-semibold text-slate-800">{t.symbol.replace('USDT', '')}</span>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                              sideLabel(t).startsWith('SHORT') ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>{sideLabel(t)}</span>
+                          </div>
+                          <div className="truncate text-xs text-slate-400">
+                            @ {t.price?.toLocaleString(undefined, { maximumFractionDigits: 6 })} · {date(t.createdAt)}
+                          </div>
+                        </div>
                         {t.status === 'open'
-                          ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">open</span>
-                          : <span className={`font-mono text-xs font-semibold ${pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{pnl >= 0 ? '+' : '−'}{money(Math.abs(pnl))}</span>}
-                        <span className="w-16 shrink-0 text-right text-[11px] text-slate-400">{date(t.createdAt)}</span>
+                          ? <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-600">open</span>
+                          : <span className={`shrink-0 font-mono text-sm font-semibold ${pnl >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{pnl >= 0 ? '+' : '−'}{money(Math.abs(pnl))}</span>}
                       </li>
                     );
                   })}

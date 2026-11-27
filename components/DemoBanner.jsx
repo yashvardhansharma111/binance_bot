@@ -157,13 +157,16 @@ export function WalletPayoutPanel() {
       )}
       {msg && <div className="mt-1.5 text-xs font-medium text-slate-600">{msg}</div>}
       {p.requests.length > 0 && (
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-2 divide-y divide-violet-100">
           {p.requests.slice(0, 5).map(r => (
-            <li key={r._id} className="flex items-center gap-3 text-[11px] text-slate-500">
-              <span className="w-20 shrink-0">{new Date(r.createdAt).toLocaleDateString()}</span>
-              <span className="w-24 shrink-0 font-mono">{money(r.amount)} → {money(r.creditAmount)}</span>
-              <span className={`rounded-full px-2 py-0.5 font-semibold ${STATUS_STYLE[r.status]}`}>{r.status}</span>
-              {r.note && <span className="truncate">{r.note}</span>}
+            <li key={r._id} className="flex items-center justify-between gap-3 py-2 text-xs text-slate-500">
+              <div className="min-w-0">
+                <div className="font-mono text-slate-700">{money(r.amount)} → {money(r.creditAmount)}</div>
+                <div className="break-words text-[11px] text-slate-400">
+                  {new Date(r.createdAt).toLocaleDateString()}{r.note ? ` · ${r.note}` : ''}
+                </div>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${STATUS_STYLE[r.status]}`}>{r.status}</span>
             </li>
           ))}
         </ul>
@@ -221,12 +224,14 @@ export function AccountModeCard() {
         {d.wallet?.credits?.length > 0 && (
           <ul className="mt-2 space-y-1">
             {d.wallet.credits.map((c) => (
-              <li key={c._id} className="flex items-center gap-3 text-[11px] text-slate-500">
-                <span className="w-20 shrink-0">{new Date(c.createdAt).toLocaleDateString()}</span>
-                <span className={`w-20 shrink-0 font-mono font-semibold ${c.amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+              <li key={c._id} className="flex items-center justify-between gap-3 text-xs text-slate-500">
+                <div className="min-w-0">
+                  <div className="break-words text-slate-600">{c.note || (c.amount > 0 ? 'Credit from admin' : 'Debit by admin')}</div>
+                  <div className="text-[11px] text-slate-400">{new Date(c.createdAt).toLocaleDateString()}</div>
+                </div>
+                <span className={`shrink-0 font-mono font-semibold ${c.amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                   {c.amount > 0 ? '+' : '−'}{money(Math.abs(c.amount))}
                 </span>
-                <span className="truncate">{c.note || (c.amount > 0 ? 'Credit from admin' : 'Debit by admin')}</span>
               </li>
             ))}
           </ul>
