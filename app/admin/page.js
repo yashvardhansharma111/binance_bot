@@ -12,6 +12,9 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_fee_pct', label: 'Platform Fee %', value: 2 },
   { key: 'min_asset_balance', label: 'Min Asset Balance ($)', value: 100 },
   { key: 'trading_symbol', label: 'Default Trading Symbol', value: 'BTCUSDT' },
+  // Read by /api/wallet/payout — wallet-credit profit → Asset Balance
+  { key: 'wallet_payout_percent', label: 'Wallet profit payout % (0 = disabled)', value: 100 },
+  { key: 'wallet_payout_min', label: 'Wallet min payout ($)', value: 10 },
 ];
 
 function StatCard({ label, value, icon: Icon, iconBg, iconColor, prefix = '', suffix = '' }) {
@@ -37,6 +40,8 @@ export default function AdminPage() {
   const [stopAllLoading, setStopAllLoading] = useState(false);
   const [stopAllMsg, setStopAllMsg] = useState('');
   const [botBusyId, setBotBusyId] = useState(null);
+  const [payouts, setPayouts] = useState([]);
+  const [payoutBusy, setPayoutBusy] = useState(null);
   const [saving, setSaving] = useState('');
   const [grantingId, setGrantingId] = useState(null);
   const [grantDays, setGrantDays] = useState('30');
@@ -129,7 +134,7 @@ export default function AdminPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadPayouts(); }, []);
 
   async function searchUsers(q) {
     setUserSearch(q);
@@ -474,6 +479,34 @@ export default function AdminPage() {
     setBotBusyId(null);
   }
 
+  async function loadPayouts() {
+    const d = await fetch('/api/admin/wallet/payouts?status=pending').then(r => (r.ok ? r.json() : null)).catch(() => null);
+    setPayouts(d?.payouts || []);
+  }
+
+  async function decidePayout(p, action) {
+    const who = p.userId?.email || 'user';
+    const note = window.prompt(
+      action === 'approve'
+        ? `Approve payout for ${who}?\n$${p.creditAmount.toFixed(2)} will be added to their Asset Balance (real money).\n\nNote (optional):`
+        : `Reject payout for ${who}?\n${p.amount.toFixed(2)} goes back to their wallet.\n\nReason (optional):`,
+      '');
+    if (note === null) return;
+    setPayoutBusy(p._id);
+    try {
+      const res = await fetch('/api/admin/wallet/payouts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payoutId: p._id, action, note }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      await loadPayouts();
+    } catch (e) {
+      window.alert(e.message);
+    }
+    setPayoutBusy(null);
+  }
+
   async function refreshBotState() {
     const s = await fetch('/api/admin/stats').then(r => r.json()).catch(() => null);
     if (s && !s.error) setStats(s);
@@ -570,6 +603,46 @@ export default function AdminPage() {
             <StatCard label="Bots Running"   value={stats?.activeBots}  icon={Bot}       iconBg="#ecfeff" iconColor="#0891b2" />
             <StatCard label="Blocked Users"  value={stats?.blockedUsers} icon={UserX}    iconBg="#fef2f2" iconColor="#dc2626" />
           </div>
+
+          {/* Wallet payout requests */}
+          {isAdmin && (
+            <div className="card glow-border mb-6 p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-base font-bold text-slate-900">
+                  Wallet payout requests {payouts.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">{payouts.length} pending</span>}
+                </h2>
+                <button onClick={loadPayouts} className="text-xs font-semibold text-slate-500 hover:text-slate-700">
+                  <RefreshCw size={12} className="inline" /> Refresh
+                </button>
+              </div>
+              {payouts.length === 0 ? (
+                <p className="text-sm text-slate-400">No pending requests. Users can request a payout of the profit they make on wallet credits.</p>
+              ) : (
+                <div className="space-y-2">
+                  {payouts.map(p => (
+                    <div key={p._id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-slate-800">{p.userId?.name || '—'} <span className="font-normal text-slate-500">{p.userId?.email}</span></div>
+                        <div className="text-xs text-slate-500">
+                          {new Date(p.createdAt).toLocaleString()} · wallet profit <span className="font-mono">{p.amount.toFixed(2)}</span> at {p.payoutPercent}%
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono text-base font-bold text-emerald-700">${p.creditAmount.toFixed(2)}</div>
+                        <div className="text-[11px] text-slate-400">to Asset Balance</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => decidePayout(p, 'approve')} disabled={payoutBusy === p._id}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">Approve</button>
+                        <button onClick={() => decidePayout(p, 'reject')} disabled={payoutBusy === p._id}
+                          className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-600 disabled:opacity-50">Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Trade stats */}
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Trading</p>

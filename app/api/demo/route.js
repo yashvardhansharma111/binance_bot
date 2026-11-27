@@ -116,9 +116,21 @@ async function closeVirtualPositions(user, kind, label) {
   return open.length;
 }
 
-export async function GET() {
+export async function GET(req) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  // ?kind=wallet → everything the Wallet page needs, whatever mode the user is in.
+  if (new URL(req.url).searchParams.get('kind') === 'wallet') {
+    const [acct, credits, trades] = await Promise.all([
+      accountSummary(user._id, 'wallet'),
+      WalletTransaction.find({ userId: user._id }).sort({ createdAt: -1 }).limit(50)
+        .select('amount balanceAfter note createdAt').lean(),
+      Trade.find({ userId: user._id, ...virtualScope('wallet') }).sort({ createdAt: -1 }).limit(30)
+        .select('symbol side market positionSide leverage price qty total profit status source reason createdAt closedAt').lean(),
+    ]);
+    return NextResponse.json({ mode: user.tradingAccount || 'live', botActive: user.botActive, ...acct, credits, trades });
+  }
   return NextResponse.json(await summary(user));
 }
 
