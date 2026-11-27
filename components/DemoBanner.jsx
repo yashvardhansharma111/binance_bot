@@ -103,78 +103,6 @@ export default function DemoBanner() {
   );
 }
 
-const STATUS_STYLE = {
-  pending:  'bg-amber-50 text-amber-700',
-  approved: 'bg-emerald-50 text-emerald-700',
-  rejected: 'bg-red-50 text-red-600',
-};
-
-/** Turn wallet-credit profit into real Asset Balance (admin approves each request). */
-export function WalletPayoutPanel() {
-  const [p, setP] = useState(null);
-  const [amount, setAmount] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const load = () => fetch('/api/wallet/payout').then(r => (r.ok ? r.json() : null)).then(setP).catch(() => {});
-  useEffect(() => { load(); }, []);
-  if (!p) return null;
-
-  const amt = parseFloat(amount) || 0;
-  async function request() {
-    setBusy(true); setMsg('');
-    try {
-      const res = await fetch('/api/wallet/payout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: amt }) });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || 'Failed');
-      setMsg(`✓ Requested — ${money(d.payout.creditAmount)} goes to your Asset Balance once the admin approves`);
-      setAmount('');
-      await load();
-    } catch (e) { setMsg(`✗ ${e.message}`); }
-    setBusy(false);
-  }
-
-  return (
-    <div className="mt-3 rounded-lg border border-violet-100 bg-violet-50/40 px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-        <span>Wallet profit available: <strong className="font-mono text-emerald-700">{money(p.profitAvailable)}</strong></span>
-        <span className="text-slate-400">· paid out at {p.payoutPercent}% to Asset Balance · min {money(p.minPayout)} · admin approval</span>
-      </div>
-      {p.payoutPercent > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input type="number" min={p.minPayout} max={p.profitAvailable} step="0.01" value={amount}
-            onChange={e => setAmount(e.target.value)} placeholder={`${p.minPayout} – ${p.profitAvailable}`}
-            disabled={p.hasPending || p.profitAvailable < p.minPayout}
-            className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-sm disabled:opacity-50" />
-          <button onClick={() => setAmount(String(p.profitAvailable))} disabled={p.hasPending || p.profitAvailable < p.minPayout}
-            className="text-xs font-semibold text-violet-600 disabled:opacity-40">Max</button>
-          <button onClick={request} disabled={busy || p.hasPending || amt < p.minPayout || amt > p.profitAvailable}
-            className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40">
-            {busy ? <RefreshCw size={11} className="animate-spin" /> : <Rocket size={11} />} Request payout
-          </button>
-          {amt > 0 && <span className="text-xs text-slate-500">you receive {money(Math.floor(amt * p.payoutPercent) / 100)}</span>}
-          {p.hasPending && <span className="text-xs text-amber-600">A request is waiting for approval</span>}
-        </div>
-      )}
-      {msg && <div className="mt-1.5 text-xs font-medium text-slate-600">{msg}</div>}
-      {p.requests.length > 0 && (
-        <ul className="mt-2 divide-y divide-violet-100">
-          {p.requests.slice(0, 5).map(r => (
-            <li key={r._id} className="flex items-center justify-between gap-3 py-2 text-xs text-slate-500">
-              <div className="min-w-0">
-                <div className="font-mono text-slate-700">{money(r.amount)} → {money(r.creditAmount)}</div>
-                <div className="break-words text-[11px] text-slate-400">
-                  {new Date(r.createdAt).toLocaleDateString()}{r.note ? ` · ${r.note}` : ''}
-                </div>
-              </div>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 font-semibold ${STATUS_STYLE[r.status]}`}>{r.status}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 /** Account switch (Demo | Wallet | Live) + wallet credits for the Settings page. */
 export function AccountModeCard() {
   const d = useAccount();
@@ -218,9 +146,9 @@ export function AccountModeCard() {
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <Wallet size={13} className="text-violet-500" />
           TrickyX Wallet Balance: <strong className="font-mono text-slate-700">{money(d.wallet?.usdt)}</strong>
-          <span className="text-slate-400">· {money(d.wallet?.totalCredited)} credited in total · credits are not withdrawable, profit can be paid out</span>
+          <span className="text-slate-400">· {money(d.wallet?.totalCredited)} added in total · virtual, cannot be withdrawn</span>
+          <Link href="/dashboard/wallet" className="ml-auto font-semibold text-violet-600 hover:text-violet-700">Open Wallet →</Link>
         </div>
-        {(d.wallet?.totalCredited > 0) && <WalletPayoutPanel />}
         {d.wallet?.credits?.length > 0 && (
           <ul className="mt-2 space-y-1">
             {d.wallet.credits.map((c) => (

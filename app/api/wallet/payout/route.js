@@ -28,7 +28,7 @@ export async function GET() {
   ]);
   return NextResponse.json({
     profitAvailable: payoutableProfit(acct),
-    payoutPercent: cfg.percent, minPayout: cfg.min,
+    enabled: cfg.enabled, payoutPercent: cfg.percent, minPayout: cfg.min,
     hasPending: requests.some(r => r.status === 'pending'),
     requests,
   });

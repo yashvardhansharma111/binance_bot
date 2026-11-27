@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Activity, RefreshCw, TrendingUp, TrendingDown, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
-import WalletSwap from '@/components/WalletSwap';
 import { fetchLivePrices as getLivePrices, priceKey, unrealized, sideBadge } from '@/lib/tradeDisplay';
 
 export default function TradePage() {
@@ -66,11 +65,6 @@ export default function TradePage() {
         <button onClick={load} className="btn-outline py-2 px-4 flex items-center gap-2 text-sm">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
-      </div>
-
-      {/* On-chain manual swap — independent of the CEX positions below */}
-      <div className="mb-8 max-w-md">
-        <WalletSwap />
       </div>
 
       {exitError && (

@@ -12,9 +12,6 @@ const DEFAULT_CONFIGS = [
   { key: 'platform_fee_pct', label: 'Platform Fee %', value: 2 },
   { key: 'min_asset_balance', label: 'Min Asset Balance ($)', value: 100 },
   { key: 'trading_symbol', label: 'Default Trading Symbol', value: 'BTCUSDT' },
-  // Read by /api/wallet/payout — wallet-credit profit → Asset Balance
-  { key: 'wallet_payout_percent', label: 'Wallet profit payout % (0 = disabled)', value: 100 },
-  { key: 'wallet_payout_min', label: 'Wallet min payout ($)', value: 10 },
 ];
 
 function StatCard({ label, value, icon: Icon, iconBg, iconColor, prefix = '', suffix = '' }) {
@@ -604,8 +601,8 @@ export default function AdminPage() {
             <StatCard label="Blocked Users"  value={stats?.blockedUsers} icon={UserX}    iconBg="#fef2f2" iconColor="#dc2626" />
           </div>
 
-          {/* Wallet payout requests */}
-          {isAdmin && (
+          {/* Wallet payout requests — payouts are switched off; shown only to decide any left from before */}
+          {isAdmin && payouts.length > 0 && (
             <div className="card glow-border mb-6 p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-base font-bold text-slate-900">
@@ -616,7 +613,7 @@ export default function AdminPage() {
                 </button>
               </div>
               {payouts.length === 0 ? (
-                <p className="text-sm text-slate-400">No pending requests. Users can request a payout of the profit they make on wallet credits.</p>
+                <p className="text-sm text-slate-400">No pending requests.</p>
               ) : (
                 <div className="space-y-2">
                   {payouts.map(p => (

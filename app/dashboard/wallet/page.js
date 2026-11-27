@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Wallet, RefreshCw, Gift, TrendingUp, TrendingDown, Coins, CheckCircle2, Activity } from 'lucide-react';
-import { switchAccount, WalletPayoutPanel } from '@/components/DemoBanner';
+import { switchAccount } from '@/components/DemoBanner';
 
 const money = (n) => `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const date = (d) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
@@ -58,7 +58,7 @@ export default function WalletPage() {
             <Wallet size={20} className="text-violet-500" /> Wallet
           </h1>
           <p className="mt-0.5 text-xs text-slate-500 lg:text-sm">
-            Trading credits added by the admin · real market prices · credits are not withdrawable, profit can be paid out
+            Trading credits added by the admin · real market prices · virtual, cannot be withdrawn
           </p>
         </div>
         <button onClick={load} className="btn-outline flex items-center gap-2 px-3 py-2 text-sm">
@@ -115,13 +115,6 @@ export default function WalletPage() {
               Icon={up ? TrendingUp : TrendingDown} />
             <Stat label="Credits received" value={money(d.totalCredited)}
               sub={d.totalDebited ? `${money(d.totalDebited)} deducted` : `${d.closedTrades} closed trade${d.closedTrades === 1 ? '' : 's'}`} Icon={Gift} />
-          </div>
-
-          {/* Payout of profit to Asset Balance */}
-          <div className="card glow-border mb-5 px-5 py-4">
-            <h2 className="text-sm font-bold text-slate-800">Move profit to Asset Balance</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Only profit above your credits can be moved. Each request is approved by the admin.</p>
-            <WalletPayoutPanel />
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">

@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Key, Users, BarChart2, LogOut, Zap,
   ShieldCheck, Activity, LineChart, ArrowDownToLine,
   Menu, X, Crown, Settings2, Zap as Trade,
-  Sun, Moon, ArrowUpRight, UserCircle, LifeBuoy, Globe, Wallet,
+  Sun, Moon, ArrowUpRight, UserCircle, LifeBuoy, Globe, Wallet, Repeat,
 } from 'lucide-react';
 import { useTheme } from '@/app/ThemeContext';
 import { Sidebar, SidebarBody, SidebarLink, useSidebar } from '@/components/ui/sidebar';
@@ -20,6 +20,7 @@ const navItems = [
   { href: '/dashboard/bot',       label: 'Bot Monitor', Icon: Activity },
   { href: '/dashboard/chart',     label: 'Live Chart',  Icon: LineChart },
   { href: '/dashboard/trade',     label: 'Trade',       Icon: Trade },
+  { href: '/dashboard/swap',      label: 'Swap',        Icon: Repeat },
   { href: '/dashboard/trades',    label: 'History',     Icon: BarChart2 },
   { href: '/dashboard/wallet',    label: 'Wallet',      Icon: Wallet },
   { href: '/dashboard/settings',  label: 'Bot Config',  Icon: Settings2 },
@@ -201,6 +202,7 @@ export function MobileTopBar() {
   const drawerLinks = [
     { href: '/dashboard/trades',    label: 'History',   Icon: BarChart2 },
     { href: '/dashboard/wallet',    label: 'Wallet',    Icon: Wallet },
+    { href: '/dashboard/swap',      label: 'Swap',      Icon: Repeat },
     { href: '/dashboard/deposit',   label: 'Deposit',   Icon: ArrowDownToLine },
     { href: '/dashboard/subscribe', label: 'Subscribe', Icon: Crown },
     { href: '/dashboard/apikeys',   label: 'API Keys',  Icon: Key },
