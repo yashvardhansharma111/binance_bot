@@ -19,6 +19,7 @@ import Trade from '../../lib/models/Trade.js';
 import User from '../../lib/models/User.js';
 import { sendTradeEmail } from '../../lib/mail.js';
 import { settleDemoFutures } from '../services/demo.js';
+import { runChecklist, checklistIndicators, checklistSummary } from './checklist.js';
 
 const { MAX_FUTURES_LEVERAGE } = fx;
 const MIN_HOLD_FOR_SIGNAL_EXIT_MIN = 15;
@@ -270,6 +271,26 @@ export async function runFuturesEntries(ctx) {
             await log(userId, 'warn', `[${sym}] ⛔ ${direction} blocked — AI sentiment ${s.sentiment} (${s.confidence}%)`); continue;
           }
         }
+      }
+
+      // 10-point pre-trade checklist
+      if (settings.entryChecklist === true) {
+        const [h1, btcH1, btc24h] = await Promise.all([
+          fx.getFuturesCandles(sym, '1h', 220).catch(() => []),
+          sym === 'BTCUSDT' ? Promise.resolve(null) : fx.getFuturesCandles('BTCUSDT', '1h', 220).catch(() => null),
+          fx.getFutures24hChange('BTCUSDT'),
+        ]);
+        const sentiment = settings.useGroqFilter ? await getSentiment(sym, ind).catch(() => null) : null;
+        const ck = runChecklist({
+          direction, signal, ind: checklistIndicators(candles),
+          h1Closes: h1.map(c => c.close), btcH1Closes: btcH1 ? btcH1.map(c => c.close) : null, btc24h,
+          takeProfitPercent: sc.takeProfitPercent, sentiment, minPass: settings.checklistMinPass ?? 10,
+        });
+        if (!ck.ok) {
+          await log(userId, 'info', `[${sym}] 🔍 Checklist ${checklistSummary(ck)} — need ${settings.checklistMinPass ?? 10}, ${direction} skipped`);
+          continue;
+        }
+        await log(userId, 'info', `[${sym}] 🔍 Checklist ${checklistSummary(ck)} — cleared`);
       }
 
       // The bot may have been stopped (by the user or the admin) after this tick began.

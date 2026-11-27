@@ -454,6 +454,33 @@ export default function SettingsPage() {
             min={1} max={10} step={1} suffix="positions" />
         </Row>
 
+        <Row label="Pre-trade Checklist" hint="10 cross-checks before every new entry: signal, 1h trend, local trend, RSI turn, momentum, volume, volatility & fees, not chasing, BTC health, AI sentiment">
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={() => set('entryChecklist', form.entryChecklist !== true)}
+              className="relative inline-flex items-center gap-3 cursor-pointer select-none">
+              <div className="relative w-11 h-6 rounded-full transition-colors duration-200"
+                style={{ background: form.entryChecklist === true ? '#16a34a' : '#cbd5e1' }}>
+                <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                  style={{ transform: form.entryChecklist === true ? 'translateX(20px)' : 'translateX(0)' }} />
+              </div>
+              <span className="text-sm font-semibold" style={{ color: form.entryChecklist === true ? '#16a34a' : '#94a3b8' }}>
+                {form.entryChecklist === true ? 'On' : 'Off'}
+              </span>
+            </button>
+            {form.entryChecklist === true && (
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                Must pass
+                <select value={form.checklistMinPass ?? 10}
+                  onChange={e => set('checklistMinPass', parseInt(e.target.value, 10))}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 font-mono text-sm">
+                  {[10, 9, 8, 7, 6].map(n => <option key={n} value={n}>{n}/10</option>)}
+                </select>
+                <span className="text-xs text-slate-400">more = fewer, safer trades</span>
+              </label>
+            )}
+          </div>
+        </Row>
+
         <Row label="AI Sentiment Filter" hint="Use Groq AI to confirm buy signals">
           <button onClick={() => set('useGroqFilter', !form.useGroqFilter)}
             className="relative inline-flex items-center gap-3 cursor-pointer select-none">

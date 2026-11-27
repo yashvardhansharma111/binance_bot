@@ -24,7 +24,7 @@ export async function PUT(req) {
   const allowed = ['symbol','symbols','timeframe','tradeUSDT','stopLossPercent','takeProfitPercent',
                    'cooldownMinutes','maxDailyTrades','maxConcurrentTrades','useGroqFilter','aggressiveMode',
                    'trailingStopPercent','symbolConfigs','useStopLoss',
-                   'tradingMode','futuresLeverage','futuresAllowShort'];
+                   'tradingMode','futuresLeverage','futuresAllowShort','entryChecklist','checklistMinPass'];
   const update = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
@@ -69,6 +69,13 @@ export async function PUT(req) {
     update.futuresLeverage = lev;
   }
   if (update.futuresAllowShort !== undefined) update.futuresAllowShort = !!update.futuresAllowShort;
+  if (update.entryChecklist !== undefined) update.entryChecklist = !!update.entryChecklist;
+  if (update.checklistMinPass !== undefined) {
+    const n = Number(update.checklistMinPass);
+    if (!Number.isInteger(n) || n < 6 || n > 10)
+      return NextResponse.json({ error: 'Checklist must require 6–10 checks' }, { status: 400 });
+    update.checklistMinPass = n;
+  }
 
   await connectDB();
   const user = await User.findOne({ email: session.user.email });

@@ -17,6 +17,7 @@ import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/se
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
 import { openPosition, closePosition } from './executor.js';
 import { manageFuturesPositions, runFuturesEntries } from './futures.js';
+import { runChecklist, checklistIndicators, checklistSummary } from './checklist.js';
 import { demoFuturesVenue, tradeScope, virtualKindOf, virtualKey } from '../services/demo.js';
 import { liveFuturesVenue } from '../services/binanceFutures.js';
 import { decrypt } from '../../lib/encryption.js';
@@ -25,6 +26,33 @@ import BotSettings from '../../lib/models/BotSettings.js';
 import Trade from '../../lib/models/Trade.js';
 import BotLog from '../../lib/models/BotLog.js';
 import User from '../../lib/models/User.js';
+
+const sc0 = (settings, sym) => symCfg(settings, sym).takeProfitPercent;
+
+/** Market context shared by every symbol in one tick (BTC 1h trend + 24h move). */
+let btcCtxCache = { at: 0, closes: null, ch24: null };
+async function btcContext(getCandles) {
+  if (Date.now() - btcCtxCache.at < 60_000) return btcCtxCache;
+  const [h1, ch24] = await Promise.all([
+    getCandles('BTCUSDT', '1h', 220).catch(() => []),
+    get24hChange('BTCUSDT').catch(() => null),
+  ]);
+  btcCtxCache = { at: Date.now(), closes: h1.map(c => c.close), ch24 };
+  return btcCtxCache;
+}
+
+/** Runs the 10 checks for a spot entry. */
+async function preTradeChecklist(sym, direction, signal, candles, takeProfitPercent, settings, getCandles) {
+  const [h1, btc] = await Promise.all([getCandles(sym, '1h', 220).catch(() => []), btcContext(getCandles)]);
+  const sentiment = settings.useGroqFilter ? await getSentiment(sym, null).catch(() => null) : null;
+  return runChecklist({
+    direction, signal, ind: checklistIndicators(candles),
+    h1Closes: h1.map(c => c.close),
+    btcH1Closes: sym === 'BTCUSDT' ? null : btc.closes,
+    btc24h: btc.ch24,
+    takeProfitPercent, sentiment, minPass: settings.checklistMinPass ?? 10,
+  });
+}
 
 function symCfg(settings, sym) {
   const over = settings.symbolConfigs?.find(c => c.symbol === sym);
@@ -419,6 +447,17 @@ export async function runBotForUser(user) {
       if (signal === 'SELL') {
         await log(userId, 'info', `[${sym}] 🔴 SELL signal but no open position to close. Will watch for BUY next tick.`);
         continue;
+      }
+
+      // 10-point pre-trade checklist
+      if (settings.entryChecklist === true) {
+        const ck = await preTradeChecklist(sym, 'LONG', signal, candles, sc0(settings, sym), settings, getCandles, getCurrentPrice);
+        if (!ck.ok) {
+          tickResults.skipped.push(`${sym}(checklist ${ck.passed}/${ck.total})`);
+          await log(userId, 'info', `[${sym}] 🔍 Checklist ${checklistSummary(ck)} — need ${settings.checklistMinPass ?? 10}, BUY skipped`);
+          continue;
+        }
+        await log(userId, 'info', `[${sym}] 🔍 Checklist ${checklistSummary(ck)} — cleared`);
       }
 
       // Risk checks

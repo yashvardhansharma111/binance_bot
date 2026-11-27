@@ -9,6 +9,7 @@
 //   futures = long + short with funding.
 import { calculateIndicators, detectSignal, checkMacroTrend } from '../../bot/services/indicators.js';
 import { aggregate, MS } from './data.mjs';
+import { runChecklist, checklistIndicators } from '../../bot/engine/checklist.js';
 
 const DAY = 86_400_000;
 
@@ -21,6 +22,7 @@ export const RSI_DEFAULTS = {
   legacySymbol: 'BTCUSDT',       // settings.symbol — canTrade() counts open trades on THIS symbol only
   fee: 0.001,                    // Binance spot taker 0.1% per side
   startEquity: 10_000,
+  checklistMinPass: 0,           // 0 = off; otherwise require this many of the 10 pre-trade checks
 };
 
 export function simulateRsiBot(series, symbols, o = {}) {
@@ -109,6 +111,25 @@ export function simulateRsiBot(series, symbols, o = {}) {
       const sig = detectSignal(indAt(sym, i), false, true);
       if (sig !== 'BUY') continue;
 
+      if (o.checklistMinPass > 0) {
+        const hb2 = Math.floor(t / MS['1h']) * MS['1h'];
+        const h1 = (sy) => {
+          const hi2 = S[sy]?.hourIdx.get(hb2);
+          if (hi2 === undefined) return [];
+          const px = S[sy].c[S[sy].idx.get(t)]?.close;
+          return [...S[sy].hours.slice(Math.max(0, hi2 - 220), hi2).map(h => h.close), ...(px ? [px] : [])];
+        };
+        const btcI = S.BTCUSDT?.idx.get(t);
+        const btc24h = btcI !== undefined && btcI >= 288
+          ? ((S.BTCUSDT.c[btcI].close - S.BTCUSDT.c[btcI - 287].open) / S.BTCUSDT.c[btcI - 287].open) * 100 : null;
+        const res = runChecklist({
+          direction: 'LONG', signal: sig, ind: checklistIndicators(c.slice(i - 119, i + 1)),
+          h1Closes: h1(sym), btcH1Closes: sym === 'BTCUSDT' ? null : (S.BTCUSDT ? h1('BTCUSDT') : null), btc24h,
+          takeProfitPercent: o.takeProfitPercent, sentiment: null, minPass: o.checklistMinPass,
+        });
+        if (!res.ok) continue;
+      }
+
       // canTrade()
       if (lastTradeAt !== null && t - lastTradeAt < o.cooldownMinutes * 60_000) continue;
       const d = new Date(t).toISOString().slice(0, 10);
@@ -131,7 +152,7 @@ export function simulateRsiBot(series, symbols, o = {}) {
   }
 
   const openAtEnd = symbols.reduce((n, s) => n + open[s].length, 0);
-  return { name: 'RSI bot (current, 5m spot)', trades, equity, fees, funding: 0, openAtEnd, startEquity: o.startEquity };
+  return { name: o.checklistMinPass ? `RSI bot + checklist ${o.checklistMinPass}/10` : 'RSI bot (current, 5m spot)', trades, equity, fees, funding: 0, openAtEnd, startEquity: o.startEquity };
 }
 
 /* ═════════════════════════ trend following ═════════════════════════ */
