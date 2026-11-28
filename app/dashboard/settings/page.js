@@ -3,6 +3,26 @@ import { useEffect, useState } from 'react';
 import { Settings2, Save, RefreshCw, Wallet, TrendingUp, TrendingDown, Shield, Plus, X, Activity, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import SymbolSearch from '@/components/SymbolSearch';
 import { AccountModeCard } from '@/components/DemoBanner';
+import { riskRewardError } from '@/lib/marketSettings';
+
+/** Unsafe stop loss / take profit pairs in the form — same rule the bot and the API use. */
+function riskProblems(form) {
+  const out = [];
+  if (form.spotEnabled !== false && form.useStopLoss !== false) {
+    const sl = form.stopLossPercent, tp = form.takeProfitPercent;
+    const e = riskRewardError(sl, tp, 'Spot stop loss');
+    if (e) out.push(e);
+    for (const c of form.symbolConfigs || []) {
+      const ce = riskRewardError(c.stopLossPercent ?? sl, c.takeProfitPercent ?? tp, `${c.symbol} stop loss`);
+      if (ce) out.push(ce);
+    }
+  }
+  if (form.futures?.enabled) {
+    const fe = riskRewardError(form.futures.stopLossPercent, form.futures.takeProfitPercent, 'Futures stop loss');
+    if (fe) out.push(fe);
+  }
+  return out;
+}
 
 const TIMEFRAMES = ['1m','5m','15m','1h','4h'];
 
@@ -231,6 +251,7 @@ export default function SettingsPage() {
   );
 
   const usdt = balance?.balances?.find(b => b.asset === 'USDT');
+  const problems = riskProblems(form);
 
   return (
     <div className="max-w-2xl">
@@ -247,6 +268,16 @@ export default function SettingsPage() {
           {saved ? 'Saved!' : 'Save'}
         </button>
       </div>
+
+      {problems.length > 0 && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          <div className="flex items-center gap-2 font-bold"><Shield size={15} /> Unsafe stop loss / take profit — the bot will not open new trades</div>
+          <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-red-600">
+            {problems.map(p => <li key={p}>{p}</li>)}
+          </ul>
+          <p className="mt-1.5 text-xs text-red-500">Rule: stop loss at most 5%, and take profit at least equal to stop loss. Fix the values below and press Save. Open trades are not affected.</p>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">{error}</div>

@@ -5,7 +5,7 @@ import { connectDB } from '@/lib/db';
 import BotSettings from '@/lib/models/BotSettings';
 import User from '@/lib/models/User';
 import { maxFuturesStopLoss, MAX_FUTURES_LEVERAGE } from '@/bot/services/binanceFutures';
-import { spotEnabled, futuresConfig, TIMEFRAMES } from '@/lib/marketSettings';
+import { spotEnabled, futuresConfig, TIMEFRAMES, riskRewardError } from '@/lib/marketSettings';
 
 /** Settings JSON with the split config resolved, so the UI always gets spotEnabled + a full futures object. */
 function present(doc) {
@@ -46,6 +46,8 @@ function validateFutures(input, current) {
     return { error: `Futures at ${f.leverage}x: stop loss must be 0.1%–${maxSl}% so it triggers before liquidation. Lower the stop loss or the leverage.` };
   f.takeProfitPercent = num(f.takeProfitPercent);
   if (!(f.takeProfitPercent >= 0.1 && f.takeProfitPercent <= 100)) return { error: 'Futures take profit must be 0.1%–100%' };
+  const rr = riskRewardError(f.stopLossPercent, f.takeProfitPercent, 'Futures stop loss');
+  if (rr) return { error: rr };
   f.trailingStopPercent = num(f.trailingStopPercent) || 0;
   if (f.trailingStopPercent < 0 || f.trailingStopPercent > 20) return { error: 'Futures trailing stop must be 0–20%' };
   f.maxLossPercent = num(f.maxLossPercent) || 0;
@@ -109,6 +111,19 @@ export async function PUT(req) {
   await connectDB();
   const user = await User.findOne({ email: session.user.email });
   const current = (await BotSettings.findOne({ userId: user._id }).lean()) || {};
+
+  // Spot stop loss vs take profit (incl. per-symbol overrides), unless the stop loss is switched off.
+  const spotTouched = ['stopLossPercent', 'takeProfitPercent', 'symbolConfigs', 'useStopLoss'].some(k => update[k] !== undefined);
+  const merged = { ...current, ...update };
+  if (spotTouched && merged.useStopLoss !== false) {
+    const sl = merged.stopLossPercent ?? 2, tp = merged.takeProfitPercent ?? 4;
+    const err = riskRewardError(sl, tp, 'Spot stop loss');
+    if (err) return bad(err);
+    for (const c of merged.symbolConfigs || []) {
+      const e = riskRewardError(c.stopLossPercent ?? sl, c.takeProfitPercent ?? tp, `${c.symbol} stop loss`);
+      if (e) return bad(e);
+    }
+  }
 
   if (body.futures !== undefined) {
     const r = validateFutures(body.futures, futuresConfig(current));

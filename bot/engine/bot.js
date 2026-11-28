@@ -17,7 +17,7 @@ import { getSentiment, shouldBlock, shouldSellOnSentiment } from '../services/se
 import { canTrade, calcTradeAmount, checkExitConditions } from './risk.js';
 import { openPosition, closePosition } from './executor.js';
 import { manageFuturesPositions, runFuturesEntries } from './futures.js';
-import { spotEnabled, futuresConfig, futuresView } from '../../lib/marketSettings.js';
+import { spotEnabled, futuresConfig, futuresView, riskRewardError } from '../../lib/marketSettings.js';
 import { runChecklist, checklistIndicators, checklistSummary } from './checklist.js';
 import { demoFuturesVenue, tradeScope, virtualKindOf, virtualKey } from '../services/demo.js';
 import { liveFuturesVenue } from '../services/binanceFutures.js';
@@ -347,11 +347,11 @@ export async function runBotForUser(user) {
         continue;
       }
 
-      // ── Bear market guards (skipped in aggressive mode) ──────────────────
+      // ── Bear market guards — also in aggressive mode (aggressive only loosens the signal) ──
       let change24h = 0;
       let h1uptrend = true;
 
-      if (!aggressiveMode) {
+      {
         // Guard 1: 24h market change — block if coin dropped > 2% in last 24h
         change24h = await get24hChange(sym);
         if (change24h < -2) {
@@ -452,6 +452,17 @@ export async function runBotForUser(user) {
         continue;
       }
 
+      // Unsafe stop loss / take profit (e.g. SL 10% with TP 4%) — no new entries until fixed.
+      if (settings.useStopLoss !== false) {
+        const sc1 = symCfg(settings, sym);
+        const rr = riskRewardError(sc1.stopLossPercent, sc1.takeProfitPercent, 'Spot stop loss');
+        if (rr) {
+          tickResults.blocked.push(`${sym}(SL/TP)`);
+          await log(userId, 'error', `[${sym}] ⛔ BUY skipped — ${rr} (fix it in Settings → Spot)`);
+          continue;
+        }
+      }
+
       // 10-point pre-trade checklist
       if (settings.entryChecklist === true) {
         const ck = await preTradeChecklist(sym, 'LONG', signal, candles, sc0(settings, sym), settings, getCandles, getCurrentPrice);
@@ -473,7 +484,7 @@ export async function runBotForUser(user) {
 
       // Groq sentiment filter
       let sentiment = { sentiment: 'neutral', confidence: 50, reason: 'Filter off' };
-      if (settings.useGroqFilter && !aggressiveMode) {
+      if (settings.useGroqFilter) {
         sentiment = await getSentiment(sym, indicators);
         await log(userId, 'info', `[${sym}] 🧠 Sentiment: ${sentiment.sentiment} (${sentiment.confidence}%) — ${sentiment.reason}`);
         if (shouldBlock(signal, sentiment)) {

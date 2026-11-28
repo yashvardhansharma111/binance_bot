@@ -21,6 +21,7 @@ import User from '../../lib/models/User.js';
 import { sendTradeEmail } from '../../lib/mail.js';
 import { settleDemoFutures } from '../services/demo.js';
 import { runChecklist, checklistIndicators, checklistSummary } from './checklist.js';
+import { riskRewardError, MAX_SAME_DIRECTION_FUTURES } from '../../lib/marketSettings.js';
 
 const { MAX_FUTURES_LEVERAGE } = fx;
 const MIN_HOLD_FOR_SIGNAL_EXIT_MIN = 15;
@@ -220,7 +221,11 @@ export async function runFuturesEntries(ctx) {
   await log(userId, 'info',
     `💰 ${ctx.demo ? '[DEMO] ' : ''}Futures USDT available: $${balance.toFixed(2)} | ${leverage}x isolated | shorts ${allowShort ? 'ON' : 'OFF'} | ${symbols.join(', ')}`);
 
-  const openSyms = new Set((await Trade.find({ userId, status: 'open', market: 'futures', ...ctx.scope }).select('symbol').lean()).map(t => t.symbol));
+  const openPos  = await Trade.find({ userId, status: 'open', market: 'futures', ...ctx.scope }).select('symbol side positionSide').lean();
+  const openSyms = new Set(openPos.map(t => t.symbol));
+  // Alt-coins move together: 5 shorts at once is one big bet, not five. Cap same-direction exposure.
+  const dirCount = { LONG: 0, SHORT: 0 };
+  for (const t of openPos) dirCount[dirOf(t)]++;
   let placed = 0;
 
   for (const sym of symbols) {
@@ -245,11 +250,18 @@ export async function runFuturesEntries(ctx) {
       const direction = directionForSignal(signal, allowShort);
       if (!direction) { await log(userId, 'info', `[${sym}] FUTURES ${signal}${signal === 'SELL' ? ' (shorts off)' : ''} — RSI ${ind.rsi}, no entry`); continue; }
 
-      // Trend guards (mirror of spot's long-only guards).
-      if (direction === 'SHORT' && ind.macroUptrend && (!aggressive || settings.respectMacroInAggressive !== false)) {
+      const rr = riskRewardError(sc.stopLossPercent, sc.takeProfitPercent, 'Futures stop loss');
+      if (rr) { await log(userId, 'error', `[${sym}] ⛔ ${direction} skipped — ${rr} (fix it in Settings → Futures)`); continue; }
+      if (dirCount[direction] >= MAX_SAME_DIRECTION_FUTURES) {
+        await log(userId, 'info', `[${sym}] ⏸ ${direction} skipped — already ${dirCount[direction]} ${direction} positions open (max ${MAX_SAME_DIRECTION_FUTURES} in one direction)`);
+        continue;
+      }
+
+      // Trend guards — they apply in aggressive mode too (aggressive only loosens the entry signal).
+      if (direction === 'SHORT' && ind.macroUptrend) {
         await log(userId, 'info', `[${sym}] SHORT skipped — price above EMA100 (macro uptrend)`); continue;
       }
-      if (!aggressive) {
+      {
         const ch = await fx.getFutures24hChange(sym);
         if (direction === 'LONG' && ch < -2) { await log(userId, 'warn', `[${sym}] ⛔ LONG blocked — 24h ${ch.toFixed(2)}%`); continue; }
         if (direction === 'SHORT' && ch > 2) { await log(userId, 'warn', `[${sym}] ⛔ SHORT blocked — 24h +${ch.toFixed(2)}%`); continue; }
@@ -337,6 +349,7 @@ export async function runFuturesEntries(ctx) {
 
       balance -= margin;
       openSyms.add(sym);
+      dirCount[direction]++;
       placed++;
       if (!aggressive) break;   // respect cooldown: one entry per tick outside aggressive mode
     } catch (e) {
